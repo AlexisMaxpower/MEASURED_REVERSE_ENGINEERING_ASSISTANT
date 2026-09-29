@@ -16,27 +16,28 @@ Chat 2 не владеет shared contracts и не изменяет их без
 2. `ORCHESTRATOR_DIRECTIVE.md`;
 3. `core/contracts/mrea_contracts_v1.schema.json`;
 4. `core/contracts/POLICIES_V1.md`;
-5. canonical fixtures в `tests/fixtures/contracts/`.
+5. canonical fixtures в `tests/fixtures/contracts/`;
+6. актуальный Chat 6 pass plan / workflow.
 
-При конфликте локальной документации с canonical contract приоритет имеет `core/contracts/`.
+При конфликте локальной документации с canonical contract или активной директивой Chat 6 приоритет имеет canonical/Chat 6 source of truth.
 
 ## Структура
 
-- `src/physical_measurement/` — внутренняя реализация Chat 2;
-- `src/physical_measurement/boundary.py` — adapter internal Phase A → canonical shared contracts;
-- `tests/test_phase_a.py` — unit tests Phase A;
-- `tests/test_contract_boundary.py` — canonical contract/integration tests;
-- `pyproject.toml` — локальная Python/test configuration Chat 2;
-- `docs/CHAT_2_ROLE.md` — документация роли и границ ownership;
-- `docs/PHASE_A_MANUAL_MEASUREMENT.md` — реализованный Phase A baseline;
-- `docs/IMPLEMENTATION_REPORT_PHASE_A.md` — отчёт Phase A;
-- `docs/IMPLEMENTATION_REPORT_CANONICAL_BOUNDARY.md` — отчёт integration gate Chat 6.
+- `src/physical_measurement/models.py` — internal measurement domain;
+- `src/physical_measurement/service.py` — MeasurementSession application service;
+- `src/physical_measurement/hands_free.py` — provider-independent command parser + hands-free state machine;
+- `src/physical_measurement/boundary.py` — internal measurement → canonical shared-contract adapter;
+- `tests/test_phase_a.py` — manual baseline tests;
+- `tests/test_contract_boundary.py` — canonical boundary tests;
+- `tests/test_pass2_raw_output.py` — deterministic real raw IMAGE_PX output tests;
+- `tests/test_pass3_hands_free.py` — hands-free parser/state-transition tests;
+- `docs/BUILD_REUSE_CHECK_PASS_3.md` — Pass 3 dependency decision;
+- `docs/IMPLEMENTATION_REPORT_PASS_3.md` — Pass 3 implementation report;
+- `ORCHESTRATOR_HANDOFF.md` — final source-of-truth handoff for Chat 6 review.
 
 ## Текущее состояние
 
-### Phase A — implemented
-
-Реализован внутренний baseline:
+### Phase A manual baseline — accepted
 
 ```text
 MeasurementSession
@@ -48,48 +49,61 @@ MeasurementSession
 → USER_CONFIRMED verified measurement
 ```
 
-Candidate не может автоматически стать verified: confirmation выполнена отдельным явным state transition.
+Manual candidate не становится verified автоматически.
 
-### Canonical boundary — implemented
+### Canonical raw measurement boundary — accepted
 
-Выполнена директива Chat 6 `OD-2026-09-29-001`:
+Chat 2 сохраняет реальные image-space anchors как `IMAGE_PX`. `IMAGE_PX → MAT_XY_MM` normalization принадлежит Chat 3 и использует CapturePackage calibration.
 
-```text
-canonical CapturePackage
-→ Phase A MeasurementSession
-→ manual verified PhysicalMeasurement
-→ CanonicalMeasurementAdapter
-→ canonical MeasurementPackage
-→ JSON Schema validation
-```
+Canonical adapter сохраняет:
 
-Текущие внутренние manual anchors хранятся в пикселях, поэтому на shared boundary честно сериализуются как `IMAGE_PX`. Преобразование в `MAT_XY_MM` не выполняется без отдельного calibration-aware шага.
+- measurement type/value/unit;
+- provenance;
+- `view_id`;
+- reference frame через anchors;
+- evidence frame;
+- uncertainty/instrument;
+- explicit `verified` + `confirmation_source`.
 
-Adapter проверяет:
+### Pass 3 hands-free domain baseline — implementation
 
-- `CapturePackage.schema_version`;
-- совпадение `project_id`;
-- существование `view_id`;
-- соответствие `reference_frame_id` canonical clean reference frame;
-- существование `evidence_frame_id` в measurement frames, если evidence указан;
-- сохранение provenance и explicit confirmation;
-- формирование canonical `MeasurementPackage`.
+Активная директива: `OD-2026-09-29-003`.
 
-Локальная проверка этой итерации:
+Добавлен provider-independent workflow:
 
 ```text
-9 passed
+speech-provider text / OCR value / device value
+→ deterministic parser or direct candidate API
+→ unverified candidate
+→ explicit confirm / reject / correct
+→ verified measurement only after USER_CONFIRMED
 ```
 
-Contract test использует repository-owned:
+Поддерживаемый narrow command grammar включает:
 
-- `core/contracts/mrea_contracts_v1.schema.json`;
-- `tests/fixtures/contracts/capture_package_v1.json`.
+- `замер`;
+- `замер 42,18` / `замер 42.18`;
+- confirm;
+- reject;
+- correct.
+
+Неоднозначные числа и illegal state transitions fail-closed. Speech/OCR provider SDK в domain layer отсутствует.
+
+Manual entry остаётся fallback и может заменить pending reported candidate, но также требует explicit confirmation.
+
+## Truth / provenance invariants
+
+1. Voice/OCR/device output — candidate, не verified fact.
+2. Verification требует отдельного explicit user confirmation transition.
+3. Rejected candidate удаляется из active MeasurementSession.
+4. Correction создаёт новый measurement candidate ID и не наследует verified state.
+5. `VISION_DETECTED`, `AI_INFERRED` и derived provenance не принимаются как direct physical-measurement candidates.
+6. Evidence/reference/view linkage сохраняется.
+7. Raw image anchors остаются `IMAGE_PX`.
 
 ## Следующий рабочий порядок
 
-1. Перед новой итерацией перечитать `ORCHESTRATOR_DIRECTIVE.md`.
-2. Передать результат Chat 6 на integration acceptance.
-3. После принятия canonical boundary перейти к следующему gate, назначенному Orchestrator.
-4. Phase B snapping не начинать, если Chat 6 выдаст более приоритетную интеграционную задачу.
-5. Shared contracts не редактировать напрямую.
+1. Работать только по активной Chat 6 directive и своей pass branch.
+2. Не менять shared contracts/CI без approved Change Request.
+3. Перед handoff выполнить локальные tests и получить доступный GitHub CI evidence.
+4. `ORCHESTRATOR_HANDOFF.md` — последний commit прохода; после handoff branch freeze до `FIX_REQUIRED`.

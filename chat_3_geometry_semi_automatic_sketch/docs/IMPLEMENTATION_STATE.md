@@ -1,197 +1,170 @@
 # Chat 3 — Implementation State
 
-**Дата:** 2026-09-29  
+**Date:** 2026-09-29  
 **Repository:** `AlexisMaxpower/MEASURED_REVERSE_ENGINEERING_ASSISTANT`  
-**Active branch:** `chat-3/pass-2`  
+**Active branch:** `chat-3/pass-3`  
 **Role:** Chat 3 — Geometry & Semi-Automatic Sketch  
-**Active directive:** `OD-2026-09-29-002`  
-**Ring:** 2
+**Directive:** `OD-2026-09-29-003`  
+**Ring:** 3
 
-## Current status
+## Accepted baseline
 
-Round 1 deterministic FRONT pipeline retained. Chat 6 identified the real Chat 2 → Chat 3 integration gap: Chat 2 legitimately emits canonical anchors in `IMAGE_PX`, while Ring 1 `CanonicalInputAdapter` accepted only `MAT_XY_MM`.
+Ring 2 was accepted and merged by Chat 6. The real Chat 2 `IMAGE_PX` → Chat 3 `MAT_XY_MM` boundary is green and remains unchanged.
 
-Ring 2 closes that boundary before any OpenCV / primitive-extraction expansion.
+Existing accepted capabilities include:
 
-## Canonical inputs / output
-
-Inputs remain Integrator-owned:
-
-- `/core/contracts/mrea_contracts_v1.schema.json`;
-- `/core/contracts/POLICIES_V1.md`;
-- `CapturePackage v1`;
-- `MeasurementPackage v1`.
-
-Output remains:
-
-- `SketchPackage v1` in `MAT_XY_MM`.
-
-Shared contracts/fixtures are not modified by Chat 3.
-
-## Implemented through Ring 1
-
-- POINT / LINE / CIRCLE / ARC internal primitives;
-- `GeometryGraph`;
-- deterministic constraint candidates;
+- canonical CapturePackage / MeasurementPackage normalization;
+- calibrated homography application;
+- POINT / LINE / CIRCLE / ARC geometry models;
+- GeometryGraph;
 - measurement binding;
 - verified-vs-derived conflict visibility;
-- canonical `SketchPackageBuilder`;
-- deterministic entity/dimension ordering;
-- exact FRONT golden comparison;
-- JSON Schema validation;
-- preservation of canonical `measurement_id` links.
+- deterministic SketchPackage v1 generation;
+- canonical unresolved projection.
 
-## Ring 2 coordinate normalization
+## Ring 3 implemented
 
-`CanonicalInputAdapter` now supports both v1 coordinate spaces.
+### Real image candidate extraction
 
-### MAT_XY_MM
+Added `ImageGeometryExtractor` backed by `opencv-python-headless`.
 
-- passed through unchanged;
-- does not require homography lookup.
+Reliable v1 promotion currently covers:
 
-### IMAGE_PX
+- quadrilateral outer profiles → deterministic LINE candidates;
+- circular inner features → CIRCLE candidates;
+- controlled open circular components → ARC candidates.
 
-Adapter:
-
-1. verifies anchor view;
-2. verifies `reference_frame_id` equals selected view clean-reference `artifact_id`;
-3. requires calibration with `coordinate_system = MAT_XY_MM`;
-4. validates exactly 9 finite homography coefficients;
-5. rejects degenerate 3x3 matrix;
-6. applies projective homogeneous transform;
-7. performs safe divide by `w`;
-8. rejects non-finite/degenerate output;
-9. returns internal `Point2D` in `MAT_XY_MM`.
-
-No scale is guessed.
-
-## Traceability
-
-Internal `AnchorRef` now retains:
-
-- `anchor_id`;
-- normalized point;
-- `feature_id`;
-- `reference_frame_id`;
-- `source_coordinate_space`.
-
-Physical `measurement_id`, value/unit, `verified` and source/provenance remain unchanged by coordinate normalization.
-
-## Chat 2 integration specimen
-
-Added:
-
-`tests/fixtures/internal/chat2_image_px_measurement_package.json`
-
-It uses the same essential wire characteristics as actual Chat 2 canonical adapter output:
-
-- `IMAGE_PX`;
-- `feature_id = null`;
-- clean-reference `reference_frame_id`;
-- verified `MANUAL_MEASURED` measurement.
-
-The specimen itself validates against canonical `MeasurementPackage` schema.
-
-## Acceptance path now implemented
+All promoted image geometry uses:
 
 ```text
-Chat-2-style IMAGE_PX MeasurementPackage
+provenance = VISION_DETECTED
+```
+
+and confidence below 1.0.
+
+### Measurement truth
+
+Image geometry is candidate evidence only. Existing verified dimensions remain sourced from canonical measurements and are never rewritten by CV.
+
+The tested reference flow is:
+
+```text
+reference image + CapturePackage calibration
+        ↓
+ImageGeometryExtractor
+        ↓
+VISION_DETECTED primitives
         +
-CapturePackage with calibration/homography
-        ↓
-CanonicalInputAdapter
-        ↓
-MAT_XY_MM AnchorRef / MeasurementRef
+verified MeasurementPackage
         ↓
 GeometryPipeline
         ↓
-SketchPackageBuilder
+VisionGeometryPipeline / SketchPackageBuilder
         ↓
-schema-valid deterministic SketchPackage v1
+deterministic SketchPackage v1
 ```
+
+### Fail-closed behavior
+
+Unsupported or ambiguous observations remain explicit instead of becoming guessed geometry.
+
+Examples:
+
+- ambiguous significant outer contours;
+- unsupported outer contour shape;
+- non-circular inner contour;
+- non-circle-preserving projective transform for CIRCLE/ARC;
+- unreliable open-curve fit or coverage.
+
+Candidate issues are projected into canonical `SketchPackage.unresolved`.
+
+### Calibration semantics
+
+LINE points may use a valid projective homography.
+
+CIRCLE/ARC promotion requires a circle-preserving similarity transform because a general projective homography maps a circle to a conic. Chat 3 does not silently collapse such a conic back into a circle.
+
+## Stable fixtures / golden tests
+
+Added textual PBM reference images and deterministic golden outputs under:
+
+`tests/fixtures/vision/`
+
+Coverage includes:
+
+- front plate image with outer rectangle and two holes;
+- exact image → SketchPackage golden;
+- open circular arc image;
+- exact ARC golden;
+- calibrated CapturePackage;
+- verified MeasurementPackage.
 
 ## Verification
 
-Executed full Chat 3 suite against a reconstructed local repository context using exact current Integrator contract blobs:
+Local reconstructed workspace regression run:
 
 ```text
-python -m pytest -q
+20 passed, 4 deselected in 1.03s
 ```
 
-Result:
+The four deselected tests require repository-level shared contract files absent from the reconstructed local workspace.
+
+GitHub Actions implementation-head run:
 
 ```text
-20 passed in 0.85s
+run: 36620011768
+head: 299a9c5b4531bf0c4a04bd3a2b452eea6e70d84e
 ```
 
-Inventory:
+Results relevant to Chat 3:
 
-- 6 Phase 1 geometry tests;
-- 4 canonical FRONT tests;
-- 10 Ring 2 coordinate-normalization tests.
+- `Chat 3 / Geometry`: **SUCCESS — 28 passed in 0.31s**;
+- `Contracts / canonical fixtures`: **SUCCESS**;
+- `Integration / Chat 2 -> Chat 3`: **SUCCESS**;
+- `Chat 4 / Generic CAD gate`: **SUCCESS**;
+- `Integration / Chat 3 -> Chat 4`: **FAIL due orchestrator-owned test defect, not Ring 3 output**.
 
-Also executed:
+The failing integration test reads:
 
 ```text
-python -m compileall -q src tests
+cad_verification_report["dimensions"]
 ```
 
-Result: success.
+but canonical `CADVerificationReport v1` and Chat 4 expose verification entries as:
 
-## Ring 2 explicit failure behavior
+```text
+cad_verification_report["items"]
+```
 
-Rejected explicitly:
-
-- wrong clean-reference frame;
-- missing calibration for IMAGE_PX;
-- wrong calibration target coordinate system;
-- wrong homography length;
-- non-finite coefficients;
-- degenerate matrix;
-- zero/degenerate homogeneous divisor;
-- non-finite homogeneous output;
-- unsupported coordinate space.
-
-## Not implemented / intentionally deferred
-
-Per active directive, still deferred:
-
-- raw image contour extraction;
-- OpenCV primitive detector;
-- detector breadth beyond deterministic fixture output;
-- general `ConstraintResolver`;
-- inferred-constraint promotion policy;
-- Dimensioned View renderer;
-- multi-view geometry;
-- CAD runtime integration/read-back.
+The same stale integration-test access remains on current `main`. Chat 3 does not modify `tests/integration/` per OD-003 ownership rules.
 
 ## Shared ownership
 
-Chat 3 does not modify:
+Ring 3 changes no files under:
 
 - `/core/contracts/`;
-- `/core/domain/shared/`;
 - `/tests/fixtures/contracts/`;
-- directories owned by Chat 1/2/4/5/6.
+- `/tests/integration/`;
+- Chat 1/2/4/5/6 directories.
 
-## Current gate
+## Not implemented / intentionally deferred
 
-Requested from Chat 6:
+- arbitrary free-form contour reconstruction;
+- ellipse/conic vocabulary outside v1;
+- hidden-edge inference;
+- general constraint solver;
+- dimensioned-view renderer;
+- multi-view reconstruction;
+- CAD logic.
 
-```text
-Chat 2 IMAGE_PX output
-→ Chat 3 homography normalization
-→ MAT_XY_MM geometry pipeline
-→ schema-valid SketchPackage
-```
+## Current status
 
-Status from Chat 3 side: `READY_FOR_RING2_INTEGRATOR_GATE`.
+`READY_FOR_RING3_INTEGRATOR_REVIEW_WITH_ORCHESTRATOR_GATE_DEFECT`
 
-OpenCV / primitive extraction must not start until Chat 6 accepts this gate.
+Chat 3 code and its upstream boundary are green. Chat 6 must correct or reclassify the stale Chat 3→4 integration test before declaring the repository-wide Pass 3 gate green.
 
-## Ring 2 documents
+## Ring 3 docs
 
-- `BUILD_REUSE_CHECK_RING2_COORDINATE_NORMALIZATION.md`;
-- `IMPLEMENTATION_REPORT_RING2_COORDINATE_NORMALIZATION_2026-09-29.md`;
+- `BUILD_REUSE_CHECK_RING3_VISION_EXTRACTION.md`;
+- `IMPLEMENTATION_REPORT_RING3_VISION_EXTRACTION_2026-09-29.md`;
 - `ORCHESTRATOR_HANDOFF.md`.

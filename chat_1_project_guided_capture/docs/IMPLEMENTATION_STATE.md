@@ -2,9 +2,10 @@
 
 **Date:** 2026-09-29  
 **Role:** Chat 1 — Project & Guided Capture  
-**Current pass:** 2  
-**Directive:** `OD-2026-09-29-002`  
-**Working branch:** `chat-1/pass-2`
+**Current pass:** 3  
+**Directive:** `OD-2026-09-29-003`  
+**Working branch:** `chat-1/pass-3`  
+**Baseline main SHA:** `c3452d7fa68c9c5c3716db5fef71172e9c3b9532`
 
 ## Source-of-truth order
 
@@ -14,106 +15,136 @@
 4. product SSOT + Chat 6 orchestration state/directive;
 5. Chat 1 local docs.
 
-Chat 1 does not modify shared contracts or canonical fixtures.
+Chat 1 does not modify shared contracts, canonical fixtures or Chat-6-owned CI/integration tests.
 
-## Accepted baseline — Pass 1
+## Accepted baseline
 
-Chat 6 accepted:
+### Pass 1 — accepted
 
 - Project/Capture domain;
 - manual capture baseline;
-- stable project/part linkage;
-- canonical `ProjectContract v1` / `CapturePackage v1` adapters;
-- ChArUco calibration baseline;
-- schema-valid FRONT CapturePackage with calibration.
+- canonical Project/Capture adapters;
+- ChArUco calibration baseline.
 
-## Pass 2 implemented
+### Pass 2 — accepted/integrated
 
-### Stable calibration provenance
+- stable calibration provenance;
+- deterministic perspective normalization;
+- immutable rectified artifact;
+- source/calibration/mat provenance;
+- canonical CapturePackage backward compatibility.
 
-- `CalibrationResult.calibration_id` added as an internal identifier;
-- legacy calibration records without the field receive deterministic UUIDv5 backfill from source frame + mat identity.
+## Pass 3 — Guided Capture Quality baseline
 
-### Perspective normalization
+### Domain/result model
 
 Added:
 
-- `RectifiedReferenceRecord`;
-- `CaptureSession.rectified_references` persistence;
-- `PerspectiveNormalizer` protocol;
-- `OpenCvPerspectiveNormalizer`;
-- `RectificationService`;
-- explicit `RectificationError` failures.
+- `CaptureQualityVerdict`: `ACCEPT`, `WARN`, `REJECT`;
+- `QualitySeverity`;
+- `QualityReasonCode`;
+- `CaptureQualityMetrics`;
+- `CaptureQualityFinding`;
+- `CaptureQualityResult`.
 
-Flow:
+`CaptureSession.quality_analyses` persists one current-baseline analysis per immutable source frame and validates source-frame/view consistency.
 
-```text
-clean reference artifact
-+ stored calibration homography
-+ MeasurementMatProfile
-+ pixels_per_mm
--> deterministic MAT-space raster
--> new content-addressed artifact
--> RectifiedReferenceRecord
-```
+### Analyzer
 
-Invariants:
+`OpenCvCaptureQualityAnalyzer` produces deterministic image diagnostics:
 
-- source clean artifact is never overwritten;
-- derived artifact has independent artifact ID/SHA;
-- source frame ID is preserved in provenance;
-- exact calibration ID and mat ID are preserved;
-- one rectified reference per view in current baseline;
-- singular/non-finite homographies fail explicitly;
-- existing calibration is reused; no second calibration representation exists.
+- `laplacian_variance` — focus/blur proxy;
+- `mean_luma`;
+- dark clipping fraction;
+- bright clipping fraction;
+- localized glare/highlight proxy fraction;
+- edge density;
+- border-edge ratio;
+- optional ChArUco corner visibility ratio.
 
-### Canonical boundary
+### Policy / verdict
 
-No shared contract change.
+`CaptureQualityPolicy` version:
 
-`CapturePackage v1` has no rectified-artifact property. Rectification therefore stays internal while the canonical package continues to expose original clean reference + calibration homography. Canonical serialization before and after internal rectification remains unchanged.
+`chat1.capture-quality.v1`
 
-## Verification
+Rules are explicit and machine-readable. Each finding stores reason code, severity, observed metric, threshold and comparison operator.
 
-Latest full local Chat 1 regression:
+Verdict aggregation:
 
 ```text
-16 passed in 1.17s
+any REJECT finding -> REJECT
+else any finding    -> WARN
+else                -> ACCEPT
 ```
 
-Pass 2 synthetic perspective test verifies:
+### Orchestration
 
-- known perspective distortion of a 5x7 ChArUco board;
-- calibration of the distorted reference;
-- deterministic repeated encoded output;
-- preserved source bytes;
-- distinct derived artifact identity/hash;
-- source/calibration/mat provenance;
-- 1000x1400 raster at 10 px/mm for 100x140 mm mat geometry;
-- mean absolute image error `< 8` against known canonical raster;
-- canonical CapturePackage remains schema-valid and unchanged;
-- singular homography explicit failure;
-- stable legacy calibration-ID backfill.
+`CaptureQualityService`:
+
+- reads immutable clean-reference bytes through `ArtifactStore`;
+- reuses existing calibration evidence when present;
+- persists analysis result in CaptureSession;
+- keeps source bytes unchanged;
+- is idempotent for the same source/calibration/mat context;
+- rejects conflicting reanalysis context rather than silently replacing provenance.
+
+`RussianQualityGuidanceAdapter` converts reason codes into actionable Russian capture instructions without embedding presentation text into the quality policy itself.
+
+## Ownership/truth boundary
+
+Quality metrics are diagnostic proxies only.
+
+They do **not**:
+
+- create PhysicalMeasurement;
+- alter verified measurement values;
+- infer geometry;
+- claim dimensional accuracy;
+- alter canonical `CapturePackage v1`.
+
+`CanonicalContractBuilder` ignores `quality_analyses`, preserving the accepted Chat 1 -> Chat 2 wire boundary.
+
+## Local verification
+
+New quality suite:
+
+```text
+8 passed in 0.21s
+```
+
+Verified generated cases:
+
+- good sharp/balanced/centered image -> `ACCEPT`;
+- strong blur -> `REJECT` / `BLUR`;
+- severe underexposure -> `REJECT` / `UNDEREXPOSED`;
+- severe overexposure -> `REJECT` / `OVEREXPOSED`;
+- localized bright highlights -> `WARN` / `GLARE_RISK`;
+- significant border activity -> `WARN` / `FRAMING_BORDER_ACTIVITY`;
+- low ChArUco corner visibility -> `REJECT` / `LOW_MARKER_VISIBILITY`;
+- repeated analysis produces equal deterministic result;
+- persisted quality result does not change canonical CapturePackage;
+- invalid image bytes fail explicitly.
+
+A local all-tests run from the archive-restored workspace reached 21 passing tests and 3 failures solely because repository-root `core/contracts/mrea_contracts_v1.schema.json` is not present in that archive workspace. Those three tests fail at schema file loading, not Chat 1 behavior. Full branch CI is required as the authoritative complete regression.
 
 ## Current limitations
 
-- no real printed-mat accuracy validation;
-- no camera lens-distortion/intrinsics compensation;
-- deterministic raster policy is pinned to current OpenCV behavior, not promised across arbitrary future versions;
-- rectified artifact is internal until/if Chat 6 creates a canonical exposure path;
-- no rectified-reference replacement/versioning policy;
-- no Guided Quality implementation yet;
-- native/mobile runtime and CI are not verified.
+- policy thresholds are not yet calibrated on a real phone-camera dataset;
+- blur metric is scene/resolution dependent;
+- glare is a proxy, not physical specular modeling;
+- framing is edge-based, not object segmentation;
+- no lens-distortion-aware quality normalization;
+- no native/mobile runtime validation;
+- one persisted quality result per source frame/context in this baseline;
+- quality verdict does not automatically mutate `CaptureViewStatus`.
 
-## Integration readiness
+## Pass 3 acceptance readiness
 
-Ready for Chat 6 Pass 2 acceptance review:
+Before handoff freeze, require:
 
-- deterministic perspective normalization;
-- immutable derived artifact;
-- explicit source/calibration provenance;
-- source evidence preservation;
-- canonical backward compatibility;
-- full local regression passing.
-
-Next work must follow the next Chat 6 directive after Pass 2 acceptance.
+- Chat 1 branch tests green in GitHub Actions;
+- `Integration / Chat 1 -> Chat 2` green;
+- shared contract checks green;
+- no shared-contract changes;
+- final `ORCHESTRATOR_HANDOFF.md` published once, then branch frozen.

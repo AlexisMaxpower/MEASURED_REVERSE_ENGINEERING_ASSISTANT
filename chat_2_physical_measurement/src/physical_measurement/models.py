@@ -119,8 +119,16 @@ class PhysicalMeasurement:
                 raise ValueError("measurement view_id must match both anchors")
         if self.anchor_a.reference_frame_id != self.anchor_b.reference_frame_id:
             raise ValueError("both anchors must belong to the same reference frame")
-        if self.source is not ProvenanceSource.MANUAL_MEASURED:
-            raise ValueError("Phase A only accepts MANUAL_MEASURED source")
+        candidate_sources = {
+            ProvenanceSource.MANUAL_MEASURED,
+            ProvenanceSource.DEVICE_REPORTED,
+            ProvenanceSource.OCR_MEASURED,
+            ProvenanceSource.VOICE_REPORTED,
+        }
+        if self.source not in candidate_sources:
+            raise ValueError(
+                "physical measurement candidates require a direct measurement/report source"
+            )
         if self.confirmed and self.confirmation_source is None:
             raise ValueError("confirmed measurement requires confirmation_source")
         if not self.confirmed and self.confirmed_at is not None:
@@ -170,6 +178,14 @@ class MeasurementSession:
         if not found:
             raise KeyError(updated.measurement_id)
         return replace(self, measurements=tuple(values))
+
+    def remove_measurement(self, measurement_id: str) -> "MeasurementSession":
+        values = tuple(
+            item for item in self.measurements if item.measurement_id != measurement_id
+        )
+        if len(values) == len(self.measurements):
+            raise KeyError(measurement_id)
+        return replace(self, measurements=values)
 
     def get(self, measurement_id: str) -> PhysicalMeasurement:
         for item in self.measurements:
