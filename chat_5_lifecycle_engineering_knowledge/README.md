@@ -1,13 +1,14 @@
 # Chat 5 — Lifecycle & Engineering Knowledge
 
-Статус: **Phase 2 canonical LifecycleEvent adapter implemented**  
+Статус: **Pass 2 CAD verification → lifecycle gate implemented**  
 Проект: **MREA — Measured Reverse Engineering Assistant**  
-Источник истины: **MREA SSOT v0.1 от 2026-09-29**  
-Текущая директива: **OD-2026-09-29-001**
+Источник истины: **MREA SSOT v0.1 + orchestration addendum v0.2**  
+Текущая директива: **OD-2026-09-29-002**  
+Рабочая ветка: `chat-5/pass-2`
 
 ## Назначение области
 
-Эта директория принадлежит Chat 5 и содержит vertical slice **Lifecycle & Engineering Knowledge**:
+Vertical slice Chat 5 отвечает за физическую инженерную жизнь ревизии:
 
 ```text
 Revision
@@ -21,93 +22,82 @@ Revision
 
 ## Реализовано
 
-Phase 1:
+### Pass 1 baseline
 
 - lifecycle domain models;
-- `RevisionService`;
-- `ManufacturingService`;
-- `InstallationService`;
-- `TestService`;
-- `FailureService`;
+- Revision/Manufacturing/Installation/Test/Failure services;
 - `LifecycleTimeline`;
 - `EquipmentPartRegistry`;
 - `LifecycleStateProjection`;
 - `RevisionComparison`;
-- `KnowledgeQueryService`;
-- `InMemoryLifecycleStore`.
-
-Phase 2:
-
+- deterministic `KnowledgeQueryService`;
 - `CanonicalLifecycleEventAdapter`;
-- canonical `mrea.lifecycle-event.v1` serialization;
-- deterministic ordered export;
-- canonical contract/golden tests;
-- evidence-preserving outbound boundary.
+- canonical `mrea.lifecycle-event.v1` export.
 
-## Contract boundary
+### Pass 2
+
+Закрыта граница Chat 4 → Chat 5:
+
+```text
+canonical CADPackage
++ canonical CADVerificationReport
+→ CAD-linked lifecycle Revision
+→ VERIFIED manufacturing eligibility
+→ existing lifecycle event flow
+```
+
+Добавлены:
+
+- `RevisionOrigin`;
+- `CADVerificationStatus`;
+- `CADArtifactReference`;
+- `CADRevisionLink`;
+- `CADRevisionPreparationService`;
+- explicit manufacturing eligibility gate for CAD-origin revisions.
+
+`FAILED` CAD verification сохраняется как traceable lifecycle Revision, но не допускается к manufacturing.
+
+## Shared-contract boundary
 
 Chat 5 не изменяет shared contracts.
 
-Canonical inputs принадлежат Integrator / Chat 6:
+Canonical inputs принадлежат Chat 6:
 
 - `core/contracts/mrea_contracts_v1.schema.json`;
 - `core/contracts/POLICIES_V1.md`;
-- `tests/fixtures/contracts/lifecycle_event_v1.json`.
+- canonical CAD/lifecycle fixtures.
 
-Текущая семантика:
-
-```text
-LifecycleEvent v1 = canonical shared outbound contract
-LifecycleState = internal derived projection
-```
-
-Rich Revision/Manufacturing/Installation/Test/Failure models остаются внутренними Chat 5.
-
-## Структура
-
-```text
-chat_5_lifecycle_engineering_knowledge/
-├── ORCHESTRATOR_DIRECTIVE.md
-├── README.md
-├── docs/
-│   ├── CHAT_5_ROLE.md
-│   ├── IMPLEMENTATION_STATE.md
-│   ├── PHASE_1_DOMAIN_BASELINE.md
-│   └── PHASE_2_CANONICAL_LIFECYCLE_ADAPTER.md
-├── src/
-│   └── mrea_lifecycle/
-│       ├── __init__.py
-│       ├── adapters.py
-│       ├── models.py
-│       ├── projections.py
-│       ├── services.py
-│       └── store.py
-└── tests/
-    ├── test_acceptance_flow.py
-    ├── test_canonical_adapter.py
-    └── test_invariants.py
-```
+Rich lifecycle/CAD linkage remains internal. Shared lifecycle output remains `LifecycleEvent v1`.
 
 ## Verification
 
-Локально:
-
 ```text
 PYTHONPATH=src pytest -q
-8 passed
+13 passed
 ```
 
-Repository-wide CI в этой итерации не запускался.
+## Pass 2 files
 
-## Документация
+Основной отчёт:
 
-- `docs/CHAT_5_ROLE.md` — role baseline.
-- `docs/PHASE_1_DOMAIN_BASELINE.md` — internal lifecycle baseline.
-- `docs/PHASE_2_CANONICAL_LIFECYCLE_ADAPTER.md` — canonical boundary и contract tests.
-- `docs/IMPLEMENTATION_STATE.md` — актуальный implementation state и следующий шаг.
+- `docs/PASS_2_CAD_LIFECYCLE_LINKAGE.md`
 
-## Следующий шаг
+Актуальное состояние:
 
-Перед каждой итерацией сначала читать `ORCHESTRATOR_DIRECTIVE.md` и canonical inputs.
+- `docs/IMPLEMENTATION_STATE.md`
 
-Если Chat 6 не изменит приоритет: repository abstraction → physical instance/removal/replacement semantics → persistence prototype → API boundary.
+Handoff для Chat 6:
+
+- `ORCHESTRATOR_HANDOFF.md`
+
+## Scope boundary
+
+В Pass 2 намеренно не добавлялись:
+
+- AI / semantic search;
+- production database persistence;
+- REST/API;
+- physical removal/replacement model;
+- manufacturing override.
+
+Следующий этап определяется следующей директивой Chat 6 после acceptance gate.
