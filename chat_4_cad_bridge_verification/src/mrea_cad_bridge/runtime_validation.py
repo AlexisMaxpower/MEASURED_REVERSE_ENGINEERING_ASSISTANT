@@ -308,6 +308,16 @@ def evaluate_solidworks_runtime_inputs_v1(
     so both runtime paths must agree exactly.
     """
 
+    raw_conflicts = runtime_inputs.get("constraint_conflicts", ())
+    if not isinstance(raw_conflicts, list) or any(
+        not isinstance(item, str) or not item for item in raw_conflicts
+    ):
+        raise _runtime_error(
+            "SOLIDWORKS_RUNTIME_CONFLICTS_INVALID",
+            "constraint_conflicts must contain only non-empty canonical dimension IDs",
+            stage="EVIDENCE",
+        )
+
     parsed = parse_solidworks_runtime_inputs_v1(runtime_inputs)
     _validate_solidworks_cross_evidence(raw_inputs=runtime_inputs, parsed=parsed)
 
