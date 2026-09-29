@@ -1,33 +1,44 @@
 # ORCHESTRATOR DIRECTIVE — Chat 2
-**Revision:** OD-2026-09-29-002  
-**Owner:** Chat 6
-**Pass:** 2  
-**Branch:** `chat-2/pass-2`
+**Revision:** OD-2026-09-29-003  
+**Owner:** Chat 6  
+**Pass:** 3  
+**Branch:** `chat-2/pass-3`
 
-## Accepted from Pass 1
-The Phase A measurement domain and canonical `MeasurementPackage v1` adapter are accepted as a slice. Raw anchors may legitimately remain `IMAGE_PX`; Chat 2 must not silently convert them into metric coordinates.
+## Accepted baseline
+Pass 2 is `ACCEPTED`. Raw `IMAGE_PX` anchors/evidence semantics are integrated and the real `Chat 2 -> Chat 3` gate is green. `Chat 1 -> Chat 2` is now also an automated repository boundary gate.
 
-## Pass 2 priority
-Harden the real raw measurement boundary and evidence chain without absorbing Chat 3 geometry responsibilities.
+## Pass 3 priority
+Implement the **hands-free measurement domain/application baseline** without tying correctness to a specific speech/OCR vendor.
 
 Required:
-- keep actual manual anchors in `IMAGE_PX` when captured in image space;
-- preserve `reference_frame_id`, `view_id`, provenance and confirmation source;
-- add/maintain a representative real-output specimen/test using canonical CapturePackage input;
-- explicitly test wrong reference frame/view rejection;
-- keep OCR/voice unverified until confirmation policy allows verification.
+- provider-independent command parser/state machine for measurement trigger, value candidate, confirm, reject/correct;
+- support command intent equivalent to `замер` and `замер 42,18`, including deterministic numeric normalization;
+- voice/OCR/device values enter as candidates, not automatically verified facts;
+- preserve manual entry as authoritative fallback;
+- explicit candidate -> confirmation -> verified transition;
+- preserve evidence frame, reference frame, view and provenance;
+- keep raw image anchors in `IMAGE_PX`;
+- deterministic tests for valid, ambiguous and invalid commands/transitions.
 
-## Integration context
-Round 1 exposed a real boundary gap: Chat 3 accepted only `MAT_XY_MM`. That conversion belongs to Chat 3 using CapturePackage calibration. Do not "fix" integration by falsifying Chat 2 coordinates.
-
-## CI requirement
-Push Pass 2 only to `chat-2/pass-2`. `.github/workflows/ci.yml` runs Chat 2 tests plus the real `Chat 2 -> Chat 3` integration gate. Chat 2 local output must remain truthful even if that cross-slice gate is red until Chat 3 is fixed. Record CI status in handoff.
+## Canonical integration gates
+Your pass must keep green:
+- `Chat 2 / Measurement`;
+- `Integration / Chat 1 -> Chat 2`;
+- `Integration / Chat 2 -> Chat 3`;
+- shared contract checks.
 
 ## Do not
-- edit canonical shared contracts/fixtures;
-- pre-normalize anchors only to satisfy Chat 3;
+- implement speech recognition engine from scratch;
+- pre-normalize geometry to satisfy Chat 3;
 - move geometry matching into Chat 2;
-- commit Pass 2 implementation directly to `main`.
+- silently verify OCR/voice candidates;
+- modify Chat-6-owned CI/shared integration tests;
+- change canonical contracts without approved CR;
+- commit directly to `main`.
 
-## Handoff
-Finish with `ORCHESTRATOR_HANDOFF.md` per Chat 6 development workflow.
+## Process
+Work only in `chat-2/pass-3`.
+
+Finish with `ORCHESTRATOR_HANDOFF.md`. **Handoff freezes the branch.** No post-handoff commits until Chat 6 explicitly returns `FIX_REQUIRED`.
+
+See `chat_6_orchestrator/PASS_3_PLAN_2026-09-29.md` and `DEVELOPMENT_WORKFLOW.md`.
