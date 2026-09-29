@@ -153,6 +153,42 @@ class FrameRecord(StrictModel):
         return self
 
 
+class MeasurementMatProfile(StrictModel):
+    mat_id: NonBlank
+    dictionary_name: NonBlank = "DICT_4X4_50"
+    squares_x: int = Field(ge=3)
+    squares_y: int = Field(ge=3)
+    square_length_mm: float = Field(gt=0)
+    marker_length_mm: float = Field(gt=0)
+    ransac_reprojection_threshold_mm: float = Field(default=0.5, gt=0)
+
+    @model_validator(mode="after")
+    def validate_marker_size(self) -> "MeasurementMatProfile":
+        if self.marker_length_mm >= self.square_length_mm:
+            raise ValueError("marker_length_mm must be smaller than square_length_mm")
+        return self
+
+
+class CalibrationResult(StrictModel):
+    view: CaptureViewType
+    source_frame_id: UUID
+    mat_id: NonBlank
+    coordinate_system: str = "MAT_XY_MM"
+    homography: list[float] = Field(min_length=9, max_length=9)
+    detected_marker_count: int = Field(ge=0)
+    detected_charuco_corner_count: int = Field(ge=0)
+    charuco_corner_ids: list[int] = Field(default_factory=list)
+    reprojection_rmse_mm: float = Field(ge=0)
+    quality: float | None = Field(default=None, ge=0, le=1)
+    created_at: datetime = Field(default_factory=utc_now)
+
+    @model_validator(mode="after")
+    def validate_coordinate_system(self) -> "CalibrationResult":
+        if self.coordinate_system != "MAT_XY_MM":
+            raise ValueError("calibration coordinate system must be MAT_XY_MM")
+        return self
+
+
 class CaptureViewProgress(StrictModel):
     view: CaptureViewType
     required: bool = True
@@ -168,6 +204,7 @@ class CaptureSession(StrictModel):
     plan_id: UUID
     views: list[CaptureViewProgress]
     frames: list[FrameRecord] = Field(default_factory=list)
+    calibrations: list[CalibrationResult] = Field(default_factory=list)
     started_at: datetime = Field(default_factory=utc_now)
     completed_at: datetime | None = None
 
@@ -178,6 +215,9 @@ class CaptureSession(StrictModel):
         values = [item.view for item in self.views]
         if len(values) != len(set(values)):
             raise ValueError("capture session cannot contain duplicate views")
+        calibration_views = [item.view for item in self.calibrations]
+        if len(calibration_views) != len(set(calibration_views)):
+            raise ValueError("capture session cannot contain duplicate calibrations per view")
         if self.started_at.tzinfo is None:
             raise ValueError("started_at must be timezone-aware")
         if self.completed_at is not None and self.completed_at.tzinfo is None:
