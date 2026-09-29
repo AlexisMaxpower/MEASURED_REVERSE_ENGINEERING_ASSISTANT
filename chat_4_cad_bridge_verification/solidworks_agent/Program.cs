@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Web.Script.Serialization;
 
@@ -11,59 +12,149 @@ namespace Mrea.SolidWorksCadAgent
         private const string ProtocolVersion = "mrea.solidworks-agent.v1";
         private const string AdapterName = "SOLIDWORKS_2026";
 
+        private const int ExitSuccess = 0;
+        private const int ExitInvalidInput = 20;
+        private const int ExitSolidWorksStartup = 30;
+        private const int ExitCadTransfer = 40;
+        private const int ExitArtifact = 50;
+        private const int ExitUnexpected = 70;
+
         [STAThread]
         private static int Main(string[] args)
         {
             string requestPath = null;
             string responsePath = null;
+
             try
             {
                 ParseArguments(args, out requestPath, out responsePath);
-                var serializer = NewSerializer();
-                var request = serializer.Deserialize<AgentRequest>(File.ReadAllText(requestPath, Encoding.UTF8));
-                ValidateRequestEnvelope(request);
-
-                AgentResponse response;
-                using (var session = SolidWorksSession.Open(request))
-                {
-                    response = SolidWorksTransfer.Execute(session, request);
-                }
-
-                WriteResponse(responsePath, response);
-                return 0;
             }
             catch (Exception exc)
             {
-                if (!string.IsNullOrWhiteSpace(responsePath))
-                {
-                    try
-                    {
-                        WriteResponse(responsePath, new AgentResponse
-                        {
-                            protocol_version = ProtocolVersion,
-                            status = "ERROR",
-                            adapter_name = AdapterName,
-                            bindings = new List<DimensionBindingDto>(),
-                            read_back = new ReadBackDto
-                            {
-                                dimensions = new List<ReadBackDimensionDto>(),
-                                constraint_conflicts = new List<string>()
-                            },
-                            artifacts = new List<ArtifactDto>(),
-                            error = new ErrorDto
-                            {
-                                type = exc.GetType().FullName,
-                                message = exc.Message
-                            }
-                        });
-                    }
-                    catch
-                    {
-                        // The process exit code remains the final failure signal if response writing also fails.
-                    }
-                }
                 Console.Error.WriteLine(exc);
-                return 2;
+                return ExitInvalidInput;
+            }
+
+            AgentRequest request;
+            try
+            {
+                var serializer = NewSerializer();
+                request = serializer.Deserialize<AgentRequest>(File.ReadAllText(requestPath, Encoding.UTF8));
+                ValidateRequestEnvelope(request);
+            }
+            catch (Exception exc)
+            {
+                SafeWriteFailure(
+                    responsePath,
+                    exc,
+                    ExitInvalidInput,
+                    "REQUEST_INVALID",
+                    "AGENT_STARTUP",
+                    false,
+                    null);
+                Console.Error.WriteLine(exc);
+                return ExitInvalidInput;
+            }
+
+            SolidWorksSession session = null;
+            try
+            {
+                try
+                {
+                    session = SolidWorksSession.Open(request);
+                }
+                catch (Exception exc)
+                {
+                    SafeWriteFailure(
+                        responsePath,
+                        exc,
+                        ExitSolidWorksStartup,
+                        StartupFailureCode(exc),
+                        "SOLIDWORKS_COM",
+                        false,
+                        null);
+                    Console.Error.WriteLine(exc);
+                    return ExitSolidWorksStartup;
+                }
+
+                AgentResponse response;
+                try
+                {
+                    response = SolidWorksTransfer.Execute(session, request);
+                }
+                catch (IOException exc)
+                {
+                    SafeWriteFailure(
+                        responsePath,
+                        exc,
+                        ExitArtifact,
+                        "ARTIFACT_WRITE_FAILED",
+                        "ARTIFACT",
+                        true,
+                        session.Version);
+                    Console.Error.WriteLine(exc);
+                    return ExitArtifact;
+                }
+                catch (COMException exc)
+                {
+                    SafeWriteFailure(
+                        responsePath,
+                        exc,
+                        ExitCadTransfer,
+                        "SOLIDWORKS_COM_TRANSFER_FAILED",
+                        "CAD_TRANSFER",
+                        true,
+                        session.Version);
+                    Console.Error.WriteLine(exc);
+                    return ExitCadTransfer;
+                }
+                catch (Exception exc)
+                {
+                    SafeWriteFailure(
+                        responsePath,
+                        exc,
+                        ExitCadTransfer,
+                        "CAD_TRANSFER_FAILED",
+                        "CAD_TRANSFER",
+                        true,
+                        session.Version);
+                    Console.Error.WriteLine(exc);
+                    return ExitCadTransfer;
+                }
+
+                response.real_host_executed = true;
+                response.solidworks_version = session.Version;
+                response.exit_code = ExitSuccess;
+                response.diagnostics = response.diagnostics ?? new List<DiagnosticDto>();
+
+                try
+                {
+                    WriteResponse(responsePath, response);
+                }
+                catch (Exception exc)
+                {
+                    Console.Error.WriteLine(exc);
+                    return ExitArtifact;
+                }
+                return ExitSuccess;
+            }
+            catch (Exception exc)
+            {
+                SafeWriteFailure(
+                    responsePath,
+                    exc,
+                    ExitUnexpected,
+                    "AGENT_INTERNAL_FAILURE",
+                    "INTERNAL",
+                    session != null,
+                    session != null ? session.Version : null);
+                Console.Error.WriteLine(exc);
+                return ExitUnexpected;
+            }
+            finally
+            {
+                if (session != null)
+                    session.Dispose();
             }
         }
 
@@ -112,6 +203,97 @@ namespace Mrea.SolidWorksCadAgent
                 throw new InvalidDataException("output_directory is required.");
             request.entities = request.entities ?? new List<EntitySpec>();
             request.dimensions = request.dimensions ?? new List<DimensionSpec>();
+        }
+
+        private static string StartupFailureCode(Exception exc)
+        {
+            var message = exc.Message ?? string.Empty;
+            if (message.IndexOf("version mismatch", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                message.IndexOf("RevisionNumber", StringComparison.OrdinalIgnoreCase) >= 0)
+                return "SOLIDWORKS_VERSION_UNSUPPORTED";
+            if (message.IndexOf("ProgID", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                message.IndexOf("not registered", StringComparison.OrdinalIgnoreCase) >= 0)
+                return "SOLIDWORKS_COM_NOT_REGISTERED";
+            if (message.IndexOf("template", StringComparison.OrdinalIgnoreCase) >= 0)
+                return "PART_TEMPLATE_UNAVAILABLE";
+            return "SOLIDWORKS_STARTUP_FAILED";
+        }
+
+        private static AgentResponse FailureResponse(
+            Exception exc,
+            int exitCode,
+            string code,
+            string stage,
+            bool realHostExecuted,
+            string solidWorksVersion)
+        {
+            var details = new Dictionary<string, object>
+            {
+                { "exception_type", exc.GetType().FullName }
+            };
+            var diagnostic = new DiagnosticDto
+            {
+                code = code,
+                stage = stage,
+                message = exc.Message,
+                severity = "ERROR",
+                details = details
+            };
+            return new AgentResponse
+            {
+                protocol_version = ProtocolVersion,
+                status = "ERROR",
+                adapter_name = AdapterName,
+                real_host_executed = realHostExecuted,
+                solidworks_version = solidWorksVersion,
+                exit_code = exitCode,
+                bindings = new List<DimensionBindingDto>(),
+                read_back = new ReadBackDto
+                {
+                    dimensions = new List<ReadBackDimensionDto>(),
+                    constraint_conflicts = new List<string>()
+                },
+                artifacts = new List<ArtifactDto>(),
+                diagnostics = new List<DiagnosticDto> { diagnostic },
+                error = new ErrorDto
+                {
+                    type = exc.GetType().FullName,
+                    code = code,
+                    stage = stage,
+                    message = exc.Message,
+                    severity = "ERROR",
+                    details = details
+                }
+            };
+        }
+
+        private static void SafeWriteFailure(
+            string responsePath,
+            Exception exc,
+            int exitCode,
+            string code,
+            string stage,
+            bool realHostExecuted,
+            string solidWorksVersion)
+        {
+            if (string.IsNullOrWhiteSpace(responsePath))
+                return;
+            try
+            {
+                WriteResponse(
+                    responsePath,
+                    FailureResponse(
+                        exc,
+                        exitCode,
+                        code,
+                        stage,
+                        realHostExecuted,
+                        solidWorksVersion));
+            }
+            catch
+            {
+                // Exit code and stderr remain the final failure signal if response writing also fails.
+            }
         }
 
         private static void WriteResponse(string path, AgentResponse response)
