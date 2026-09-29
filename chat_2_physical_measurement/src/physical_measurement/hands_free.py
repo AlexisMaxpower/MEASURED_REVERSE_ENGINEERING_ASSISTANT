@@ -56,6 +56,7 @@ class MeasurementCandidateContext:
     anchor_a: FeatureAnchor
     anchor_b: FeatureAnchor
     evidence_frame_id: str | None = None
+    uncertainty: Decimal | int | float | str | None = None
     uncertainty_mm: Decimal | int | float | str | None = None
     instrument_type: str | None = None
 
@@ -300,6 +301,7 @@ class HandsFreeMeasurementController:
             anchor_a=self._context.anchor_a,
             anchor_b=self._context.anchor_b,
             evidence_frame_id=self._context.evidence_frame_id,
+            uncertainty=self._context.uncertainty,
             uncertainty_mm=self._context.uncertainty_mm,
             instrument_type=self._context.instrument_type,
         )
@@ -344,7 +346,6 @@ class HandsFreeMeasurementController:
             session_id=self._session_id,
             measurement_id=old_measurement_id,
         )
-        # Correction text is itself a voice-reported value. It remains a candidate.
         self._state = HandsFreeMeasurementState(
             phase=HandsFreePhase.AWAITING_VALUE,
             last_verified_measurement_id=self._state.last_verified_measurement_id,
