@@ -1,64 +1,71 @@
 # Chat 4 — Build / Reuse Check: CAD Core Baseline
 
 **Дата:** 2026-09-29  
-**Scope:** internal CAD model, SVG/DXF export, pure verification core
+**Scope:** canonical boundary, internal CAD model, SVG/DXF export, verification
 
-## 1. Generic CAD model
+## Internal CAD model
 
-**Проблема:** нужен vendor-neutral внутренний слой между будущим `SketchPackage` mapper и конкретными exporters/adapters.  
-**Есть ли готовое open-source решение:** YES.  
-**Можно ли использовать:** PARTIAL.  
-**Что используем:** стандартные immutable Python structures для небольшого internal boundary.  
-**Что пишем сами:** минимальный internal model для Point/Line/Circle/Arc/Polyline и deterministic ordering.  
-**Почему:** shared `SketchPackage` contract ещё не опубликован; тяжёлый CAD kernel здесь не нужен и создал бы лишний lock-in.  
-**Lock-in risk:** LOW.  
-**Fallback:** заменить internal mapping/adapters после утверждения repository architecture без изменения shared contracts.
+**Проблема:** vendor-neutral representation между canonical SketchPackage и CAD adapters.  
+**Reuse:** PARTIAL.  
+**Решение:** минимальные immutable Python dataclasses только для supported 2D baseline.  
+**Почему:** полноценный CAD kernel не нужен для transport/export boundary.  
+**Lock-in:** LOW.
 
-## 2. SVG
+## Canonical contracts
 
-**Проблема:** детерминированный перенос простой 2D geometry в человекочитаемый interchange/preview format.  
-**Есть ли готовое open-source решение:** YES.  
-**Можно ли использовать:** YES, но не требуется для baseline.  
-**Что используем:** стандартная строковая XML generation без внешней runtime dependency.  
-**Что пишем сами:** mapping internal entities → SVG primitives.  
-**Почему:** поддерживаемый subset мал, формат прост, внешняя библиотека пока не даёт достаточной дополнительной ценности.  
-**Lock-in risk:** LOW.  
-**Fallback:** перейти на XML/SVG library, если появятся сложные styles/metadata/transforms.
+**Проблема:** cross-slice DTO и policies.  
+**Reuse:** YES — только Integrator-owned contracts.  
+**Используем:**
 
-## 3. DXF
+- `core/contracts/mrea_contracts_v1.schema.json`;
+- `core/contracts/POLICIES_V1.md`;
+- `tests/fixtures/contracts/`.
 
-**Проблема:** корректный перенос простых 2D entities в CAD interchange format без собственной реализации DXF serialization rules.  
-**Есть ли готовое open-source решение:** YES — `ezdxf`.  
-**Можно ли использовать:** YES.  
-**Что используем:** `ezdxf==1.4.4`, `ezdxf.addons.r12writer.r12writer`, ASCII DXF R12, `fixed_tables=True`.  
-**Что пишем сами:** только mapping `CadSketch` entities → публичные операции `r12writer` (`add_point`, `add_line`, `add_circle`, `add_arc`, `add_polyline_2d`).  
-**Почему:** SSOT прямо запрещает без причины переписывать стабильный DXF tooling. `ezdxf` предоставляет готовый R12 writer, поэтому low-level group-code serialization удалена из ownership Chat 4.  
-**Construction geometry:** остаётся на layer `0`, но получает стандартный `DASHED` linetype из fixed R12 tables.  
-**Validation:** generated DXF повторно читается через `ezdxf.read()` в unit test; проверяются entity types и construction linetype.  
-**Lock-in risk:** LOW/MEDIUM — exporter зависит от публичного API `r12writer`, но boundary остаётся `CadExporter`, поэтому implementation можно заменить.  
-**Fallback:** перейти на основной `ezdxf` document API или другой зрелый DXF writer без изменения internal CAD model/shared contracts.
+Chat 4 не создаёт параллельные shared DTO.
 
-## 4. Verification core
+## SVG
 
-**Проблема:** сравнить verified physical dimensions с CAD read-back без silent correction.  
-**Есть ли готовое open-source решение:** общие numeric/testing libraries существуют, но доменная policy специфична MREA.  
-**Можно ли использовать:** PARTIAL.  
-**Что используем:** стандартная арифметика Python.  
-**Что пишем сами:** status mapping `VERIFIED/MISMATCH/MISSING/CONSTRAINT_CONFLICT`, explicit tolerance input, deterministic report ordering.  
-**Почему:** это уникальная доменная логика MREA; tolerance намеренно не угадывается и обязана приходить от утверждённой policy/contract boundary.  
-**Lock-in risk:** LOW.  
-**Fallback:** заменить numeric representation после Integrator ADR, сохранив no-silent-correction invariant.
+**Проблема:** простой deterministic 2D interchange/preview.  
+**Reuse:** стандартная XML/string generation достаточна для текущего subset.  
+**Fallback:** XML/SVG library при усложнении metadata/styles/transforms.  
+**Lock-in:** LOW.
+
+## DXF
+
+**Проблема:** корректный CAD interchange без собственной реализации DXF serialization.  
+**Reuse:** YES.  
+**Используем:** `ezdxf==1.4.4`, R12 writer.  
+**Пишем сами:** только mapping internal entities → public `ezdxf` API.  
+**Validation:** generated DXF parse-back через `ezdxf.read()`.  
+**Lock-in:** LOW/MEDIUM; exporter скрыт за `CadExporter`.
+
+## Verification
+
+**Проблема:** MREA-specific no-silent-correction numerical CAD transfer verification.  
+**Reuse:** canonical policy + standard arithmetic.  
+**Пишем сами:** domain state transitions и report mapping.  
+**Canonical tolerance:** `1e-6 mm`, `1e-6 deg`.  
+**Lock-in:** LOW.
+
+## JSON Schema contract tests
+
+**Проблема:** гарантировать совместимость local mapper с Integrator-owned schemas.  
+**Reuse:** YES.  
+**Используем:** `jsonschema==4.26.0` только как development/test dependency.  
+**Пишем сами:** golden mapping assertions и exact fixture comparison.  
+**Почему:** дублировать JSON Schema validator не имеет смысла.  
+**Lock-in:** LOW.
 
 ## Dependencies
 
-Runtime dependency Chat 4 baseline:
+Runtime:
 
 ```text
 ezdxf==1.4.4
 ```
 
-Тесты остаются на standard-library `unittest`; отдельная test framework dependency не требуется.
+Development/tests:
 
-## Ограничение baseline
-
-Этот код **не определяет** `SketchPackage`, `CADPackage` или `CADVerificationReport` как shared contracts. Он является внутренним Chat 4 core. Contract mappers появятся только после публикации Integrator-owned schemas/fixtures.
+```text
+jsonschema==4.26.0
+```

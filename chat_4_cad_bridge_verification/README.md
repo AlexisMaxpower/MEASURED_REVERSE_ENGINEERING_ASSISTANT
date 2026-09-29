@@ -6,99 +6,97 @@
 
 Chat 4 отвечает за вертикальный слайс `CAD Bridge & Verification`:
 
-- экспорт `SketchPackage` в SVG/DXF;
+- canonical `SketchPackage` intake;
+- SVG/DXF export;
+- `CADPackage`;
 - общий CAD adapter interface;
 - SOLIDWORKS adapter;
-- создание CAD sketch;
-- создание geometry entities;
-- создание CAD dimensions и constraints;
-- сохранение связи CAD dimensions с `measurement_id`;
-- read-back созданного sketch;
-- сравнение ожидаемых verified measurements с фактическими CAD values;
-- формирование `CADVerificationReport`;
+- создание CAD sketch/entities/dimensions/constraints;
+- сохранение связи CAD dimensions с `dimension_id` и `measurement_id`;
+- CAD read-back;
+- `CADVerificationReport`;
 - CAD integration tests.
 
-Chat 4 не владеет capture, measurement extraction, geometry semantics, lifecycle или shared contracts и не изменяет их без решения Integrator.
+Chat 4 не владеет capture, measurement extraction, geometry semantics, lifecycle или shared contracts.
+
+## Source of truth
+
+Для cross-slice boundary используются только:
+
+- `../core/contracts/mrea_contracts_v1.schema.json`;
+- `../core/contracts/POLICIES_V1.md`;
+- `../tests/fixtures/contracts/`.
+
+Slice-local models являются implementation details.
 
 ## Реализованный baseline
 
-Внутри Chat 4 уже есть независимый CAD-core:
+```text
+SketchPackage v1
+    ↓ canonical mapper
+MappedSketchPackage
+    ├─ internal CadSketch
+    ├─ canonical entities/dimensions/constraints/unresolved
+    └─ verified dimensions + transfer tolerance
+          ↓
+      VerificationEngine
+          ↓
+internal VerificationReport
+          ↓ canonical mapper
+CADVerificationReport v1
+```
 
-- immutable internal 2D CAD model;
+Также реализованы:
+
 - deterministic SVG exporter;
 - DXF R12 exporter через `ezdxf`;
-- pure verification engine;
-- unit tests;
-- Build / Reuse Check;
-- Change Request для отсутствующих canonical CAD contracts.
+- `CADPackage v1` builder;
+- canonical golden contract tests;
+- no-silent-correction verification statuses.
 
-DXF serialization низкого уровня самостоятельно не реализуется. Используется:
+## Dependencies
+
+Runtime:
 
 ```text
 ezdxf==1.4.4
 ```
 
-## Технологический baseline
-
-SOLIDWORKS integration:
-
-- C#;
-- .NET;
-- SOLIDWORKS API;
-- COM.
-
-Generic CAD bridge:
-
-- SVG;
-- DXF;
-- JSON `SketchPackage` как будущий canonical input boundary.
-
-## Структура
+Development / contract tests:
 
 ```text
-chat_4_cad_bridge_verification/
-├─ README.md
-├─ requirements.txt
-├─ src/
-│  └─ mrea_cad_bridge/
-│     ├─ model.py
-│     ├─ adapter.py
-│     ├─ verification.py
-│     └─ exporters/
-│        ├─ svg.py
-│        └─ dxf.py
-├─ tests/
-│  ├─ test_exporters.py
-│  └─ test_verification.py
-└─ docs/
-   ├─ CHAT_4_ROLE.md
-   ├─ IMPLEMENTATION_STATE.md
-   ├─ BUILD_REUSE_CHECK_CAD_CORE.md
-   └─ CHANGE_REQUEST_001_CAD_CONTRACT_BASELINE.md
+jsonschema==4.26.0
 ```
 
-## Локальная проверка
+## Проверка
+
+Из `chat_4_cad_bridge_verification/`:
 
 ```text
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 PYTHONPATH=src python -m unittest discover -s tests -v
 ```
 
-Текущий baseline: 9 tests, `OK`.
+Текущий baseline: **14 tests, OK**.
 
-DXF test не ограничивается проверкой строк: generated DXF повторно читается через `ezdxf.read()`.
+Contract tests читают реальные canonical schema/fixtures из repository root, а не локальные копии.
 
-## Текущий blocker
+## Текущий следующий этап
 
-Canonical shared-contract schemas/fixtures для `SketchPackage` и `CADVerificationReport` пока не опубликованы Integrator-ом. Поэтому Chat 4 намеренно не создаёт собственные shared DTO и не реализует contract boundary по догадкам.
+Canonical contract blocker снят. Следующий vendor-specific этап — SOLIDWORKS C#/.NET/COM adapter и CAD read-back. Он остаётся зависимым от утверждённого Windows/SOLIDWORKS target environment.
 
 ## Главный инвариант
 
-Ни один mismatch между verified physical measurement и CAD read-back не должен скрываться или автоматически исправляться.
+Verified physical value не корректируется по CAD read-back.
 
-Допустимые verification statuses:
+Допустимые item statuses:
 
 - `VERIFIED`;
 - `MISMATCH`;
 - `MISSING`;
 - `CONSTRAINT_CONFLICT`.
+
+Canonical `overall_status`:
+
+- `VERIFIED`;
+- `FAILED`.

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 from math import isfinite
-from typing import Mapping, AbstractSet
+from typing import AbstractSet, Mapping
 
 
 class VerificationStatus(StrEnum):
@@ -15,26 +15,34 @@ class VerificationStatus(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class ExpectedDimension:
-    measurement_id: str
-    expected_value_mm: float
-    tolerance_mm: float
+    dimension_id: str
+    measurement_id: str | None
+    expected_value: float
+    unit: str
+    tolerance: float
 
     def __post_init__(self) -> None:
-        if not self.measurement_id:
-            raise ValueError("measurement_id must not be empty")
-        if not isfinite(self.expected_value_mm):
-            raise ValueError("expected_value_mm must be finite")
-        if not isfinite(self.tolerance_mm) or self.tolerance_mm < 0:
-            raise ValueError("tolerance_mm must be finite and >= 0")
+        if not self.dimension_id:
+            raise ValueError("dimension_id must not be empty")
+        if self.measurement_id == "":
+            raise ValueError("measurement_id must be null or non-empty")
+        if self.unit not in {"mm", "deg"}:
+            raise ValueError(f"unsupported unit: {self.unit}")
+        if not isfinite(self.expected_value):
+            raise ValueError("expected_value must be finite")
+        if not isfinite(self.tolerance) or self.tolerance < 0:
+            raise ValueError("tolerance must be finite and >= 0")
 
 
 @dataclass(frozen=True, slots=True)
 class DimensionVerification:
-    measurement_id: str
-    expected_value_mm: float
-    actual_value_mm: float | None
-    tolerance_mm: float
-    delta_mm: float | None
+    dimension_id: str
+    measurement_id: str | None
+    expected_value: float
+    actual_value: float | None
+    unit: str
+    tolerance: float
+    difference: float | None
     status: VerificationStatus
 
 
@@ -42,75 +50,79 @@ class DimensionVerification:
 class VerificationReport:
     results: tuple[DimensionVerification, ...]
 
-    def by_measurement_id(self) -> dict[str, DimensionVerification]:
-        return {result.measurement_id: result for result in self.results}
+    def by_dimension_id(self) -> dict[str, DimensionVerification]:
+        return {result.dimension_id: result for result in self.results}
 
 
 class VerificationEngine:
-    """Pure comparison logic.
-
-    This model intentionally does not define the shared CADVerificationReport contract.
-    A future boundary mapper must translate this internal report into the Integrator-owned
-    contract once that schema exists.
-    """
+    """Pure numerical-transfer comparison keyed by canonical dimension_id."""
 
     def verify(
         self,
         expected: tuple[ExpectedDimension, ...],
-        actual_values_mm: Mapping[str, float],
+        actual_values: Mapping[str, float],
         constraint_conflicts: AbstractSet[str] = frozenset(),
     ) -> VerificationReport:
         seen: set[str] = set()
         results: list[DimensionVerification] = []
 
-        for item in sorted(expected, key=lambda dim: dim.measurement_id):
-            if item.measurement_id in seen:
-                raise ValueError(f"duplicate expected measurement_id: {item.measurement_id}")
-            seen.add(item.measurement_id)
+        for item in expected:
+            if item.dimension_id in seen:
+                raise ValueError(f"duplicate expected dimension_id: {item.dimension_id}")
+            seen.add(item.dimension_id)
 
-            if item.measurement_id in constraint_conflicts:
+            if item.dimension_id in constraint_conflicts:
+                actual = actual_values.get(item.dimension_id)
+                if actual is not None and not isfinite(actual):
+                    raise ValueError(f"actual value for {item.dimension_id} must be finite")
                 results.append(
                     DimensionVerification(
+                        dimension_id=item.dimension_id,
                         measurement_id=item.measurement_id,
-                        expected_value_mm=item.expected_value_mm,
-                        actual_value_mm=actual_values_mm.get(item.measurement_id),
-                        tolerance_mm=item.tolerance_mm,
-                        delta_mm=None,
+                        expected_value=item.expected_value,
+                        actual_value=actual,
+                        unit=item.unit,
+                        tolerance=item.tolerance,
+                        difference=None,
                         status=VerificationStatus.CONSTRAINT_CONFLICT,
                     )
                 )
                 continue
 
-            if item.measurement_id not in actual_values_mm:
+            if item.dimension_id not in actual_values:
                 results.append(
                     DimensionVerification(
+                        dimension_id=item.dimension_id,
                         measurement_id=item.measurement_id,
-                        expected_value_mm=item.expected_value_mm,
-                        actual_value_mm=None,
-                        tolerance_mm=item.tolerance_mm,
-                        delta_mm=None,
+                        expected_value=item.expected_value,
+                        actual_value=None,
+                        unit=item.unit,
+                        tolerance=item.tolerance,
+                        difference=None,
                         status=VerificationStatus.MISSING,
                     )
                 )
                 continue
 
-            actual = actual_values_mm[item.measurement_id]
+            actual = actual_values[item.dimension_id]
             if not isfinite(actual):
-                raise ValueError(f"actual value for {item.measurement_id} must be finite")
+                raise ValueError(f"actual value for {item.dimension_id} must be finite")
 
-            delta = actual - item.expected_value_mm
+            difference = abs(actual - item.expected_value)
             status = (
                 VerificationStatus.VERIFIED
-                if abs(delta) <= item.tolerance_mm
+                if difference <= item.tolerance
                 else VerificationStatus.MISMATCH
             )
             results.append(
                 DimensionVerification(
+                    dimension_id=item.dimension_id,
                     measurement_id=item.measurement_id,
-                    expected_value_mm=item.expected_value_mm,
-                    actual_value_mm=actual,
-                    tolerance_mm=item.tolerance_mm,
-                    delta_mm=delta,
+                    expected_value=item.expected_value,
+                    actual_value=actual,
+                    unit=item.unit,
+                    tolerance=item.tolerance,
+                    difference=difference,
                     status=status,
                 )
             )
