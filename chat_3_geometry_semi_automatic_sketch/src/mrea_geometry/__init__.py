@@ -1,8 +1,6 @@
-"""Internal deterministic geometry core owned by MREA Chat 3.
+"""Deterministic geometry core and canonical v1 bridge owned by MREA Chat 3."""
 
-It intentionally does not define or serialize canonical shared contracts.
-"""
-
+from .contracts import CanonicalGeometryInput, CanonicalInputAdapter
 from .core import (
     AnchorEntityMatcher,
     ConstraintCandidateEngine,
@@ -22,13 +20,17 @@ from .models import (
     Line,
     MeasurementRef,
     Point2D,
+    PointEntity,
     UnresolvedBinding,
 )
+from .sketch_package import SketchPackageBuilder
 
 __all__ = [
     "AnchorEntityMatcher",
     "AnchorRef",
     "Arc",
+    "CanonicalGeometryInput",
+    "CanonicalInputAdapter",
     "Circle",
     "ConstraintCandidate",
     "ConstraintCandidateEngine",
@@ -42,5 +44,7 @@ __all__ = [
     "Line",
     "MeasurementRef",
     "Point2D",
+    "PointEntity",
+    "SketchPackageBuilder",
     "UnresolvedBinding",
 ]
