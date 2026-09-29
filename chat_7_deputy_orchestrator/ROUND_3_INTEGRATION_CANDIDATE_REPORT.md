@@ -7,17 +7,35 @@
 ## Integration candidate
 
 **Branch:** `integration/pass-3-candidate`  
-**Exact final candidate SHA:** `199cf5a15a22a6b6a01b54540f5f856a18ca7752`  
-**Exact corrected main base:** `b78eb3f7d8295ca7693cbc6cf060c1474b0ea050`  
-**Candidate tree:** `7aa08438de7a3f0b57acef62b9654c079bb3dfa3`  
+**Exact final candidate SHA:** `1c9ccb432664e57a24be8fe586bb07ad13fd5075`  
+**Exact current main base:** `dcdb1b7a1399415522a1a17a7979dda536f116f4`  
+**Candidate tree:** `435dda140d3980256ca32c42bd07d81b15c4328c`  
 **Parent count:** 1  
-**Parent:** corrected main `b78eb3f7d8295ca7693cbc6cf060c1474b0ea050`
+**Parent:** current main `dcdb1b7a1399415522a1a17a7979dda536f116f4`
 
 The candidate branch is intentionally frozen on the exact SHA above. Stage-2 documentation is stored on `chat-7/round-3-stage2-report` so documentation-only commits do not change the tested candidate SHA.
 
+## Why this rebuild exists
+
+Chat 8 Finding 002 required the Round-3 golden-path job to run on post-merge `main`, not only on the integration candidate.
+
+Chat 6 changed `.github/workflows/ci.yml` on `main` at:
+
+`dcdb1b7a1399415522a1a17a7979dda536f116f4`
+
+so `Integration / Round 3 golden path` is now enabled for:
+
+- `main`;
+- integration-candidate pull requests;
+- integration-candidate pushes.
+
+The pre-merge `main` run `36643094207` then failed because pre-merge `main` does not yet contain `tests/integration/test_round3_golden_path.py` or the accepted Round-3 worker trees. No skip, placeholder, or weaker substitute was introduced.
+
+This Stage-2 rebuild therefore verifies the corrected workflow on the actual accepted Round-3 candidate while preserving the final post-merge-main gate for Chat 8.
+
 ## Accepted frozen worker inputs
 
-Only these previously accepted Round-3 worker heads were integrated:
+Only these previously accepted Round-3 worker heads are integrated:
 
 | Slice | Frozen head | Integrated directory tree |
 |---|---|---|
@@ -27,94 +45,52 @@ Only these previously accepted Round-3 worker heads were integrated:
 | Chat 4 | `08beb9c45cdc1bbbcdebe220059a64288a880095` | `c19331c4d91c8069e52e04a2a213e1f13d16dcdd` |
 | Chat 5 | `cdc5baceb281b657680d1e38cc49ea8094669ad8` | `9e66264d5d19932883a34e753f320cefb8e76a8b` |
 
-No frozen worker branch was reopened or changed. No Pass-4 or Pass-5 branch content was integrated.
+No frozen worker branch was reopened or changed. No Pass-4, Pass-5, or Pass-6 worker tree was integrated.
 
-## Shared baseline retained from corrected main
+## Integration method
 
-The candidate retains shared repository state from exact main `b78eb3f7d8295ca7693cbc6cf060c1474b0ea050`, including:
-
-- corrected `.github/workflows/ci.yml` candidate trigger and boundary conditions;
-- canonical contracts;
-- canonical fixtures;
-- shared boundary integration tests;
-- Chat-6 orchestration records;
-- Chat-8 `FINAL_REVIEW_FINDING_001` record.
-
-The candidate does not import shared files from worker histories.
-
-## Preserved golden path
-
-`tests/integration/test_round3_golden_path.py` is preserved from the previous candidate exactly as blob:
-
-`2e05dab6f2b82499b0bc23496a6e029d43d3e765`
-
-It exercises the available automated Round-3 route:
-
-```text
-Capture
-  -> canonical CapturePackage
-Measurement
-  -> voice-reported candidate + explicit user confirmation
-  -> canonical MeasurementPackage
-Geometry
-  -> IMAGE_PX -> MAT_XY_MM normalization + measurement binding
-  -> canonical SketchPackage
-CAD
-  -> generic transfer/read-back verification
-  -> CADPackage + VERIFIED CADVerificationReport
-Lifecycle
-  -> CAD revision -> manufacturing -> PhysicalPartInstance
-```
-
-It deliberately does not claim real SOLIDWORKS COM execution.
-
-## Integration method and conflicts
-
-Integration was performed as a clean tree rebuild from corrected main rather than by merging historical worker branches.
+The new candidate was rebuilt directly from the current `main` tree rather than merging worker histories.
 
 Method:
 
-1. start from corrected main tree `b55a540d67208fdf933fff0620d3fa394f9a4c5d`;
-2. replace only each worker-owned slice directory with the exact tree from its frozen Round-3 head;
-3. add the preserved golden-path blob;
-4. create one candidate commit with corrected main as its only parent;
-5. force-update `integration/pass-3-candidate` to the resulting exact commit.
+1. base tree: current `main` tree from `dcdb1b7a1399415522a1a17a7979dda536f116f4`;
+2. replace only `chat_1_project_guided_capture/` through `chat_5_lifecycle_engineering_knowledge/` with the exact accepted Round-3 trees listed above;
+3. preserve `tests/integration/test_round3_golden_path.py` exactly as blob `2e05dab6f2b82499b0bc23496a6e029d43d3e765`;
+4. create one candidate commit with current `main` as its only parent;
+5. update `integration/pass-3-candidate` to the exact resulting commit.
+
+Candidate commit:
+
+`1c9ccb432664e57a24be8fe586bb07ad13fd5075`
+
+Candidate tree:
+
+`435dda140d3980256ca32c42bd07d81b15c4328c`
 
 Merge conflicts: **none**.  
-Manual source-code conflict resolution: **none**.  
+Manual worker source-code conflict resolution: **none**.  
 Canonical contract mutation by Chat 7: **none**.
 
-## Corrected main CI evidence
+## Preserved shared baseline
 
-Corrected main:
+Because the current `main` is the direct parent, the candidate inherits the latest shared state, including:
 
-- SHA: `b78eb3f7d8295ca7693cbc6cf060c1474b0ea050`;
-- MREA CI run: `36638429445`;
-- conclusion: `SUCCESS`.
-
-Actually executed + SUCCESS on corrected main:
-
-- Contracts / canonical fixtures;
-- Chat 1 / Capture;
-- Chat 2 / Measurement;
-- Chat 3 / Geometry;
-- Chat 4 / Generic CAD gate;
-- Chat 5 / Lifecycle;
-- Integration / Chat 1 -> Chat 2;
-- Integration / Chat 2 -> Chat 3;
-- Integration / Chat 3 -> Chat 4;
-- Integration / Chat 4 -> Chat 5.
-
-The Round-3 golden job is candidate-only and is expected to be skipped on main.
+- the Finding-002 CI correction enabling the golden job on `main`;
+- Chat-8 Finding 002 documentation;
+- canonical contracts and fixtures;
+- shared integration tests;
+- Chat-6 orchestration state.
 
 ## Candidate CI evidence
 
-**Authoritative candidate run:** `36638965404`  
+**Authoritative candidate run:** `36644505122`  
 **Workflow:** `MREA CI`  
 **Event:** `push`  
-**Head SHA:** `199cf5a15a22a6b6a01b54540f5f856a18ca7752`  
+**Head SHA:** `1c9ccb432664e57a24be8fe586bb07ad13fd5075`  
 **Status:** `completed`  
 **Conclusion:** `success`
+
+Actually executed and `SUCCESS`:
 
 | Required job | Conclusion |
 |---|---|
@@ -130,9 +106,39 @@ The Round-3 golden job is candidate-only and is expected to be skipped on main.
 | Integration / Chat 4 -> Chat 5 | `SUCCESS` |
 | Integration / Round 3 golden path | `SUCCESS` |
 
-All mandatory boundary jobs were actually executed. None of the four boundary gates or the golden-path gate is accepted as `skipped`.
+No mandatory boundary or golden-path gate is accepted as `skipped`.
 
-The golden-path job step `Run Round 3 Capture -> Physical Instance golden path` completed `SUCCESS`.
+The golden-path step `Run Round 3 Capture -> Physical Instance golden path` executed and completed `SUCCESS`.
+
+## PR state
+
+PR #27 targets `main` from `integration/pass-3-candidate`.
+
+At the time of this report:
+
+- base SHA: `dcdb1b7a1399415522a1a17a7979dda536f116f4`;
+- head SHA: `1c9ccb432664e57a24be8fe586bb07ad13fd5075`;
+- mergeable: `true`;
+- merged: `false`.
+
+Its description has been updated to the exact current candidate and CI evidence so it no longer advertises the superseded `199cf5a...` candidate.
+
+## Finding 002 truth state
+
+```text
+FINDING_002_CI_DESIGN_CORRECTION = IMPLEMENTED
+PRE_MERGE_MAIN_GOLDEN_RUN = EXECUTED_BUT_FAILED_TEST_FILE_ABSENT
+REBUILT_CANDIDATE_FROM_CURRENT_MAIN = PASS
+FOUR_BOUNDARY_GATES_ON_CANDIDATE = PASS
+ROUND3_GOLDEN_ON_CANDIDATE = PASS
+FULL_CANDIDATE_CI = PASS
+FINAL_REVIEW = PENDING_CHAT_8
+FINAL_MERGE = NOT_PERFORMED
+POST_MERGE_MAIN_GOLDEN = NOT_YET_EXECUTED
+ROUND_3 = NOT_CLOSED
+```
+
+Finding 002 is not declared closed by Chat 7. Chat 8 owns the protocol decision, final merge authorization, and the required post-merge `main` evidence.
 
 ## External gates
 
@@ -148,13 +154,6 @@ Status:
 
 These are not represented as PASS by Linux CI or TestDouble CAD evidence.
 
-## Known limitations
-
-- real-host SOLIDWORKS validation remains external;
-- the software golden path uses the generic `TestDoubleCadAdapter` for CAD read-back verification;
-- worker-specific limitations documented in each frozen Pass-3 handoff remain in force;
-- this Stage-2 report does not accept any Pass-4/Pass-5 work into Round 3.
-
 ## Handoff to Chat 8
 
 ```text
@@ -165,13 +164,19 @@ Candidate branch:
 integration/pass-3-candidate
 
 Exact tested candidate SHA:
-199cf5a15a22a6b6a01b54540f5f856a18ca7752
+1c9ccb432664e57a24be8fe586bb07ad13fd5075
+
+Current main parent:
+dcdb1b7a1399415522a1a17a7979dda536f116f4
 
 Candidate CI run:
-36638965404 — SUCCESS
+36644505122 — SUCCESS
+
+Finding 002:
+OPEN UNTIL CHAT 8 FINAL REVIEW + CERTIFIED MERGE + POST-MERGE MAIN GOLDEN SUCCESS
 
 External gate:
 REAL SOLIDWORKS 2026 HOST = EXTERNAL_GATE_UNVERIFIED
 ```
 
-Chat 7 does not merge the candidate into `main` and does not close the round. Final Review, final merge decision, post-merge main CI, and round closure remain owned by Chat 8.
+Chat 7 does not merge the candidate into `main` and does not close Round 3.
