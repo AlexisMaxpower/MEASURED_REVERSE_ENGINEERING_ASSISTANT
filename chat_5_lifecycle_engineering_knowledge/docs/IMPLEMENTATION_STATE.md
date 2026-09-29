@@ -3,97 +3,115 @@
 ## Snapshot
 
 - Date: **2026-09-29**
-- Branch: `main`
+- Branch: `chat-5/pass-2`
 - Slice: **Lifecycle & Engineering Knowledge**
-- SSOT: **MREA v0.1**
-- Orchestrator directive: **OD-2026-09-29-001**
-- State: **Phase 2 canonical LifecycleEvent adapter implemented and locally verified**
+- SSOT: **MREA v0.1 + orchestration addendum v0.2**
+- Orchestrator directive: **OD-2026-09-29-002**
+- State: **Pass 2 CAD verification → lifecycle gate implemented and locally verified**
 
-## Реализовано
+## Accepted baseline from Pass 1
 
-Phase 1 остаётся действующим: Revision/Manufacturing/Installation/Test/Failure domain, services, timeline, equipment registry, state projection, revision comparison, deterministic knowledge queries и in-memory store.
+Still active:
 
-Phase 2 добавляет:
+- Revision / Manufacturing / Installation / Test / Failure domain;
+- lifecycle services;
+- timeline and equipment registry;
+- lifecycle state projection;
+- revision comparison;
+- deterministic knowledge queries;
+- `CanonicalLifecycleEventAdapter` for `mrea.lifecycle-event.v1`;
+- evidence-preserving canonical lifecycle export.
 
-- `src/mrea_lifecycle/adapters.py`;
-- `CanonicalLifecycleEventAdapter`;
-- canonical schema version constant;
-- deterministic export по `sequence`;
-- UTC ISO-8601 serialization;
-- boundary validation;
-- `tests/test_canonical_adapter.py`;
-- `docs/PHASE_2_CANONICAL_LIFECYCLE_ADAPTER.md`.
+## Pass 2 additions
+
+### Models
+
+- `RevisionOrigin` (`MANUAL`, `CAD_TRANSFER`);
+- `CADVerificationStatus` (`VERIFIED`, `FAILED`);
+- `CADArtifactReference` internal snapshot;
+- `CADRevisionLink`;
+- `Revision.origin`;
+- `Revision.cad_link`.
+
+### Application path
+
+- `CADRevisionPreparationService`;
+- canonical CADPackage schema/version checks;
+- canonical CADVerificationReport schema/version checks;
+- package/report ID linkage validation;
+- CAD artifact traceability retention;
+- explicit CAD manufacturing eligibility gate.
+
+### Manufacturing rule
+
+For `RevisionOrigin.CAD_TRANSFER`:
+
+```text
+verification_status == VERIFIED → eligible
+verification_status == FAILED   → blocked
+missing CAD link                 → invalid revision
+```
+
+No silent override exists.
+
+The explicit `MANUAL` origin preserves the pre-existing Phase-1 internal/manual flow and is not treated as a CAD verification result.
 
 ## Canonical inputs
 
-По директиве Chat 6 используются:
+Consumed without modification:
 
 - `core/contracts/mrea_contracts_v1.schema.json`;
 - `core/contracts/POLICIES_V1.md`;
+- `tests/fixtures/contracts/cad_package_v1.json`;
+- `tests/fixtures/contracts/cad_verification_v1.json`;
 - `tests/fixtures/contracts/lifecycle_event_v1.json`.
 
-Shared files Chat 5 не изменял.
+Shared contracts remain owned by Chat 6.
 
-## Contract semantics
+## Tests
 
-`CR-CHAT5-001` считается **RESOLVED** директивой Chat 6:
-
-```text
-LifecycleEvent v1 = canonical shared outbound contract
-LifecycleState = internal derived projection Chat 5
-```
-
-Rich lifecycle models остаются внутренними.
-
-## Acceptance target
-
-Поддержан экспорт последовательности:
-
-```text
-REVISION_CREATED
-→ MANUFACTURED
-→ INSTALLED
-→ FAILED
-→ REVISION_CREATED (next revision)
-```
-
-Canonical traceability сохраняется через `manufacturing_id`, `installation_id`, `test_id`, `failure_id`.
-
-Failure evidence остаётся во внутреннем `FailureRecord.evidence_artifact_ids` и не теряется при export.
-
-## Verification
-
-Локальный полный набор Chat 5 tests:
+Full Chat 5 suite:
 
 ```text
 PYTHONPATH=src pytest -q
-8 passed
+13 passed
 ```
 
-Проверены Phase 1 tests плюс:
+New coverage:
 
-- sync constants с Integrator-owned schema;
-- exact golden fixture output;
-- deterministic ordered export;
-- traceability IDs;
-- evidence retention;
-- timezone-aware timestamps.
+- VERIFIED CAD → Revision → manufacturing;
+- FAILED CAD retained but manufacturing rejected;
+- `cad_package_id` mismatch rejected;
+- `sketch_package_id` mismatch rejected;
+- CAD IDs/artifacts retained;
+- metadata defensive copy;
+- missing/non-canonical verification rejected;
+- existing canonical LifecycleEvent export unchanged.
 
-Repository-wide CI в этой итерации не запускался.
+## Files added in Pass 2
 
-## Не реализовано
+- `tests/test_cad_lifecycle_linkage.py`;
+- `docs/PASS_2_CAD_LIFECYCLE_LINKAGE.md`;
+- `ORCHESTRATOR_HANDOFF.md` (written after tested implementation SHA is known).
+
+## Files modified in Pass 2
+
+- `src/mrea_lifecycle/models.py`;
+- `src/mrea_lifecycle/services.py`;
+- `src/mrea_lifecycle/__init__.py`;
+- `README.md`;
+- `docs/IMPLEMENTATION_STATE.md`.
+
+## Not implemented
 
 - production persistence;
 - repository abstraction;
-- `PhysicalPartInstance`;
-- removal/replacement semantics;
+- physical instance/removal/replacement semantics;
 - REST/API;
 - concurrency/versioning;
 - migrations;
 - semantic search / AI.
 
-## Следующий шаг
+## Next step
 
-Перед следующей итерацией снова прочитать `ORCHESTRATOR_DIRECTIVE.md`, canonical contracts и актуальный repository state.
-
-Если приоритеты не изменились: repository abstraction → physical instance/removal/replacement semantics → persistence prototype → API boundary.
+Do not continue past this integration gate until Chat 6 reviews Pass 2 and issues the next directive.
