@@ -9,7 +9,7 @@ Chat 4 отвечает за вертикальный слайс `CAD Bridge & V
 - canonical `SketchPackage` intake;
 - SVG/DXF export;
 - `CADPackage`;
-- общий CAD adapter interface;
+- vendor-neutral CAD adapter/read-back boundary;
 - SOLIDWORKS adapter;
 - создание CAD sketch/entities/dimensions/constraints;
 - сохранение связи CAD dimensions с `dimension_id` и `measurement_id`;
@@ -25,7 +25,8 @@ Chat 4 не владеет capture, measurement extraction, geometry semantics, 
 
 - `../core/contracts/mrea_contracts_v1.schema.json`;
 - `../core/contracts/POLICIES_V1.md`;
-- `../tests/fixtures/contracts/`.
+- `../tests/fixtures/contracts/`;
+- `ORCHESTRATOR_DIRECTIVE.md`.
 
 Slice-local models являются implementation details.
 
@@ -36,22 +37,30 @@ SketchPackage v1
     ↓ canonical mapper
 MappedSketchPackage
     ├─ internal CadSketch
-    ├─ canonical entities/dimensions/constraints/unresolved
-    └─ verified dimensions + transfer tolerance
+    └─ verified dimensions
+          ↓
+      CadAdapter
+          ↓
+CadDimensionBinding + normalized CadReadBack
           ↓
       VerificationEngine
           ↓
 internal VerificationReport
           ↓ canonical mapper
-CADVerificationReport v1
+CADPackage v1 + CADVerificationReport v1
 ```
 
-Также реализованы:
+Generic layer:
 
 - deterministic SVG exporter;
-- DXF R12 exporter через `ezdxf`;
-- `CADPackage v1` builder;
-- canonical golden contract tests;
+- DXF R12 exporter via `ezdxf`;
+- canonical `CADPackage v1` builder;
+- canonical `CADVerificationReport v1` builder;
+- vendor-neutral `CadAdapter` protocol;
+- explicit `dimension_id ↔ measurement_id ↔ vendor_dimension_ref` mapping;
+- normalized CAD read-back in `mm` / `deg`;
+- deterministic `TestDoubleCadAdapter`;
+- full canonical golden flow without installed SOLIDWORKS;
 - no-silent-correction verification statuses.
 
 ## Dependencies
@@ -77,13 +86,22 @@ pip install -r requirements-dev.txt
 PYTHONPATH=src python -m unittest discover -s tests -v
 ```
 
-Текущий baseline: **14 tests, OK**.
+Repository test inventory after the adapter-baseline change: **20 tests**.
+
+Последний clean baseline до этой итерации: **14 tests, OK**. Новый adapter/pipeline набор отдельно выполнен: **6 tests, OK**. Fresh full 20-test checkout run остаётся integration verification item, потому что текущий execution container не имеет outbound DNS к GitHub.
 
 Contract tests читают реальные canonical schema/fixtures из repository root, а не локальные копии.
 
 ## Текущий следующий этап
 
-Canonical contract blocker снят. Следующий vendor-specific этап — SOLIDWORKS C#/.NET/COM adapter и CAD read-back. Он остаётся зависимым от утверждённого Windows/SOLIDWORKS target environment.
+Generic CAD gate закрыт. Следующий vendor-specific этап — SOLIDWORKS C#/.NET/COM adapter за уже существующим normalized boundary.
+
+До реализации необходимо зафиксировать target environment:
+
+- supported SOLIDWORKS version;
+- .NET target;
+- interop strategy;
+- Windows/SOLIDWORKS test host.
 
 ## Главный инвариант
 
