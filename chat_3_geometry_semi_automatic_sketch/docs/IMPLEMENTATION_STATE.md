@@ -2,169 +2,258 @@
 
 **Date:** 2026-09-29  
 **Repository:** `AlexisMaxpower/MEASURED_REVERSE_ENGINEERING_ASSISTANT`  
-**Active branch:** `chat-3/pass-3`  
+**Active branch:** `chat-3/pass-4`  
 **Role:** Chat 3 — Geometry & Semi-Automatic Sketch  
-**Directive:** `OD-2026-09-29-003`  
-**Ring:** 3
+**Ring:** 4  
+**Authorization:** explicit user-requested Pass 4; no Chat 6 `OD-004` was present on `main` when this branch was created.
 
-## Accepted baseline
+## Baseline
 
-Ring 2 was accepted and merged by Chat 6. The real Chat 2 `IMAGE_PX` → Chat 3 `MAT_XY_MM` boundary is green and remains unchanged.
+Ring 4 was branched from the frozen Ring 3 head:
 
-Existing accepted capabilities include:
+```text
+08e716161a8c9173b7583d6ad87c84c10ddc4221
+```
 
-- canonical CapturePackage / MeasurementPackage normalization;
-- calibrated homography application;
+This preserves the complete Ring 3 OpenCV image-extraction implementation even though Chat 6 had not yet merged/published a Pass 4 directive on `main`.
+
+## Capabilities implemented through Ring 3
+
+- canonical CapturePackage / MeasurementPackage adapter;
+- `IMAGE_PX -> MAT_XY_MM` homography normalization;
 - POINT / LINE / CIRCLE / ARC geometry models;
-- GeometryGraph;
+- deterministic GeometryGraph;
 - measurement binding;
 - verified-vs-derived conflict visibility;
 - deterministic SketchPackage v1 generation;
-- canonical unresolved projection.
+- OpenCV-backed reference-image LINE/CIRCLE/ARC candidate extraction;
+- truthful `VISION_DETECTED` provenance;
+- fail-closed ambiguous/unsupported geometry handling;
+- stable image and golden fixtures.
 
-## Ring 3 implemented
+## Ring 4 — Constraint Resolution
 
-### Real image candidate extraction
+Ring 4 adds the previously missing promotion layer between internal constraint candidates and canonical `SketchPackage.constraints`.
 
-Added `ImageGeometryExtractor` backed by `opencv-python-headless`.
-
-Reliable v1 promotion currently covers:
-
-- quadrilateral outer profiles → deterministic LINE candidates;
-- circular inner features → CIRCLE candidates;
-- controlled open circular components → ARC candidates.
-
-All promoted image geometry uses:
+New core component:
 
 ```text
-provenance = VISION_DETECTED
+ConstraintResolver
 ```
 
-and confidence below 1.0.
+New data structures:
 
-### Measurement truth
+- `ResolvedConstraint`;
+- `ConstraintIssue`;
+- `ConstraintResolution`.
 
-Image geometry is candidate evidence only. Existing verified dimensions remain sourced from canonical measurements and are never rewritten by CV.
-
-The tested reference flow is:
+## Constraint promotion pipeline
 
 ```text
-reference image + CapturePackage calibration
-        ↓
-ImageGeometryExtractor
-        ↓
-VISION_DETECTED primitives
-        +
-verified MeasurementPackage
-        ↓
 GeometryPipeline
         ↓
-VisionGeometryPipeline / SketchPackageBuilder
+ConstraintCandidateEngine
         ↓
-deterministic SketchPackage v1
+ConstraintResolver
+        ↓
+ResolvedConstraint + ConstraintIssue
+        ↓
+SketchPackageBuilder
+        ↓
+canonical constraints + unresolved
 ```
 
-### Fail-closed behavior
+The resolver does not move entities and does not modify verified dimensions.
 
-Unsupported or ambiguous observations remain explicit instead of becoming guessed geometry.
+## Promotion policy
 
-Examples:
+A relation is publishable only when:
 
-- ambiguous significant outer contours;
-- unsupported outer contour shape;
-- non-circular inner contour;
-- non-circle-preserving projective transform for CIRCLE/ARC;
-- unreliable open-curve fit or coverage.
+1. every referenced entity exists;
+2. effective confidence is at least the configured threshold;
+3. it is not redundant with stronger already-observed axis relations;
+4. it does not contradict verified physical measurements.
 
-Candidate issues are projected into canonical `SketchPackage.unresolved`.
+Default promotion confidence:
 
-### Calibration semantics
+```text
+0.95
+```
 
-LINE points may use a valid projective homography.
+Effective confidence:
 
-CIRCLE/ARC promotion requires a circle-preserving similarity transform because a general projective homography maps a circle to a conic. Chat 3 does not silently collapse such a conic back into a circle.
+```text
+min(candidate confidence, confidence of referenced entities when present)
+```
 
-## Stable fixtures / golden tests
+This prevents low-confidence vision geometry from becoming a high-confidence inferred CAD relation.
 
-Added textual PBM reference images and deterministic golden outputs under:
+## Measurement truth guardrails
 
-`tests/fixtures/vision/`
+Main invariant remains:
 
-Coverage includes:
+```text
+verified physical measurement > image-derived / geometry-derived relation
+```
 
-- front plate image with outer rectangle and two holes;
-- exact image → SketchPackage golden;
-- open circular arc image;
-- exact ARC golden;
-- calibrated CapturePackage;
-- verified MeasurementPackage.
+### EQUAL
+
+If verified comparable intrinsic measurements disagree beyond tolerance, EQUAL is not published.
+
+Code:
+
+```text
+VERIFIED_MEASUREMENT_CONTRADICTS_EQUAL_CONSTRAINT
+```
+
+### CONCENTRIC
+
+If a verified center-distance for the entity pair is non-zero beyond tolerance, CONCENTRIC is not published.
+
+Code:
+
+```text
+VERIFIED_MEASUREMENT_CONTRADICTS_CONCENTRIC_CONSTRAINT
+```
+
+### Weak relation
+
+If effective confidence is below promotion threshold:
+
+```text
+CONSTRAINT_BELOW_PROMOTION_CONFIDENCE
+```
+
+The relation stays explicit in `unresolved` rather than disappearing silently.
+
+## Redundancy / overconstraint control
+
+For axis-aligned lines:
+
+- HORIZONTAL / VERTICAL are publishable;
+- PARALLEL between two already-HORIZONTAL or two already-VERTICAL lines is omitted;
+- PERPENDICULAR between already-HORIZONTAL and VERTICAL lines is omitted.
+
+For rotated geometry, non-redundant PARALLEL / PERPENDICULAR candidates remain publishable.
+
+## Builder compatibility
+
+`SketchPackageBuilder.build()` accepts optional `constraint_resolution`.
+
+If omitted:
+
+```text
+constraints = []
+```
+
+Therefore legacy/canonical Ring 1 fixture behavior remains unchanged.
+
+Constraint-aware callers explicitly supply the resolution.
+
+## Vision integration
+
+Package-level `VisionGeometryPipeline` now composes:
+
+```text
+image extraction
+→ GeometryPipeline
+→ ConstraintResolver
+→ SketchPackageBuilder
+→ canonical unresolved merge
+```
+
+The Ring 3 image detector itself remains unchanged.
+
+For the current vision fixture:
+
+Published constraints:
+
+- EQUAL opposite horizontal sides;
+- EQUAL opposite vertical sides;
+- HORIZONTAL bottom/top;
+- VERTICAL left/right.
+
+Not published:
+
+- EQUAL between the two detected holes, because both CIRCLE entities have confidence `0.766`.
+
+That relation is explicitly unresolved with `CONSTRAINT_BELOW_PROMOTION_CONFIDENCE`.
+
+Verified dimensions remain exactly:
+
+- width `40.0 mm`;
+- height `20.0 mm`;
+- hole diameter `8.0 mm`;
+- center distance `20.0 mm`.
+
+## Runtime version / dependencies
+
+Package version:
+
+```text
+0.4.0
+```
+
+New Ring 4 dependencies: **none**.
+
+Existing Ring 3 dependency retained:
+
+```text
+opencv-python-headless >=4.10,<5
+```
 
 ## Verification
 
-Local reconstructed workspace regression run:
+Authoritative GitHub Actions implementation-head run:
 
 ```text
-20 passed, 4 deselected in 1.03s
+run: 36625586757
+head: 8ca1fa2294467636583eea2340c2c02e7d130cf7
 ```
 
-The four deselected tests require repository-level shared contract files absent from the reconstructed local workspace.
+Results:
 
-GitHub Actions implementation-head run:
-
-```text
-run: 36620011768
-head: 299a9c5b4531bf0c4a04bd3a2b452eea6e70d84e
-```
-
-Results relevant to Chat 3:
-
-- `Chat 3 / Geometry`: **SUCCESS — 28 passed in 0.31s**;
+- `Chat 3 / Geometry`: **SUCCESS — 35 passed in 0.31s**;
 - `Contracts / canonical fixtures`: **SUCCESS**;
+- `Chat 2 / Measurement`: **SUCCESS**;
 - `Integration / Chat 2 -> Chat 3`: **SUCCESS**;
 - `Chat 4 / Generic CAD gate`: **SUCCESS**;
-- `Integration / Chat 3 -> Chat 4`: **FAIL due orchestrator-owned test defect, not Ring 3 output**.
+- `Integration / Chat 3 -> Chat 4`: **FAIL only because shared integration test still reads stale `cad_verification_report["dimensions"]` instead of canonical `cad_verification_report["items"]`**.
 
-The failing integration test reads:
-
-```text
-cad_verification_report["dimensions"]
-```
-
-but canonical `CADVerificationReport v1` and Chat 4 expose verification entries as:
-
-```text
-cad_verification_report["items"]
-```
-
-The same stale integration-test access remains on current `main`. Chat 3 does not modify `tests/integration/` per OD-003 ownership rules.
+The Chat 3 -> Chat 4 test reaches successful CAD transfer and schema-valid CADVerificationReport before that stale lookup fails.
 
 ## Shared ownership
 
-Ring 3 changes no files under:
+Ring 4 modifies no files under:
 
 - `/core/contracts/`;
 - `/tests/fixtures/contracts/`;
 - `/tests/integration/`;
+- `.github/`;
 - Chat 1/2/4/5/6 directories.
 
-## Not implemented / intentionally deferred
+No Change Request was required.
 
-- arbitrary free-form contour reconstruction;
-- ellipse/conic vocabulary outside v1;
-- hidden-edge inference;
-- general constraint solver;
-- dimensioned-view renderer;
-- multi-view reconstruction;
-- CAD logic.
+## Deferred Chat 3 work
+
+- full constraint solving / geometry movement;
+- COINCIDENT/TANGENT/SYMMETRIC candidate-generation policy;
+- Dimensioned View renderer;
+- multi-view geometry/constraints;
+- CAD-native integration/read-back.
+
+The next natural Chat 3 slice is Dimensioned View, unless Chat 6 issues a different directive.
 
 ## Current status
 
-`READY_FOR_RING3_INTEGRATOR_REVIEW_WITH_ORCHESTRATOR_GATE_DEFECT`
+```text
+READY_FOR_RING4_INTEGRATOR_REVIEW_WITH_PREEXISTING_CHAT3_TO_CHAT4_GATE_DEFECT
+```
 
-Chat 3 code and its upstream boundary are green. Chat 6 must correct or reclassify the stale Chat 3→4 integration test before declaring the repository-wide Pass 3 gate green.
+Chat 3 itself, canonical contracts, and Chat 2 -> Chat 3 are independently green on GitHub Actions.
 
-## Ring 3 docs
+## Ring 4 documents
 
-- `BUILD_REUSE_CHECK_RING3_VISION_EXTRACTION.md`;
-- `IMPLEMENTATION_REPORT_RING3_VISION_EXTRACTION_2026-09-29.md`;
+- `BUILD_REUSE_CHECK_RING4_CONSTRAINT_RESOLUTION.md`;
+- `IMPLEMENTATION_REPORT_RING4_CONSTRAINT_RESOLUTION_2026-09-29.md`;
 - `ORCHESTRATOR_HANDOFF.md`.
