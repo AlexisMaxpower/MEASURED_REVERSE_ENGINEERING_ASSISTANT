@@ -6,6 +6,7 @@ from math import atan2, degrees, hypot, isclose
 from .graph import GeometryGraph
 from .models import (
     Arc,
+    AnchorRef,
     Circle,
     ConstraintCandidate,
     DimensionBinding,
@@ -15,6 +16,7 @@ from .models import (
     Line,
     MeasurementRef,
     Point2D,
+    PointEntity,
     UnresolvedBinding,
 )
 
@@ -46,6 +48,8 @@ def _angle_on_arc(angle: float, start: float, end: float) -> bool:
 
 
 def _distance_to_primitive(point: Point2D, entity: GeometryPrimitive) -> float:
+    if isinstance(entity, PointEntity):
+        return hypot(point.x - entity.point.x, point.y - entity.point.y)
     if isinstance(entity, Line):
         return _point_segment_distance(point, entity)
     radial = hypot(point.x - entity.center.x, point.y - entity.center.y)
@@ -64,6 +68,23 @@ class AnchorEntityMatcher:
             raise ValueError("max_distance must be non-negative")
         self.max_distance = max_distance
         self.ambiguity_epsilon = ambiguity_epsilon
+
+    def match_anchor(
+        self,
+        anchor: AnchorRef,
+        entities: tuple[GeometryPrimitive, ...],
+    ) -> str | None:
+        if anchor.feature_id:
+            feature_matches = sorted(
+                entity.entity_id
+                for entity in entities
+                if getattr(entity, "feature_id", None) == anchor.feature_id
+            )
+            if len(feature_matches) == 1:
+                return feature_matches[0]
+            if len(feature_matches) > 1:
+                return None
+        return self.match(anchor.point, entities)
 
     def match(self, point: Point2D, entities: tuple[GeometryPrimitive, ...]) -> str | None:
         ranked = sorted(
@@ -147,7 +168,7 @@ class DimensionBinder:
         unresolved: list[UnresolvedBinding] = []
 
         for measurement in sorted(measurements, key=lambda item: item.measurement_id):
-            matches = [self.matcher.match(anchor.point, entities) for anchor in measurement.anchors]
+            matches = [self.matcher.match_anchor(anchor, entities) for anchor in measurement.anchors]
             if any(match is None for match in matches):
                 unresolved.append(
                     UnresolvedBinding(
@@ -164,6 +185,7 @@ class DimensionBinder:
                 DimensionBinding(
                     dimension_id=f"D_{measurement.measurement_id}",
                     measurement_id=measurement.measurement_id,
+                    measurement_type=measurement.measurement_type,
                     value=measurement.value,
                     unit=measurement.unit,
                     verified=measurement.verified,
@@ -209,7 +231,12 @@ def _parallel_line_distance(first: Line, second: Line) -> float | None:
     norm = first.length * second.length
     if norm == 0 or abs(ax * by - ay * bx) / norm > 1e-6:
         return None
-    numerator = abs(ay * second.start.x - ax * second.start.y + first.end.x * first.start.y - first.end.y * first.start.x)
+    numerator = abs(
+        ay * second.start.x
+        - ax * second.start.y
+        + first.end.x * first.start.y
+        - first.end.y * first.start.x
+    )
     denominator = hypot(ax, ay)
     return numerator / denominator if denominator else None
 
