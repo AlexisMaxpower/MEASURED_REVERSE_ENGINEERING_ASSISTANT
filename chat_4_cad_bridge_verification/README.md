@@ -87,20 +87,30 @@ pip install -r requirements-dev.txt
 PYTHONPATH=src python -m unittest discover -s tests -v
 ```
 
-Repository test inventory after hardening: **23 tests**.
+Repository test inventory after Pass 2 boundary tests: **32 tests** (23 baseline + 9 SOLIDWORKS-agent boundary tests).
 
-Последний clean repository baseline до adapter work: **14 tests, OK**. В reconstructed local harness выполнены exporters + verification + все 9 adapter/pipeline tests: **18 tests, OK**. Пять schema contract tests не перезапускались в текущем container из-за отсутствия outbound GitHub DNS; shared schema/contract tests этим patch не изменяются.
+Pass 2 sandbox execution: **27 tests, OK** — exporters (3) + verification (6) + existing adapter/pipeline (9) + SOLIDWORKS-agent boundary (9). Пять schema contract tests не перезапускались в локальном staging, поскольку shared schema не материализован в sandbox checkout; shared schema/tests Pass 2 не изменяет. Real Windows/SOLIDWORKS execution: **UNVERIFIED**.
 
-## Текущий следующий этап
+## Pass 2 — SOLIDWORKS 2026 CAD Agent
 
-Generic CAD gate закрыт. Следующий vendor-specific этап — SOLIDWORKS C#/.NET/COM adapter за существующим normalized boundary.
+По `OD-2026-09-29-002` и ADR-001 добавлен реальный vendor path:
 
-Открыт `docs/CHANGE_REQUEST_002_SOLIDWORKS_ENVIRONMENT.md`; требуется canonical решение Chat 6 по:
+```text
+SketchPackage v1
+→ SolidWorksAgentAdapter (Python)
+→ slice-local JSON process protocol
+→ Mrea.SolidWorksCadAgent.exe (.NET Framework 4.8 x64, STA)
+→ SOLIDWORKS 2026 COM/API
+→ normalized bindings/read-back/artifact
+→ existing VerificationEngine
+→ CADPackage v1 + CADVerificationReport v1
+```
 
-- supported SOLIDWORKS version;
-- .NET target;
-- interop strategy;
-- Windows/SOLIDWORKS test host.
+Реализованы preflight unresolved/unsupported checks, out-of-process runner, C# agent skeleton/transfer path, native `.SLDPRT` artifact registration and real-host smoke scripts. `CHANGE_REQUEST_002_SOLIDWORKS_ENVIRONMENT.md` resolved by `chat_6_orchestrator/ADR_001_SOLIDWORKS_2026_CAD_AGENT.md`.
+
+Текущий real-host status: **UNVERIFIED** — финальная проверка требует Windows 11 x64 + SOLIDWORKS 2026 x64. См. `docs/SOLIDWORKS_2026_SMOKE_TEST.md`.
+
+Current real-host slice deliberately supports golden LINE/CIRCLE + DISTANCE/DIAMETER (RADIUS path included). POINT/ARC/ANGLE and canonical constraints are explicit follow-up work and are not silently approximated.
 
 ## Главный инвариант
 
