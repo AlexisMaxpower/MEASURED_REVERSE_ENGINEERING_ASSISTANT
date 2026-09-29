@@ -24,24 +24,50 @@ $agentFull = [IO.Path]::GetFullPath($Agent)
 $prebuildReadiness = Join-Path $outputFull "host_readiness_prebuild.json"
 $finalReadiness = Join-Path $outputFull "host_readiness.json"
 
+$powerShellExe = Join-Path $PSHOME "powershell.exe"
+if (-not (Test-Path -LiteralPath $powerShellExe -PathType Leaf)) {
+    $powerShellCommand = Get-Command powershell.exe -ErrorAction SilentlyContinue
+    if ($null -eq $powerShellCommand) { $powerShellCommand = Get-Command pwsh.exe -ErrorAction SilentlyContinue }
+    if ($null -eq $powerShellCommand) {
+        Write-Error "HOST_PREFLIGHT_NOT_READY: no child PowerShell executable is available."
+        exit 10
+    }
+    $powerShellExe = $powerShellCommand.Source
+}
+
 function Invoke-Readiness {
     param(
         [string]$JsonPath,
         [bool]$AgentRequired,
         [bool]$RequireBuildTools
     )
-    $params = @{
-        SolidWorksInstallDir = $SolidWorksInstallDir
-        AgentPath = $agentFull
-        OutputDir = $outputFull
-        OutputJson = $JsonPath
-        AgentRequired = $AgentRequired
-        AllowLaunchForVersionProbe = (-not $NoLaunch)
-    }
-    if ($PartTemplate) { $params.PartTemplate = $PartTemplate }
-    if ($RequireBuildTools) { $params.RequireBuildTools = $true }
+    $childArgs = @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $preflight,
+        "-SolidWorksInstallDir", $SolidWorksInstallDir,
+        "-AgentPath", $agentFull,
+        "-OutputDir", $outputFull,
+        "-OutputJson", $JsonPath
+    )
+    if ($PartTemplate) { $childArgs += @("-PartTemplate", $PartTemplate) }
+    if (-not $AgentRequired) { $childArgs += "-AgentOptional" }
+    if ($RequireBuildTools) { $childArgs += "-RequireBuildTools" }
+    if (-not $NoLaunch) { $childArgs += "-AllowLaunchForVersionProbe" }
 
-    & $preflight @params
+    & $powerShellExe @childArgs
+    return $LASTEXITCODE
+}
+
+function Invoke-AgentBuild {
+    $childArgs = @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $builder,
+        "-SolidWorksInstallDir", $SolidWorksInstallDir,
+        "-Configuration", "Release"
+    )
+    & $powerShellExe @childArgs
     return $LASTEXITCODE
 }
 
@@ -55,9 +81,9 @@ try {
         }
 
         Write-Host "Building SOLIDWORKS CAD Agent..."
-        & $builder -SolidWorksInstallDir $SolidWorksInstallDir -Configuration "Release"
-        if ($LASTEXITCODE -ne 0) {
-            Write-Error "HOST_BUILD_NOT_READY: CAD Agent build failed."
+        $buildExit = Invoke-AgentBuild
+        if ($buildExit -ne 0) {
+            Write-Error "HOST_BUILD_NOT_READY: CAD Agent build failed with exit $buildExit."
             exit 10
         }
     }
