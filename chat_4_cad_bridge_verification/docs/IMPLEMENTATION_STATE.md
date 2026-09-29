@@ -2,9 +2,10 @@
 
 **Дата:** 2026-09-29  
 **Repository:** `AlexisMaxpower/MEASURED_REVERSE_ENGINEERING_ASSISTANT`  
-**Branch:** `main`  
+**Branch:** `main` after integration  
 **Role:** Chat 4 — CAD Bridge & Verification  
-**Canonical baseline:** `mrea.contracts.v1`
+**Canonical baseline:** `mrea.contracts.v1`  
+**Orchestrator directive:** `OD-2026-09-29-001`
 
 ---
 
@@ -40,9 +41,9 @@ Canonical contract blocker снят Orchestrator-ом.
 
 ### Canonical `SketchPackage v1` boundary
 
-Добавлен mapper canonical `SketchPackage` → `MappedSketchPackage`.
+Canonical `SketchPackage` maps to `MappedSketchPackage`.
 
-Поддерживаемый canonical v1 subset:
+Supported mandatory v1 subset:
 
 - `POINT`;
 - `LINE`;
@@ -51,45 +52,43 @@ Canonical contract blocker снят Orchestrator-ом.
 
 Mapper:
 
-- требует `mrea.sketch-package.v1`;
-- требует `MAT_XY_MM`;
-- сохраняет canonical entity/dimension/constraint/unresolved data;
-- не молча отбрасывает unsupported entity;
-- выделяет только `verified=true` dimensions как CAD numerical-transfer truth;
-- использует `dimension_id` как primary CAD verification key;
-- сохраняет nullable `measurement_id` как traceability link;
-- применяет canonical transfer tolerance: `1e-6 mm` / `1e-6 deg`.
+- requires `mrea.sketch-package.v1`;
+- requires `MAT_XY_MM`;
+- preserves canonical entity/dimension/constraint/unresolved data;
+- rejects unsupported entity instead of silently dropping it;
+- uses only `verified=true` dimensions as CAD numerical-transfer truth;
+- uses `dimension_id` as primary CAD verification key;
+- preserves nullable `measurement_id` as traceability link;
+- applies canonical transfer tolerance `1e-6 mm` / `1e-6 deg`.
 
 ### Generic CAD artifacts
 
 - deterministic SVG;
-- DXF R12 через `ezdxf==1.4.4`;
-- DXF parse-back test через `ezdxf.read()`.
+- DXF R12 via `ezdxf==1.4.4`;
+- DXF parse-back test via `ezdxf.read()`.
 
 ### `CADPackage v1`
 
-Добавлен builder canonical `mrea.cad-package.v1`.
+Canonical `mrea.cad-package.v1` builder implemented.
 
-Artifact storage/URI generation остаётся отдельной boundary: builder принимает уже сформированные `ArtifactReference` values и не выдумывает storage URI.
+Artifact storage/URI generation remains a separate boundary: the builder accepts already formed `ArtifactReference` values and does not invent storage URIs.
 
 ### Verification core
 
-Internal model переработан под canonical contract:
-
-- key — `dimension_id`, не `measurement_id`;
-- `measurement_id` nullable и сохраняется отдельно;
+- key: `dimension_id`;
+- nullable `measurement_id` retained separately;
 - units: `mm` / `deg`;
-- `difference` — absolute non-negative difference;
-- input order сохраняется для deterministic canonical output;
+- `difference` is absolute non-negative difference;
+- input order preserved for deterministic canonical output;
 - duplicate `dimension_id` rejected;
-- `VERIFIED`, `MISMATCH`, `MISSING`, `CONSTRAINT_CONFLICT`;
+- statuses: `VERIFIED`, `MISMATCH`, `MISSING`, `CONSTRAINT_CONFLICT`;
 - no silent correction.
 
 ### `CADVerificationReport v1`
 
-Добавлен mapper internal report → canonical `mrea.cad-verification.v1`.
+Internal report maps to canonical `mrea.cad-verification.v1`.
 
-Canonical policy output:
+Canonical policy:
 
 ```text
 kind = NUMERICAL_TRANSFER
@@ -97,37 +96,136 @@ length tolerance = 1e-6 mm
 angle tolerance = 1e-6 deg
 ```
 
-`overall_status`: все items VERIFIED → `VERIFIED`, иначе → `FAILED`.
+`overall_status`: all items VERIFIED → `VERIFIED`; otherwise → `FAILED`.
+
+### Vendor-neutral CAD adapter/read-back boundary
+
+Implemented:
+
+- `CadAdapter` protocol;
+- `CadDimensionBinding`;
+- `CadReadBackDimension`;
+- `CadReadBack`;
+- `CadAdapterResult`;
+- `CadAdapterError`.
+
+The boundary explicitly preserves:
+
+```text
+dimension_id
+↕
+measurement_id (nullable traceability)
+↕
+vendor_dimension_ref
+↕
+normalized read-back value + unit
+```
+
+Rules:
+
+- vendor dimension refs are unique inside one adapter result;
+- read-back cannot contain an unbound `dimension_id`;
+- constraint conflicts cannot reference an unbound dimension;
+- actual values must be finite;
+- vendor read-back is normalized to canonical `mm` / `deg`;
+- unit mismatch is rejected before numerical verification.
+
+### TEST_DOUBLE adapter
+
+Implemented deterministic `TestDoubleCadAdapter` for full flow without installed SOLIDWORKS.
+
+Default behavior:
+
+- creates deterministic vendor references `TEST_DOUBLE::DIM::<dimension_id>`;
+- echoes verified canonical dimension values as normalized CAD read-back;
+- emits no fake artifacts;
+- preserves `measurement_id` mapping.
+
+Controlled negative modes:
+
+- actual value override → `MISMATCH` test;
+- omitted read-back → `MISSING` test;
+- explicit constraint conflict → `CONSTRAINT_CONFLICT` test;
+- unknown dimension controls rejected.
+
+### Canonical CAD transfer pipeline
+
+Implemented `execute_cad_transfer_v1`:
+
+```text
+canonical SketchPackage
+→ MappedSketchPackage
+→ CadAdapter.transfer()
+→ normalized CadReadBack
+→ unit validation
+→ VerificationEngine
+→ canonical CADPackage
+→ canonical CADVerificationReport
+```
+
+With `TestDoubleCadAdapter`, golden fixture produces both canonical outputs exactly:
+
+- `tests/fixtures/contracts/cad_package_v1.json`;
+- `tests/fixtures/contracts/cad_verification_v1.json`.
 
 ---
 
 ## Tests
 
-Current suite:
+Repository test inventory after this iteration:
 
 - exporter tests: 3;
 - verification tests: 6;
 - canonical contract tests: 5;
-- total: **14**.
+- adapter/pipeline tests: 6;
+- total: **20**.
 
-Contract tests читают canonical schema/fixtures из repository root и проверяют exact golden outputs.
+New adapter/pipeline tests cover:
 
-### Local verification
+1. exact golden `CADPackage` + `CADVerificationReport` flow;
+2. deterministic `dimension_id` / `measurement_id` / vendor ref mapping;
+3. `MISMATCH` without silent correction;
+4. `MISSING`;
+5. `CONSTRAINT_CONFLICT`;
+6. unknown test controls rejection;
+7. unit mismatch rejection before numerical comparison.
+
+### Verification evidence
+
+Previous baseline verification recorded in repository:
 
 ```text
 Ran 14 tests
 OK
 ```
 
-Проверено на Python 3.13 с `ezdxf 1.4.4` и `jsonschema 4.26.0`.
+The new adapter/pipeline implementation was independently executed against the canonical golden values in a local reconstructed harness:
 
-Не проверено: real SOLIDWORKS import/API/COM runtime.
+```text
+Ran 6 adapter/pipeline tests
+OK
+```
+
+A fresh full 20-test checkout run could not be executed in the current tool container because outbound GitHub DNS access is unavailable there. Source changes are therefore marked ready for repository integration review, while a clean-checkout full-suite run remains an integration verification item.
+
+Not verified: real SOLIDWORKS import/API/COM runtime.
 
 ---
 
-## Resolved blocker
+## Build / Reuse
 
-`CHANGE_REQUEST_001_CAD_CONTRACT_BASELINE.md` закрыт: Orchestrator опубликовал canonical schemas, fixtures и policies.
+- `BUILD_REUSE_CHECK_CAD_CORE.md` — generic model/export/verification decisions;
+- `BUILD_REUSE_CHECK_ADAPTER_BOUNDARY.md` — vendor-neutral adapter/read-back and TEST_DOUBLE decision.
+
+No CAD kernel or mocking framework is introduced for the adapter boundary. TEST_DOUBLE is test infrastructure only, not a production CAD implementation.
+
+---
+
+## Resolved blockers
+
+`CHANGE_REQUEST_001_CAD_CONTRACT_BASELINE.md` is closed: Orchestrator published canonical schemas, fixtures and policies.
+
+The previous generic read-back/test-double blocker is also resolved by this iteration.
 
 ---
 
@@ -135,35 +233,37 @@ OK
 
 - Artifact persistence/registry integration;
 - canonical artifact URI production;
-- dimension/constraint application в vendor CAD;
+- actual dimension/constraint application in vendor CAD;
 - SOLIDWORKS C#/.NET project;
 - SOLIDWORKS COM/API connection;
-- SolidWorks entity/constraint/dimension creation;
-- persistent CAD mapping for `dimension_id` / `measurement_id`;
-- CAD read-back adapter;
-- SolidWorks integration tests;
+- SOLIDWORKS entity/constraint/dimension creation;
+- persistent SOLIDWORKS mapping for `dimension_id` / `measurement_id`;
+- real SOLIDWORKS CAD read-back;
+- SOLIDWORKS integration tests;
 - Windows/SOLIDWORKS CI/test host.
 
 ---
 
 ## Remaining external dependency
 
-SOLIDWORKS stage требует target environment decision:
+SOLIDWORKS stage requires an integration environment decision:
 
 - supported SOLIDWORKS version;
 - .NET target;
-- interop strategy;
+- SOLIDWORKS interop strategy;
 - Windows test host;
 - availability of real SOLIDWORKS runtime for integration tests.
 
-До этого generic contract/DXF/SVG/verification slice остаётся тестируемым без SOLIDWORKS.
+The vendor-neutral contract boundary is intentionally complete enough that these decisions no longer block generic CAD verification development.
 
 ---
 
 ## Next action
 
-1. определить vendor-neutral CAD read-back interface;
-2. зафиксировать mapping `dimension_id` ↔ vendor dimension handle/name;
-3. подготовить SOLIDWORKS adapter project skeleton после environment decision;
-4. создать TEST_DOUBLE adapter для полного canonical golden flow без installed SOLIDWORKS;
-5. затем заменить TEST_DOUBLE реальным SOLIDWORKS API adapter.
+1. publish this adapter/read-back baseline to `main`;
+2. notify Chat 6 through repository-visible state that pure generic CAD gate is complete;
+3. define the SOLIDWORKS adapter project/environment baseline with Chat 6;
+4. create C# adapter skeleton behind the existing normalized boundary;
+5. implement entity creation for canonical POINT/LINE/CIRCLE/ARC subset;
+6. implement dimension binding/read-back and compare against the same canonical golden fixture;
+7. only then add constraints and Windows/SOLIDWORKS integration tests.
