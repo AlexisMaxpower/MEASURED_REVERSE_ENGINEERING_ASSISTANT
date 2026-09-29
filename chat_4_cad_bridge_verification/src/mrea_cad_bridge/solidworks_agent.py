@@ -18,7 +18,7 @@ from .vendor import (
 
 SOLIDWORKS_AGENT_PROTOCOL = "mrea.solidworks-agent.v1"
 SOLIDWORKS_ADAPTER_NAME = "SOLIDWORKS_2026"
-_SUPPORTED_ENTITY_TYPES = frozenset({"LINE", "CIRCLE"})
+_SUPPORTED_ENTITY_TYPES = frozenset({"POINT", "LINE", "CIRCLE", "ARC"})
 _SUPPORTED_DIMENSION_TYPES = frozenset({"DISTANCE", "DIAMETER", "RADIUS"})
 
 
@@ -114,7 +114,7 @@ def _verified_dimension_contracts(package: MappedSketchPackage) -> tuple[Mapping
 def _preflight(package: MappedSketchPackage) -> None:
     if package.constraints:
         raise CadAdapterError(
-            "SOLIDWORKS Pass 2 slice does not yet implement canonical constraints; "
+            "SOLIDWORKS vendor slice does not yet implement canonical constraints; "
             "non-empty constraints must not be silently ignored"
         )
 
@@ -151,7 +151,7 @@ def _preflight(package: MappedSketchPackage) -> None:
     )
     if unsupported_entities:
         raise CadAdapterError(
-            "SOLIDWORKS Pass 2 golden slice supports LINE/CIRCLE only; "
+            "SOLIDWORKS vendor slice supports canonical POINT/LINE/CIRCLE/ARC only; "
             f"unsupported entities: {unsupported_entities!r}"
         )
 
@@ -164,7 +164,7 @@ def _preflight(package: MappedSketchPackage) -> None:
     )
     if unsupported_dimensions:
         raise CadAdapterError(
-            "SOLIDWORKS Pass 2 golden slice does not support verified dimension types: "
+            "SOLIDWORKS vendor slice does not support verified dimension types: "
             f"{unsupported_dimensions!r}"
         )
 
@@ -177,7 +177,7 @@ def _preflight(package: MappedSketchPackage) -> None:
     )
     if unsupported_units:
         raise CadAdapterError(
-            "SOLIDWORKS Pass 2 real-host slice supports verified mm dimensions only; "
+            "SOLIDWORKS real-host slice supports verified mm dimensions only; "
             f"unsupported units: {unsupported_units!r}"
         )
 
