@@ -14,6 +14,7 @@ from .models import (
     decimal_value,
 )
 from .repository import InMemoryMeasurementSessionRepository
+from .type_registry import MeasurementTypeRegistry
 
 
 def _utc_now() -> datetime:
@@ -42,10 +43,13 @@ class MeasurementSessionService:
         *,
         id_factory: Callable[[str], str] | None = None,
         clock: Callable[[], datetime] | None = None,
+        type_registry: MeasurementTypeRegistry | None = None,
     ) -> None:
         self._repository = repository
         self._id_factory = id_factory or (lambda prefix: f"{prefix}_{uuid4().hex}")
         self._clock = clock or _utc_now
+        self._type_registry = type_registry or MeasurementTypeRegistry()
+        self._type_registry.validate_complete()
 
     def _now(self) -> datetime:
         value = self._clock()
@@ -100,7 +104,7 @@ class MeasurementSessionService:
             measurement_id=self._id_factory("M"),
             measurement_type=measurement_type,
             value=decimal_value(value),
-            unit="mm",
+            unit=self._type_registry.unit_for(measurement_type),
             uncertainty_mm=(
                 decimal_value(uncertainty_mm, "uncertainty_mm")
                 if uncertainty_mm is not None
