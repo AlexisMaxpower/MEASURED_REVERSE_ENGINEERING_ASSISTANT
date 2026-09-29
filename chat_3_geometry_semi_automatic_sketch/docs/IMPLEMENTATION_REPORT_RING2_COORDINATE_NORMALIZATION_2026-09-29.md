@@ -69,3 +69,76 @@ Chat-2-style IMAGE_PX MeasurementPackage
 8. degenerate homography rejection;
 9. MAT_XY_MM pass-through без calibration lookup;
 10. deterministic output при изменении порядка anchors.
+
+## Runtime verification
+
+Локальный workspace восстановлен из Ring 1 cumulative snapshot плюс exact current Integrator-owned contract blobs из GitHub.
+
+Выполнено:
+
+```text
+cd chat_3_geometry_semi_automatic_sketch
+python -m pytest -q
+```
+
+Результат:
+
+```text
+19 passed in 0.86s
+```
+
+Полный suite включает:
+
+- 6 Phase 1 geometry-core tests;
+- 4 existing canonical FRONT tests;
+- 9 Ring 2 coordinate-normalization tests.
+
+Также выполнялось:
+
+```text
+python -m compileall -q src tests
+```
+
+Результат: success, compile errors отсутствуют.
+
+## Dependencies
+
+Новых runtime dependencies нет. Сохраняются существующие test-only:
+
+- `pytest >=8,<9`;
+- `jsonschema >=4.23,<5`.
+
+## Shared ownership
+
+Ring 2 не изменяет:
+
+- `core/contracts/`;
+- `tests/fixtures/contracts/`;
+- Chat 2 code;
+- Chat 4 code;
+- global architecture.
+
+## Known limitations
+
+- поддерживаются только canonical `IMAGE_PX` и `MAT_XY_MM`, как определено v1;
+- normalization выполняется в рамках выбранного view; multi-view остаётся later work;
+- локальный threshold для calibration `quality` не выдумывается: проверяются наличие, shape и numeric validity;
+- raw image primitive extraction намеренно отложен активной директивой;
+- missing/invalid calibration приводит к explicit adapter error, recovery через guessed scale отсутствует.
+
+## Change Requests
+
+None. Shared v1 contracts достаточны для Ring 2.
+
+## Acceptance requested
+
+Chat 6 должен проверить branch `chat-3/pass-2` и подтвердить gate:
+
+```text
+IMAGE_PX MeasurementPackage
++ valid CapturePackage calibration
+→ MAT_XY_MM normalized geometry input
+→ deterministic schema-valid SketchPackage
+```
+
+Только после acceptance этого gate Chat 3 должен переходить к OpenCV / primitive extraction.
