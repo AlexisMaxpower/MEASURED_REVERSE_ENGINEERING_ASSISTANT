@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mrea.local/contracts/mrea_contracts_v1.schema.json",
+  "title": "MREA canonical shared contracts v1",
+  "$defs": {
+    "OpaqueId": {"type": "string", "minLength": 1},
+    "Timestamp": {"type": "string", "format": "date-time"},
+    "ProvenanceSource": {"type": "string", "enum": ["MANUAL_MEASURED","DEVICE_REPORTED","OCR_MEASURED","VOICE_REPORTED","VISION_DETECTED","CALIBRATION_DERIVED","GEOMETRY_DERIVED","AI_INFERRED","USER_CONFIRMED"]},
+    "ArtifactReference": {
+      "type": "object", "additionalProperties": false,
+      "required": ["artifact_id","kind","uri"],
+      "properties": {
+        "artifact_id": {"$ref": "#/$defs/OpaqueId"},
+        "kind": {"type": "string", "minLength": 1},
+        "uri": {"type": "string", "minLength": 1},
+        "media_type": {"type": ["string","null"]},
+        "sha256": {"type": ["string","null"]},
+        "metadata": {"type": "object"}
+      }
+    },
+    "ProjectContract": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version","project_id","part_id","name","part"],
+      "properties": {
+        "schema_version": {"const": "mrea.project.v1"},
+        "project_id": {"$ref": "#/$defs/OpaqueId"},
+        "part_id": {"$ref": "#/$defs/OpaqueId"},
+        "name": {"type": "string", "minLength": 1},
+        "status": {"enum": ["ACTIVE","ARCHIVED"]},
+        "part": {
+          "type": "object", "additionalProperties": false, "required": ["part_type"],
+          "properties": {
+            "part_type": {"type": "string", "minLength": 1},
+            "equipment": {"type": ["string","null"]},
+            "assembly": {"type": ["string","null"]},
+            "purpose": {"type": ["string","null"]},
+            "problem": {"type": ["string","null"]},
+            "reverse_engineering_reason": {"type": ["string","null"]},
+            "original_material": {"type": ["string","null"]},
+            "original_manufacturing_method": {"type": ["string","null"]},
+            "target_manufacturing_method": {"type": ["string","null"]},
+            "comments": {"type": ["string","null"]}
+          }
+        },
+        "created_at": {"$ref": "#/$defs/Timestamp"},
+        "updated_at": {"$ref": "#/$defs/Timestamp"}
+      }
+    },
+    "MeasurementCaptureFrame": {
+      "type": "object", "additionalProperties": false,
+      "required": ["frame_id","view_id","artifact","captured_at"],
+      "properties": {
+        "frame_id": {"$ref": "#/$defs/OpaqueId"},
+        "view_id": {"$ref": "#/$defs/OpaqueId"},
+        "artifact": {"$ref": "#/$defs/ArtifactReference"},
+        "captured_at": {"$ref": "#/$defs/Timestamp"},
+        "camera_metadata": {"type": "object"},
+        "voice_event": {"type": ["object","null"]}
+      }
+    },
+    "CapturePackage": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version","capture_package_id","project_id","part_id","views"],
+      "properties": {
+        "schema_version": {"const": "mrea.capture-package.v1"},
+        "capture_package_id": {"$ref": "#/$defs/OpaqueId"},
+        "project_id": {"$ref": "#/$defs/OpaqueId"},
+        "part_id": {"$ref": "#/$defs/OpaqueId"},
+        "views": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["view_id","view_type","clean_reference_frame","measurement_frames"],
+            "properties": {
+              "view_id": {"$ref": "#/$defs/OpaqueId"},
+              "view_type": {"enum": ["FRONT","LEFT","RIGHT","TOP","BOTTOM","REAR","DETAIL_A","DETAIL_B","OPTIONAL_3Q"]},
+              "clean_reference_frame": {"$ref": "#/$defs/ArtifactReference"},
+              "measurement_frames": {"type": "array", "items": {"$ref": "#/$defs/MeasurementCaptureFrame"}},
+              "calibration": {
+                "type": ["object","null"], "additionalProperties": false,
+                "properties": {
+                  "coordinate_system": {"const": "MAT_XY_MM"},
+                  "mat_id": {"type": "string", "minLength": 1},
+                  "homography": {"type": "array", "minItems": 9, "maxItems": 9, "items": {"type": "number"}},
+                  "quality": {"type": ["number","null"], "minimum": 0, "maximum": 1}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "FeatureAnchor": {
+      "type": "object", "additionalProperties": false,
+      "required": ["anchor_id","view_id","reference_frame_id","coordinate_space","x","y"],
+      "properties": {
+        "anchor_id": {"$ref": "#/$defs/OpaqueId"},
+        "view_id": {"$ref": "#/$defs/OpaqueId"},
+        "reference_frame_id": {"$ref": "#/$defs/OpaqueId"},
+        "coordinate_space": {"enum": ["IMAGE_PX","MAT_XY_MM"]},
+        "x": {"type": "number"}, "y": {"type": "number"},
+        "feature_id": {"type": ["string","null"]}
+      }
+    },
+    "PhysicalMeasurement": {
+      "type": "object", "additionalProperties": false,
+      "required": ["measurement_id","type","value","unit","source","view_id","anchors","verified"],
+      "properties": {
+        "measurement_id": {"$ref": "#/$defs/OpaqueId"},
+        "type": {"enum": ["LINEAR_EXTERNAL","LINEAR_INTERNAL","THICKNESS","DEPTH","DIAMETER_EXTERNAL","DIAMETER_INTERNAL","RADIUS","ANGLE","CENTER_DISTANCE","SLOT_WIDTH","SURFACE_DISTANCE"]},
+        "value": {"type": "number"},
+        "unit": {"enum": ["mm","deg"]},
+        "uncertainty": {"type": ["number","null"], "minimum": 0},
+        "source": {"$ref": "#/$defs/ProvenanceSource"},
+        "view_id": {"$ref": "#/$defs/OpaqueId"},
+        "anchors": {"type": "array", "minItems": 1, "maxItems": 3, "items": {"$ref": "#/$defs/FeatureAnchor"}},
+        "evidence_frame_id": {"type": ["string","null"]},
+        "instrument": {"type": ["object","null"]},
+        "confidence": {"type": ["number","null"], "minimum": 0, "maximum": 1},
+        "verified": {"type": "boolean"},
+        "confirmation_source": {"anyOf": [{"$ref": "#/$defs/ProvenanceSource"},{"type": "null"}]},
+        "created_at": {"anyOf": [{"$ref": "#/$defs/Timestamp"},{"type": "null"}]}
+      }
+    },
+    "MeasurementPackage": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version","measurement_package_id","project_id","part_id","capture_package_id","measurements"],
+      "properties": {
+        "schema_version": {"const": "mrea.measurement-package.v1"},
+        "measurement_package_id": {"$ref": "#/$defs/OpaqueId"},
+        "project_id": {"$ref": "#/$defs/OpaqueId"},
+        "part_id": {"$ref": "#/$defs/OpaqueId"},
+        "capture_package_id": {"$ref": "#/$defs/OpaqueId"},
+        "measurements": {"type": "array", "items": {"$ref": "#/$defs/PhysicalMeasurement"}}
+      }
+    },
+    "Point2D": {"type": "object", "additionalProperties": false, "required": ["x","y"], "properties": {"x":{"type":"number"},"y":{"type":"number"}}},
+    "SketchEntity": {
+      "oneOf": [
+        {"type":"object","additionalProperties":false,"required":["entity_id","type","point","provenance"],"properties":{"entity_id":{"$ref":"#/$defs/OpaqueId"},"type":{"const":"POINT"},"point":{"$ref":"#/$defs/Point2D"},"provenance":{"$ref":"#/$defs/ProvenanceSource"},"confidence":{"type":["number","null"]}}},
+        {"type":"object","additionalProperties":false,"required":["entity_id","type","start","end","provenance"],"properties":{"entity_id":{"$ref":"#/$defs/OpaqueId"},"type":{"const":"LINE"},"start":{"$ref":"#/$defs/Point2D"},"end":{"$ref":"#/$defs/Point2D"},"provenance":{"$ref":"#/$defs/ProvenanceSource"},"confidence":{"type":["number","null"]}}},
+        {"type":"object","additionalProperties":false,"required":["entity_id","type","center","radius","provenance"],"properties":{"entity_id":{"$ref":"#/$defs/OpaqueId"},"type":{"const":"CIRCLE"},"center":{"$ref":"#/$defs/Point2D"},"radius":{"type":"number","exclusiveMinimum":0},"provenance":{"$ref":"#/$defs/ProvenanceSource"},"confidence":{"type":["number","null"]}}},
+        {"type":"object","additionalProperties":false,"required":["entity_id","type","center","radius","start_angle_deg","end_angle_deg","provenance"],"properties":{"entity_id":{"$ref":"#/$defs/OpaqueId"},"type":{"const":"ARC"},"center":{"$ref":"#/$defs/Point2D"},"radius":{"type":"number","exclusiveMinimum":0},"start_angle_deg":{"type":"number"},"end_angle_deg":{"type":"number"},"provenance":{"$ref":"#/$defs/ProvenanceSource"},"confidence":{"type":["number","null"]}}}
+      ]
+    },
+    "SketchConstraint": {
+      "type":"object","additionalProperties":false,"required":["constraint_id","type","entity_ids","status"],
+      "properties": {
+        "constraint_id":{"$ref":"#/$defs/OpaqueId"},
+        "type":{"enum":["COINCIDENT","HORIZONTAL","VERTICAL","PARALLEL","PERPENDICULAR","TANGENT","CONCENTRIC","EQUAL","SYMMETRIC"]},
+        "entity_ids":{"type":"array","minItems":1,"items":{"$ref":"#/$defs/OpaqueId"}},
+        "status":{"enum":["VERIFIED","DETECTED","INFERRED","UNRESOLVED"]}
+      }
+    },
+    "SketchDimension": {
+      "type":"object","additionalProperties":false,"required":["dimension_id","type","value","unit","entity_ids","verified","provenance"],
+      "properties": {
+        "dimension_id":{"$ref":"#/$defs/OpaqueId"},"measurement_id":{"type":["string","null"]},
+        "type":{"enum":["DISTANCE","DIAMETER","RADIUS","ANGLE"]},"value":{"type":"number"},"unit":{"enum":["mm","deg"]},
+        "entity_ids":{"type":"array","minItems":1,"items":{"$ref":"#/$defs/OpaqueId"}},"verified":{"type":"boolean"},"provenance":{"$ref":"#/$defs/ProvenanceSource"}
+      }
+    },
+    "UnresolvedItem": {
+      "type":"object","additionalProperties":false,"required":["unresolved_id","code","message"],
+      "properties": {"unresolved_id":{"$ref":"#/$defs/OpaqueId"},"code":{"type":"string","minLength":1},"message":{"type":"string","minLength":1},"entity_ids":{"type":"array","items":{"$ref":"#/$defs/OpaqueId"}},"measurement_ids":{"type":"array","items":{"$ref":"#/$defs/OpaqueId"}}}
+    },
+    "SketchPackage": {
+      "type":"object","additionalProperties":false,
+      "required":["schema_version","sketch_package_id","project_id","part_id","view_id","coordinate_system","entities","constraints","dimensions","unresolved","source_view_ids"],
+      "properties": {
+        "schema_version":{"const":"mrea.sketch-package.v1"},"sketch_package_id":{"$ref":"#/$defs/OpaqueId"},"project_id":{"$ref":"#/$defs/OpaqueId"},"part_id":{"$ref":"#/$defs/OpaqueId"},"view_id":{"$ref":"#/$defs/OpaqueId"},
+        "coordinate_system":{"const":"MAT_XY_MM"},"entities":{"type":"array","items":{"$ref":"#/$defs/SketchEntity"}},"constraints":{"type":"array","items":{"$ref":"#/$defs/SketchConstraint"}},"dimensions":{"type":"array","items":{"$ref":"#/$defs/SketchDimension"}},"unresolved":{"type":"array","items":{"$ref":"#/$defs/UnresolvedItem"}},"source_view_ids":{"type":"array","minItems":1,"items":{"$ref":"#/$defs/OpaqueId"}}
+      }
+    },
+    "CADPackage": {
+      "type":"object","additionalProperties":false,"required":["schema_version","cad_package_id","sketch_package_id","adapter","artifacts"],
+      "properties": {"schema_version":{"const":"mrea.cad-package.v1"},"cad_package_id":{"$ref":"#/$defs/OpaqueId"},"sketch_package_id":{"$ref":"#/$defs/OpaqueId"},"adapter":{"type":"string","minLength":1},"artifacts":{"type":"array","items":{"$ref":"#/$defs/ArtifactReference"}}}
+    },
+    "CADVerificationItem": {
+      "type":"object","additionalProperties":false,"required":["dimension_id","expected","actual","unit","tolerance","difference","status"],
+      "properties": {"dimension_id":{"$ref":"#/$defs/OpaqueId"},"measurement_id":{"type":["string","null"]},"expected":{"type":"number"},"actual":{"type":["number","null"]},"unit":{"enum":["mm","deg"]},"tolerance":{"type":"number","minimum":0},"difference":{"type":["number","null"],"minimum":0},"status":{"enum":["VERIFIED","MISMATCH","MISSING","CONSTRAINT_CONFLICT"]}}
+    },
+    "CADVerificationReport": {
+      "type":"object","additionalProperties":false,"required":["schema_version","report_id","cad_package_id","sketch_package_id","policy","items","overall_status"],
+      "properties": {
+        "schema_version":{"const":"mrea.cad-verification.v1"},"report_id":{"$ref":"#/$defs/OpaqueId"},"cad_package_id":{"$ref":"#/$defs/OpaqueId"},"sketch_package_id":{"$ref":"#/$defs/OpaqueId"},
+        "policy":{"type":"object","additionalProperties":false,"required":["kind","default_length_tolerance_mm","default_angle_tolerance_deg"],"properties":{"kind":{"const":"NUMERICAL_TRANSFER"},"default_length_tolerance_mm":{"type":"number","exclusiveMinimum":0},"default_angle_tolerance_deg":{"type":"number","exclusiveMinimum":0}}},
+        "items":{"type":"array","items":{"$ref":"#/$defs/CADVerificationItem"}},"overall_status":{"enum":["VERIFIED","FAILED"]}
+      }
+    },
+    "LifecycleEvent": {
+      "type":"object","additionalProperties":false,"required":["schema_version","event_id","event_type","occurred_at","sequence","revision_id"],
+      "properties": {"schema_version":{"const":"mrea.lifecycle-event.v1"},"event_id":{"$ref":"#/$defs/OpaqueId"},"event_type":{"enum":["REVISION_CREATED","MANUFACTURED","INSTALLED","TESTED","FAILED"]},"occurred_at":{"$ref":"#/$defs/Timestamp"},"sequence":{"type":"integer","minimum":1},"revision_id":{"$ref":"#/$defs/OpaqueId"},"manufacturing_id":{"type":["string","null"]},"installation_id":{"type":["string","null"]},"test_id":{"type":["string","null"]},"failure_id":{"type":["string","null"]}}
+    }
+  }
+}
