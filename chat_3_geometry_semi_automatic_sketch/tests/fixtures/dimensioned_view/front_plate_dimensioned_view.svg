@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 656 582" width="656" height="582" role="img" aria-label="MREA dimensioned view">
+<metadata>MREA Dimensioned View | sketch_package_id=SP-VISION-001 | coordinate_system=MAT_XY_MM</metadata>
+<defs>
+<marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto-start-reverse" markerUnits="strokeWidth">
+<path d="M 0 0 L 8 4 L 0 8 z" fill="currentColor"/>
+</marker>
+</defs>
+<g id="geometry-overlay" fill="none" stroke="currentColor">
+<line class="geometry-line" data-entity-id="L-BOTTOM" data-provenance="VISION_DETECTED" data-confidence="0.99" x1="168" y1="328" x2="488" y2="328"><title>L-BOTTOM | VISION_DETECTED | confidence=0.990</title></line>
+<line class="geometry-line" data-entity-id="L-LEFT" data-provenance="VISION_DETECTED" data-confidence="0.99" x1="168" y1="168" x2="168" y2="328"><title>L-LEFT | VISION_DETECTED | confidence=0.990</title></line>
+<line class="geometry-line" data-entity-id="L-RIGHT" data-provenance="VISION_DETECTED" data-confidence="0.99" x1="488" y1="328" x2="488" y2="168"><title>L-RIGHT | VISION_DETECTED | confidence=0.990</title></line>
+<line class="geometry-line" data-entity-id="L-TOP" data-provenance="VISION_DETECTED" data-confidence="0.99" x1="488" y1="168" x2="168" y2="168"><title>L-TOP | VISION_DETECTED | confidence=0.990</title></line>
+<circle class="geometry-circle" data-entity-id="C-HOLE-1" data-provenance="VISION_DETECTED" data-confidence="0.766" cx="248" cy="248" r="32"><title>C-HOLE-1 | VISION_DETECTED | confidence=0.766</title></circle>
+<circle class="geometry-circle" data-entity-id="C-HOLE-2" data-provenance="VISION_DETECTED" data-confidence="0.766" cx="408" cy="248" r="32"><title>C-HOLE-2 | VISION_DETECTED | confidence=0.766</title></circle>
+</g>
+<g id="dimension-overlay" fill="none" stroke="currentColor">
+<g class="dimension" data-dimension-id="D-V-CENTER" data-provenance="MANUAL_MEASURED" data-verified="true" data-measurement-id="M-V-CENTER">
+<line class="extension-line" x1="248" y1="248" x2="248" y2="270"/>
+<line class="extension-line" x1="408" y1="248" x2="408" y2="270"/>
+<line class="dimension-line" x1="248" y1="270" x2="408" y2="270" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+<text class="dimension-value" font-size="13" x="328" y="280" fill="currentColor" stroke="none" text-anchor="middle">20 mm</text>
+<text class="dimension-trace" font-size="9" x="328" y="293" fill="currentColor" stroke="none" text-anchor="middle">M-V-CENTER · MANUAL_MEASURED · VERIFIED</text>
+</g>
+<g class="dimension" data-dimension-id="D-V-HEIGHT" data-provenance="MANUAL_MEASURED" data-verified="true" data-measurement-id="M-V-HEIGHT">
+<line class="extension-line" x1="168" y1="168" x2="124" y2="168"/>
+<line class="extension-line" x1="168" y1="328" x2="124" y2="328"/>
+<line class="dimension-line" x1="124" y1="168" x2="124" y2="328" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+<text class="dimension-value" font-size="13" x="114" y="248" fill="currentColor" stroke="none" text-anchor="middle">20 mm</text>
+<text class="dimension-trace" font-size="9" x="114" y="261" fill="currentColor" stroke="none" text-anchor="middle">M-V-HEIGHT · MANUAL_MEASURED · VERIFIED</text>
+</g>
+<g class="dimension" data-dimension-id="D-V-HOLE" data-provenance="MANUAL_MEASURED" data-verified="true" data-measurement-id="M-V-HOLE">
+<line class="extension-line" x1="216" y1="248" x2="216" y2="281"/>
+<line class="extension-line" x1="280" y1="248" x2="280" y2="281"/>
+<line class="dimension-line" x1="216" y1="281" x2="280" y2="281" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+<text class="dimension-value" font-size="13" x="248" y="291" fill="currentColor" stroke="none" text-anchor="middle">Ø8 mm</text>
+<text class="dimension-trace" font-size="9" x="248" y="304" fill="currentColor" stroke="none" text-anchor="middle">M-V-HOLE · MANUAL_MEASURED · VERIFIED</text>
+</g>
+<g class="dimension" data-dimension-id="D-V-WIDTH" data-provenance="MANUAL_MEASURED" data-verified="true" data-measurement-id="M-V-WIDTH">
+<line class="extension-line" x1="168" y1="328" x2="168" y2="416"/>
+<line class="extension-line" x1="488" y1="328" x2="488" y2="416"/>
+<line class="dimension-line" x1="168" y1="416" x2="488" y2="416" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+<text class="dimension-value" font-size="13" x="328" y="426" fill="currentColor" stroke="none" text-anchor="middle">40 mm</text>
+<text class="dimension-trace" font-size="9" x="328" y="439" fill="currentColor" stroke="none" text-anchor="middle">M-V-WIDTH · MANUAL_MEASURED · VERIFIED</text>
+</g>
+</g>
+<g id="traceability-footer" fill="currentColor" stroke="none">
+<text font-size="11" x="16" y="466">Geometry: VISION_DETECTED · confidence 0.766–0.990</text>
+<text font-size="11" x="16" y="486">Dimensions: MANUAL_MEASURED · verified state preserved from SketchPackage</text>
+<text class="unresolved-item" font-size="11" x="16" y="506">UNRESOLVED U-C_EQUAL_C-HOLE-1_C-HOLE-2: CONSTRAINT_BELOW_PROMOTION_CONFIDENCE</text>
+</g>
+</svg>
