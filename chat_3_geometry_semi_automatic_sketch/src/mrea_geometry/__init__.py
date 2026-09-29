@@ -1,5 +1,6 @@
 """Deterministic geometry core and canonical v1 bridge owned by MREA Chat 3."""
 
+from .constraint_satisfaction import ConstraintSatisfaction, ConstraintSatisfactionAnalyzer
 from .constraints import ConstraintIssue, ConstraintResolution, ConstraintResolver, ResolvedConstraint
 from .contracts import CanonicalGeometryInput, CanonicalInputAdapter
 from .dimensioned_view import DimensionedViewArtifact, DimensionedViewRenderer, ReferenceImageLayer
@@ -42,6 +43,8 @@ __all__ = [
     "ConstraintIssue",
     "ConstraintResolution",
     "ConstraintResolver",
+    "ConstraintSatisfaction",
+    "ConstraintSatisfactionAnalyzer",
     "DimensionBinder",
     "DimensionedViewArtifact",
     "DimensionedViewRenderer",
