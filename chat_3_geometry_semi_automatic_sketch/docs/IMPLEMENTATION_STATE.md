@@ -2,185 +2,196 @@
 
 **Дата:** 2026-09-29  
 **Repository:** `AlexisMaxpower/MEASURED_REVERSE_ENGINEERING_ASSISTANT`  
-**Branch:** `main`  
+**Active branch:** `chat-3/pass-2`  
 **Role:** Chat 3 — Geometry & Semi-Automatic Sketch  
-**Active directive:** `OD-2026-09-29-001`
+**Active directive:** `OD-2026-09-29-002`  
+**Ring:** 2
 
-## Текущее состояние
+## Current status
 
-Chat 6 / Integrator опубликовал canonical v1 contracts, policies и fixtures и добавил `ORCHESTRATOR_DIRECTIVE.md` непосредственно в Chat 3 workspace.
+Round 1 deterministic FRONT pipeline retained. Chat 6 identified the real Chat 2 → Chat 3 integration gap: Chat 2 legitimately emits canonical anchors in `IMAGE_PX`, while Ring 1 `CanonicalInputAdapter` accepted only `MAT_XY_MM`.
 
-Главный прежний blocker снят. Chat 3 теперь потребляет Integrator-owned contracts и реализует canonical FRONT pipeline до `SketchPackage v1`, не изменяя shared schemas самостоятельно.
+Ring 2 closes that boundary before any OpenCV / primitive-extraction expansion.
 
 ## Canonical inputs / output
 
-Inputs:
+Inputs remain Integrator-owned:
 
 - `/core/contracts/mrea_contracts_v1.schema.json`;
 - `/core/contracts/POLICIES_V1.md`;
-- `/tests/fixtures/contracts/capture_package_v1.json`;
-- `/tests/fixtures/contracts/measurement_package_v1.json`.
+- `CapturePackage v1`;
+- `MeasurementPackage v1`.
 
-Golden output:
+Output remains:
 
-- `/tests/fixtures/contracts/sketch_package_v1.json`.
+- `SketchPackage v1` in `MAT_XY_MM`.
 
-Coordinate system для текущего acceptance target:
+Shared contracts/fixtures are not modified by Chat 3.
 
-```text
-MAT_XY_MM
-```
+## Implemented through Ring 1
 
-## Реализовано
-
-### Internal geometry core
-
-- `Point2D`;
-- `PointEntity`;
-- `Line`;
-- `Circle`;
-- `Arc`;
+- POINT / LINE / CIRCLE / ARC internal primitives;
 - `GeometryGraph`;
-- deterministic endpoint/point adjacency;
-- `AnchorRef`;
-- `MeasurementRef`;
-- `AnchorEntityMatcher`;
-- feature-aware matching через canonical `feature_id`;
-- coordinate-distance fallback;
-- `DimensionBinder`;
-- geometry estimates для supported linear/diameter/radius/center-distance cases;
-- `ConstraintCandidateEngine`;
-- internal candidates: `HORIZONTAL`, `VERTICAL`, `PARALLEL`, `PERPENDICULAR`, `EQUAL`, `CONCENTRIC`;
-- `GeometryConflictDetector`;
-- explicit `UnresolvedBinding`;
-- deterministic internal `GeometryDraft`.
+- deterministic constraint candidates;
+- measurement binding;
+- verified-vs-derived conflict visibility;
+- canonical `SketchPackageBuilder`;
+- deterministic entity/dimension ordering;
+- exact FRONT golden comparison;
+- JSON Schema validation;
+- preservation of canonical `measurement_id` links.
 
-### Canonical bridge
+## Ring 2 coordinate normalization
 
-- `CanonicalInputAdapter`;
-- CapturePackage/MeasurementPackage identity consistency checks;
-- v1 FRONT selection;
-- `MAT_XY_MM` enforcement;
-- canonical anchor → internal anchor conversion;
-- `measurement_id` preservation;
-- `SketchPackageBuilder`;
-- canonical POINT/LINE/CIRCLE/ARC serialization;
-- canonical dimension type mapping;
-- deterministic entity ordering;
-- deterministic dimension ordering;
-- canonical unresolved projection;
-- verified-vs-derived conflicts preserved as unresolved instead of silent correction;
-- inferred constraints intentionally kept internal for current golden baseline.
+`CanonicalInputAdapter` now supports both v1 coordinate spaces.
 
-### Fixtures / tests
+### MAT_XY_MM
 
-- Phase 1 internal FRONT fixture;
-- canonical FRONT primitive-detector-output fixture;
-- Phase 1 unit tests;
-- Phase 2 canonical golden/schema tests;
-- JSON Schema Draft 2020-12 validation through test-only `jsonschema` dependency.
+- passed through unchanged;
+- does not require homography lookup.
 
-## Главный метрологический инвариант
+### IMAGE_PX
+
+Adapter:
+
+1. verifies anchor view;
+2. verifies `reference_frame_id` equals selected view clean-reference `artifact_id`;
+3. requires calibration with `coordinate_system = MAT_XY_MM`;
+4. validates exactly 9 finite homography coefficients;
+5. rejects degenerate 3x3 matrix;
+6. applies projective homogeneous transform;
+7. performs safe divide by `w`;
+8. rejects non-finite/degenerate output;
+9. returns internal `Point2D` in `MAT_XY_MM`.
+
+No scale is guessed.
+
+## Traceability
+
+Internal `AnchorRef` now retains:
+
+- `anchor_id`;
+- normalized point;
+- `feature_id`;
+- `reference_frame_id`;
+- `source_coordinate_space`.
+
+Physical `measurement_id`, value/unit, `verified` and source/provenance remain unchanged by coordinate normalization.
+
+## Chat 2 integration specimen
+
+Added:
+
+`tests/fixtures/internal/chat2_image_px_measurement_package.json`
+
+It uses the same essential wire characteristics as actual Chat 2 canonical adapter output:
+
+- `IMAGE_PX`;
+- `feature_id = null`;
+- clean-reference `reference_frame_id`;
+- verified `MANUAL_MEASURED` measurement.
+
+The specimen itself validates against canonical `MeasurementPackage` schema.
+
+## Acceptance path now implemented
 
 ```text
-verified physical measurement > image-derived / geometry-derived estimate
-```
-
-Verified value никогда не переписывается геометрией. Расхождение сохраняется явно.
-
-## Canonical FRONT acceptance path
-
-```text
-CapturePackage v1
+Chat-2-style IMAGE_PX MeasurementPackage
         +
-MeasurementPackage v1
+CapturePackage with calibration/homography
         ↓
 CanonicalInputAdapter
         ↓
-normalized measurements + feature hints
-        +
-primitive detector output fixture
+MAT_XY_MM AnchorRef / MeasurementRef
         ↓
-GeometryGraph
-        ↓
-feature-aware measurement binding
-        ↓
-geometry estimate
-        ↓
-conflict / unresolved detection
-        +
-internal constraint candidates
+GeometryPipeline
         ↓
 SketchPackageBuilder
         ↓
-SketchPackage v1
-        ↓
-JSON Schema validation
-        ↓
-exact golden comparison
+schema-valid deterministic SketchPackage v1
 ```
 
-## Проверка
+## Verification
 
-### Phase 1 historical verification
-
-Ранее зафиксирован exact-payload runtime run:
+Executed full Chat 3 suite against a reconstructed local repository context using exact current Integrator contract blobs:
 
 ```text
-6 passed in 0.06s
+python -m pytest -q
 ```
 
-### Phase 2
+Result:
 
-Добавлены acceptance tests для:
+```text
+20 passed in 0.85s
+```
 
-- exact equality с Integrator `sketch_package_v1.json`;
-- canonical JSON Schema validation;
-- deterministic result при reverse primitive order;
-- сохранения `M-WIDTH`, `M-HEIGHT`, `M-HOLE`, `M-CENTER`;
-- обязательного v1 `POINT`.
+Inventory:
 
-Runtime `pytest` Phase 2 в текущей ChatGPT sandbox не выполнен: среда не разрешает DNS-доступ к `github.com`, а repository CI workflow отсутствует. Поэтому Phase 2 не помечается ложным `passed`; состояние — **runtime verification pending**.
+- 6 Phase 1 geometry tests;
+- 4 canonical FRONT tests;
+- 10 Ring 2 coordinate-normalization tests.
 
-## Не реализовано
+Also executed:
+
+```text
+python -m compileall -q src tests
+```
+
+Result: success.
+
+## Ring 2 explicit failure behavior
+
+Rejected explicitly:
+
+- wrong clean-reference frame;
+- missing calibration for IMAGE_PX;
+- wrong calibration target coordinate system;
+- wrong homography length;
+- non-finite coefficients;
+- degenerate matrix;
+- zero/degenerate homogeneous divisor;
+- non-finite homogeneous output;
+- unsupported coordinate space.
+
+## Not implemented / intentionally deferred
+
+Per active directive, still deferred:
 
 - raw image contour extraction;
-- OpenCV primitive detection;
-- реальный `fixture://images/front_clean.png` artifact отсутствует в repository;
-- IMAGE_PX → MAT_XY_MM transformer для non-canonical/raw anchors;
+- OpenCV primitive detector;
+- detector breadth beyond deterministic fixture output;
 - general `ConstraintResolver`;
-- policy продвижения inferred constraints в canonical `constraints`;
+- inferred-constraint promotion policy;
 - Dimensioned View renderer;
-- persistence/API;
 - multi-view geometry;
-- CAD integration/read-back.
+- CAD runtime integration/read-back.
 
 ## Shared ownership
 
-Chat 3 не изменяет самостоятельно:
+Chat 3 does not modify:
 
 - `/core/contracts/`;
 - `/core/domain/shared/`;
 - `/tests/fixtures/contracts/`;
-- contracts/policies Integrator;
-- директории других chats.
+- directories owned by Chat 1/2/4/5/6.
 
-## Текущие ограничения canonical FRONT baseline
+## Current gate
 
-1. Primitive geometry поступает из локального deterministic fixture, моделирующего результат будущего detector-а.
-2. Canonical golden anchors уже находятся в `MAT_XY_MM`, поэтому pixel transform в этом acceptance case не нужен.
-3. `feature_id` используется как primary semantic association hint; coordinate matching остаётся fallback.
-4. Pure inferred constraints пока не экспортируются, поскольку canonical golden fixture содержит пустой `constraints`.
-5. Linear measurement association и CAD-oriented dimension host различаются: measured left/right edges могут породить canonical width dimension на bottom line.
+Requested from Chat 6:
 
-## Следующий шаг
+```text
+Chat 2 IMAGE_PX output
+→ Chat 3 homography normalization
+→ MAT_XY_MM geometry pipeline
+→ schema-valid SketchPackage
+```
 
-1. Integrator должен выполнить/review Phase 2 runtime acceptance или предоставить CI/release-gate environment.
-2. После зелёного canonical FRONT gate — реализовать primitive extraction boundary.
-3. Выполнить Build / Reuse spike для OpenCV contour/line/circle/arc detection на реальном image fixture.
-4. Не расширять v1 geometry vocabulary без Change Request.
+Status from Chat 3 side: `READY_FOR_RING2_INTEGRATOR_GATE`.
 
-Подробности:
+OpenCV / primitive extraction must not start until Chat 6 accepts this gate.
 
-- `BUILD_REUSE_CHECK_PHASE2_CANONICAL_BRIDGE.md`;
-- `IMPLEMENTATION_REPORT_PHASE2_CANONICAL_FRONT_2026-09-29.md`.
+## Ring 2 documents
+
+- `BUILD_REUSE_CHECK_RING2_COORDINATE_NORMALIZATION.md`;
+- `IMPLEMENTATION_REPORT_RING2_COORDINATE_NORMALIZATION_2026-09-29.md`;
+- `ORCHESTRATOR_HANDOFF.md`.

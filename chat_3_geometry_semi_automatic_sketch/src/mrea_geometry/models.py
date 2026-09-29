@@ -149,6 +149,8 @@ class AnchorRef:
     anchor_id: str
     point: Point2D
     feature_id: str | None = None
+    reference_frame_id: str | None = None
+    source_coordinate_space: str = "MAT_XY_MM"
 
 
 @dataclass(frozen=True, slots=True)
