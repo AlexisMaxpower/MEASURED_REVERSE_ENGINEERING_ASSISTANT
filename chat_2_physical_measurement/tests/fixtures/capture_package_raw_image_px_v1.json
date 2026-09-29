@@ -1,0 +1,49 @@
+{
+  "schema_version": "mrea.capture-package.v1",
+  "capture_package_id": "CP-CHAT2-PASS2-001",
+  "project_id": "P-CHAT2-PASS2-001",
+  "part_id": "PART-CHAT2-PASS2-001",
+  "views": [
+    {
+      "view_id": "VIEW-FRONT-RAW-001",
+      "view_type": "FRONT",
+      "clean_reference_frame": {
+        "artifact_id": "A-FRONT-CLEAN-RAW-001",
+        "kind": "CLEAN_REFERENCE_IMAGE",
+        "uri": "fixture://chat2/front_clean_raw.png",
+        "media_type": "image/png",
+        "sha256": null,
+        "metadata": {
+          "width_px": 1604,
+          "height_px": 842
+        }
+      },
+      "measurement_frames": [
+        {
+          "frame_id": "FRAME-FRONT-MEAS-001",
+          "view_id": "VIEW-FRONT-RAW-001",
+          "artifact": {
+            "artifact_id": "A-FRONT-MEAS-001",
+            "kind": "MEASUREMENT_IMAGE",
+            "uri": "fixture://chat2/front_measurement_caliper.png",
+            "media_type": "image/png",
+            "sha256": null,
+            "metadata": {
+              "width_px": 1604,
+              "height_px": 842
+            }
+          },
+          "captured_at": "2026-09-29T12:00:00Z",
+          "camera_metadata": {},
+          "voice_event": null
+        }
+      ],
+      "calibration": {
+        "coordinate_system": "MAT_XY_MM",
+        "mat_id": "MAT-CHAT2-PASS2-001",
+        "homography": [0.1,0,0,0,0.1,0,0,0,1],
+        "quality": 1.0
+      }
+    }
+  ]
+}
