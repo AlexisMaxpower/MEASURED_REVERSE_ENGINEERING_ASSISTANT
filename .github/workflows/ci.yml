@@ -258,3 +258,44 @@ jobs:
         env:
           PYTHONPATH: chat_4_cad_bridge_verification/src:chat_5_lifecycle_engineering_knowledge/src
         run: python -m pytest -q tests/integration/test_chat4_to_chat5_boundary.py
+
+  round3-golden-path:
+    name: Integration / Round 3 golden path
+    if: (github.event_name == 'pull_request' && startsWith(github.head_ref, 'integration/pass-')) || startsWith(github.ref, 'refs/heads/integration/pass-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs:
+      - contracts
+      - chat1
+      - chat2
+      - chat3
+      - chat4
+      - chat5
+      - integration-chat1-chat2
+      - integration-chat2-chat3
+      - integration-chat3-chat4
+      - integration-chat4-chat5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            chat_1_project_guided_capture/pyproject.toml
+            chat_2_physical_measurement/pyproject.toml
+            chat_3_geometry_semi_automatic_sketch/pyproject.toml
+            chat_4_cad_bridge_verification/requirements-dev.txt
+      - name: Install golden-path test environment
+        run: |
+          python -m pip install --upgrade pip pytest "jsonschema>=4.23,<5"
+          python -m pip install -e "./chat_1_project_guided_capture[test]"
+          python -m pip install -e "./chat_2_physical_measurement[test]"
+          python -m pip install -e "./chat_3_geometry_semi_automatic_sketch[test]"
+          python -m pip install -r chat_4_cad_bridge_verification/requirements-dev.txt
+      - name: Run Round 3 Capture -> Physical Instance golden path
+        env:
+          PYTHONPATH: chat_4_cad_bridge_verification/src:chat_5_lifecycle_engineering_knowledge/src
+        run: python -m pytest -q tests/integration/test_round3_golden_path.py
