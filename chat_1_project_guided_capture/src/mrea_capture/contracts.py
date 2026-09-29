@@ -112,6 +112,23 @@ class CanonicalContractBuilder:
                 for frame in session.frames
                 if frame.view is progress.view and frame.kind is FrameKind.MEASUREMENT
             ]
+            calibration = next(
+                (item for item in session.calibrations if item.view is progress.view),
+                None,
+            )
+            canonical_calibration = None
+            if calibration is not None:
+                if calibration.source_frame_id != clean.frame_id:
+                    raise CanonicalContractError(
+                        f"calibration for {progress.view.value} does not reference its clean frame"
+                    )
+                canonical_calibration = {
+                    "coordinate_system": "MAT_XY_MM",
+                    "mat_id": calibration.mat_id,
+                    "homography": calibration.homography,
+                    "quality": calibration.quality,
+                }
+
             views.append(
                 {
                     "view_id": view_id,
@@ -125,7 +142,7 @@ class CanonicalContractBuilder:
                         },
                     ),
                     "measurement_frames": measurements,
-                    "calibration": None,
+                    "calibration": canonical_calibration,
                 }
             )
 
