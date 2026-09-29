@@ -67,6 +67,7 @@ chat_1_project_guided_capture/
 │  ├─ contracts.py
 │  ├─ models.py
 │  ├─ quality.py
+│  ├─ guidance.py
 │  ├─ rectification.py
 │  ├─ repositories.py
 │  └─ services.py
@@ -77,7 +78,8 @@ chat_1_project_guided_capture/
 │  ├─ test_canonical_contracts.py
 │  ├─ test_calibration.py
 │  ├─ test_rectification.py
-│  └─ test_quality.py
+│  ├─ test_quality.py
+│  └─ test_guidance.py
 └─ docs/
    ├─ IMPLEMENTATION_STATE.md
    ├─ BUILD_REUSE_CHECK_PASS3_GUIDED_QUALITY.md
@@ -110,3 +112,8 @@ Subject to the next Chat 6 directive:
 - richer framing/object guidance if a safe segmentation boundary is approved;
 - native/mobile camera integration;
 - voice-trigger capture in its later roadmap gate.
+
+
+## Isolated Pass 4 — Guided Capture Readiness
+
+Pending Round-3 closure / official OD-004, `chat-1/pass-4` contains an isolated future-work layer that derives deterministic next actions and required-view completeness from existing CaptureSession evidence. It does not modify canonical contracts and must not be treated as integrated into `main` until orchestration approval.

@@ -148,3 +148,14 @@ Before handoff freeze, require:
 - shared contract checks green;
 - no shared-contract changes;
 - final `ORCHESTRATOR_HANDOFF.md` published once, then branch frozen.
+
+
+## Isolated Pass 4 work package — Guided Capture Readiness
+
+While Round 3 final merge remains blocked by Chat-6-owned post-merge golden-path CI coverage, Chat 1 future work is isolated on `chat-1/pass-4` and is **not yet accepted/integrated**.
+
+Added `guidance.py` with versioned deterministic readiness orchestration over existing capture evidence. It derives the first remaining required view and next action across clean reference, calibration, quality, measurement frame and explicit acceptance. Quality `REJECT` blocks progression; WARN handling is policy-controlled. Optional views do not block required completion.
+
+This layer is pure/read-only and does not change `CapturePackage v1`, physical measurements, geometry, or persisted evidence.
+
+Local schema-independent regression: `24 passed`. Full repository CI is required after upload.

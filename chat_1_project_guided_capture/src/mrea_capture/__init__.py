@@ -7,6 +7,15 @@ from .calibration import (
     OpenCvCharucoCalibrationDetector,
 )
 from .contracts import CanonicalContractBuilder, CanonicalContractError
+from .guidance import (
+    GuidedCaptureAction,
+    GuidedCaptureBlockerCode,
+    GuidedCaptureError,
+    GuidedCapturePolicy,
+    GuidedCaptureReadiness,
+    GuidedCaptureReadinessService,
+    GuidedViewReadiness,
+)
 from .models import (
     ArtifactRecord,
     CalibrationResult,
@@ -89,6 +98,13 @@ __all__ = [
     "FileSystemArtifactStore",
     "FrameKind",
     "FrameRecord",
+    "GuidedCaptureAction",
+    "GuidedCaptureBlockerCode",
+    "GuidedCaptureError",
+    "GuidedCapturePolicy",
+    "GuidedCaptureReadiness",
+    "GuidedCaptureReadinessService",
+    "GuidedViewReadiness",
     "JsonCaptureSessionRepository",
     "JsonProjectRepository",
     "MeasurementMatProfile",
