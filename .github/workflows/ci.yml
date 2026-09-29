@@ -261,7 +261,7 @@ jobs:
 
   round3-golden-path:
     name: Integration / Round 3 golden path
-    if: (github.event_name == 'pull_request' && startsWith(github.head_ref, 'integration/pass-')) || startsWith(github.ref, 'refs/heads/integration/pass-')
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'pull_request' && startsWith(github.head_ref, 'integration/pass-')) || startsWith(github.ref, 'refs/heads/integration/pass-')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs:
