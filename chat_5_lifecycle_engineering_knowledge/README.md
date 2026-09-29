@@ -1,14 +1,13 @@
 # Chat 5 — Lifecycle & Engineering Knowledge
 
-Статус: **Phase 1 domain/runtime baseline implemented**  
+Статус: **Phase 2 canonical LifecycleEvent adapter implemented**  
 Проект: **MREA — Measured Reverse Engineering Assistant**  
-Источник истины: **MREA SSOT v0.1 от 2026-09-29**
+Источник истины: **MREA SSOT v0.1 от 2026-09-29**  
+Текущая директива: **OD-2026-09-29-001**
 
 ## Назначение области
 
-Эта директория принадлежит Chat 5 и содержит реализацию вертикального слайса **Lifecycle & Engineering Knowledge**.
-
-Слайс отвечает за физическую жизнь детали после этапа CAD:
+Эта директория принадлежит Chat 5 и содержит vertical slice **Lifecycle & Engineering Knowledge**:
 
 ```text
 Revision
@@ -20,106 +19,95 @@ Revision
 → Engineering Knowledge
 ```
 
-## Ownership
+## Реализовано
 
-Chat 5 отвечает за:
+Phase 1:
 
-- revisions;
-- manufacturing records;
-- installation;
-- tests;
-- failures;
-- revision comparison;
-- field status;
-- equipment mapping;
-- lifecycle timeline;
-- engineering knowledge queries.
+- lifecycle domain models;
+- `RevisionService`;
+- `ManufacturingService`;
+- `InstallationService`;
+- `TestService`;
+- `FailureService`;
+- `LifecycleTimeline`;
+- `EquipmentPartRegistry`;
+- `LifecycleStateProjection`;
+- `RevisionComparison`;
+- `KnowledgeQueryService`;
+- `InMemoryLifecycleStore`.
 
-Реализованный Phase 1 содержит:
+Phase 2:
 
-- `RevisionService`
-- `ManufacturingService`
-- `InstallationService`
-- `TestService`
-- `FailureService`
-- `RevisionComparison`
-- `EquipmentPartRegistry`
-- `LifecycleTimeline`
-- `LifecycleStateProjection`
-- `KnowledgeQueryService`
-- `InMemoryLifecycleStore`
+- `CanonicalLifecycleEventAdapter`;
+- canonical `mrea.lifecycle-event.v1` serialization;
+- deterministic ordered export;
+- canonical contract/golden tests;
+- evidence-preserving outbound boundary.
 
-## Не входит в ownership
+## Contract boundary
 
-Chat 5 самостоятельно не изменяет:
+Chat 5 не изменяет shared contracts.
 
-- camera / Guided Capture;
-- Physical Measurement;
-- Geometry / Sketch;
-- SolidWorks API / CAD adapter;
-- shared contracts;
-- global architecture;
-- contract fixtures Integrator-а.
+Canonical inputs принадлежат Integrator / Chat 6:
 
-Cross-slice изменения оформляются через `CHANGE_REQUEST` для Integrator.
+- `core/contracts/mrea_contracts_v1.schema.json`;
+- `core/contracts/POLICIES_V1.md`;
+- `tests/fixtures/contracts/lifecycle_event_v1.json`.
+
+Текущая семантика:
+
+```text
+LifecycleEvent v1 = canonical shared outbound contract
+LifecycleState = internal derived projection
+```
+
+Rich Revision/Manufacturing/Installation/Test/Failure models остаются внутренними Chat 5.
 
 ## Структура
 
 ```text
 chat_5_lifecycle_engineering_knowledge/
+├── ORCHESTRATOR_DIRECTIVE.md
 ├── README.md
 ├── docs/
 │   ├── CHAT_5_ROLE.md
 │   ├── IMPLEMENTATION_STATE.md
-│   └── PHASE_1_DOMAIN_BASELINE.md
+│   ├── PHASE_1_DOMAIN_BASELINE.md
+│   └── PHASE_2_CANONICAL_LIFECYCLE_ADAPTER.md
 ├── src/
 │   └── mrea_lifecycle/
 │       ├── __init__.py
+│       ├── adapters.py
 │       ├── models.py
 │       ├── projections.py
 │       ├── services.py
 │       └── store.py
 └── tests/
     ├── test_acceptance_flow.py
+    ├── test_canonical_adapter.py
     └── test_invariants.py
 ```
 
-## Первый acceptance-flow
-
-```text
-REV01
-→ manufactured
-→ installed
-→ failed
-→ failure evidence retained
-→ REV02
-→ manufactured
-→ installed
-→ active
-```
-
-Этот flow реализован и локально проверен.
-
 ## Verification
+
+Локально:
 
 ```text
 PYTHONPATH=src pytest -q
+8 passed
 ```
 
-Результат Phase 1:
-
-```text
-4 passed
-```
-
-## Важное ограничение
-
-`LifecycleEvent`, `LifecycleEventType` и `LifecycleState` в текущем коде являются **внутренними типами Chat 5**, а не shared contracts проекта.
-
-Integrator-owned schemas/fixtures на момент Phase 1 в проверенной структуре repository отсутствовали. Shared contracts не изменялись.
+Repository-wide CI в этой итерации не запускался.
 
 ## Документация
 
-- [`docs/CHAT_5_ROLE.md`](docs/CHAT_5_ROLE.md) — роль, ownership, границы и архитектурная модель.
-- [`docs/PHASE_1_DOMAIN_BASELINE.md`](docs/PHASE_1_DOMAIN_BASELINE.md) — реализованный Phase 1, invariants, verification и ограничения.
-- [`docs/IMPLEMENTATION_STATE.md`](docs/IMPLEMENTATION_STATE.md) — актуальное фактическое состояние и следующий шаг.
+- `docs/CHAT_5_ROLE.md` — role baseline.
+- `docs/PHASE_1_DOMAIN_BASELINE.md` — internal lifecycle baseline.
+- `docs/PHASE_2_CANONICAL_LIFECYCLE_ADAPTER.md` — canonical boundary и contract tests.
+- `docs/IMPLEMENTATION_STATE.md` — актуальный implementation state и следующий шаг.
+
+## Следующий шаг
+
+Перед каждой итерацией сначала читать `ORCHESTRATOR_DIRECTIVE.md` и canonical inputs.
+
+Если Chat 6 не изменит приоритет: repository abstraction → physical instance/removal/replacement semantics → persistence prototype → API boundary.
