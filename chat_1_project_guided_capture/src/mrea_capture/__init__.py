@@ -23,6 +23,14 @@ from .models import (
     PartContext,
     Project,
     ProjectStatus,
+    RectifiedReferenceRecord,
+)
+from .rectification import (
+    OpenCvPerspectiveNormalizer,
+    PerspectiveNormalizer,
+    RectificationError,
+    RectificationService,
+    RectifiedRaster,
 )
 from .repositories import (
     CaptureSessionNotFoundError,
@@ -63,9 +71,15 @@ __all__ = [
     "JsonProjectRepository",
     "MeasurementMatProfile",
     "OpenCvCharucoCalibrationDetector",
+    "OpenCvPerspectiveNormalizer",
     "PartContext",
+    "PerspectiveNormalizer",
     "Project",
     "ProjectNotFoundError",
     "ProjectService",
     "ProjectStatus",
+    "RectificationError",
+    "RectificationService",
+    "RectifiedRaster",
+    "RectifiedReferenceRecord",
 ]

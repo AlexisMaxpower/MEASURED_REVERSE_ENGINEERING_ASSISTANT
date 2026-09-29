@@ -1,133 +1,99 @@
 # Chat 1 — Project & Guided Capture
 
-Эта директория является изолированной рабочей областью Chat 1 проекта MREA.
+Chat 1 owns the MREA vertical slice from Project/Capture setup through canonical `CapturePackage` production and guided-capture preprocessing. Shared contracts remain owned by Chat 6.
 
-## Ownership
+## Current orchestration
 
-Chat 1 отвечает за vertical slice `Project & Guided Capture`: project creation, part initial context, CapturePlan, camera/capture workflow, Guided Capture, Measurement Mat detection, calibration, clean reference frame, measurement-frame capture, voice capture trigger, image-quality analysis и формирование canonical `CapturePackage`.
+- Pass 1: **accepted** by Chat 6.
+- Current directive: `OD-2026-09-29-002`.
+- Pass 2 branch: `chat-1/pass-2`.
+- Pass 2 gate: perspective normalization / derived reference artifact.
 
-Chat 1 не владеет shared contracts и не изменяет `core/contracts/` или `tests/fixtures/contracts/` без решения Chat 6 — Orchestrator / Repository Integrator.
+## Current implementation
 
-## Source of truth
+### Project / capture
 
-1. current repository state on `main`;
-2. `core/contracts/`;
-3. `tests/fixtures/contracts/`;
-4. product SSOT + orchestrator directives/state;
-5. Chat 1 local documentation.
+- `Project` + `PartContext` with stable `project_id` / `part_id`;
+- deterministic CapturePlan;
+- persistent offline-first CaptureSession;
+- clean-reference and measurement-frame separation;
+- content-addressed local ArtifactStore with SHA-256 verification.
 
-Current orchestrator directive: `OD-2026-09-29-001`.
+### Canonical boundary
 
-## Current structure
+- `ProjectContract v1` adapter;
+- `CapturePackage v1` builder;
+- ArtifactReference / MeasurementCaptureFrame mapping;
+- schema-valid canonical FRONT flow;
+- canonical ChArUco calibration in `MAT_XY_MM`.
+
+### Calibration
+
+- `MeasurementMatProfile`;
+- `CalibrationResult` with stable internal `calibration_id`;
+- OpenCV ChArUco detection;
+- RANSAC homography `IMAGE_PX -> MAT_XY_MM`;
+- calibration provenance tied to clean reference.
+
+### Pass 2 — perspective normalization
+
+- `PerspectiveNormalizer` abstraction;
+- `OpenCvPerspectiveNormalizer`;
+- deterministic MAT-space raster dimensions;
+- explicit invalid/singular-homography failures;
+- immutable rectified image artifact;
+- `RectifiedReferenceRecord`;
+- provenance: source clean frame + calibration + mat;
+- original clean reference remains unchanged/retrievable;
+- canonical CapturePackage remains backward-compatible and schema-valid.
+
+## Structure
 
 ```text
 chat_1_project_guided_capture/
-├─ MREA_SSOT_PRODUCT_CONCEPT_ARCHITECTURE_CHAT_ROLES_V0_1_2026-09-29.md
 ├─ ORCHESTRATOR_DIRECTIVE.md
 ├─ ORCHESTRATOR_HANDOFF.md
-├─ README.md
 ├─ pyproject.toml
-├─ src/
-│  └─ mrea_capture/
-│     ├─ __init__.py
-│     ├─ artifacts.py
-│     ├─ calibration.py
-│     ├─ contracts.py
-│     ├─ models.py
-│     ├─ repositories.py
-│     └─ services.py
+├─ src/mrea_capture/
+│  ├─ artifacts.py
+│  ├─ calibration.py
+│  ├─ contracts.py
+│  ├─ models.py
+│  ├─ rectification.py
+│  ├─ repositories.py
+│  └─ services.py
 ├─ tests/
 │  ├─ test_project_service.py
 │  ├─ test_capture_plan.py
 │  ├─ test_manual_capture.py
 │  ├─ test_canonical_contracts.py
-│  └─ test_calibration.py
+│  ├─ test_calibration.py
+│  └─ test_rectification.py
 └─ docs/
-   ├─ CHAT_1_ROLE.md
-   ├─ BUILD_REUSE_CHECK_PHASE1.md
-   ├─ BUILD_REUSE_CHECK_PHASE2.md
-   ├─ BUILD_REUSE_CHECK_PHASE3_CALIBRATION.md
-   ├─ IMPLEMENTATION_REPORT_R1_PHASE1_2026-09-29.md
-   ├─ IMPLEMENTATION_REPORT_R1_PHASE2_2026-09-29.md
-   ├─ IMPLEMENTATION_REPORT_ORCHESTRATOR_GATE_2026-09-29.md
-   ├─ IMPLEMENTATION_REPORT_R1_PHASE3_CALIBRATION_2026-09-29.md
-   └─ IMPLEMENTATION_STATE.md
+   ├─ IMPLEMENTATION_STATE.md
+   ├─ BUILD_REUSE_CHECK_PHASE3_RECTIFICATION.md
+   └─ IMPLEMENTATION_REPORT_PASS2_RECTIFICATION_2026-09-29.md
 ```
-
-## Implemented in Pass 1
-
-### R1 Phase 1 — Project/Capture domain
-
-- `Project` + `PartContext`;
-- stable `project_id` and `part_id`;
-- deterministic legacy `part_id` backfill;
-- project create/recovery/archive;
-- replaceable repository abstraction;
-- offline-first JSON persistence;
-- deterministic `CapturePlan` and CaptureSession initialization.
-
-### R1 Phase 2 — Manual Capture
-
-- `CameraMetadata`;
-- distinct clean-reference and measurement frames;
-- content-addressed filesystem artifacts with SHA-256 verification;
-- persistent CaptureSession;
-- clean reference capture;
-- manual measurement-frame capture;
-- measurement frame forbidden before clean reference;
-- required-view acceptance/completion.
-
-### Orchestrator canonical gate
-
-- outward adapter to canonical `ProjectContract v1`;
-- canonical `CapturePackage v1` builder;
-- canonical `ArtifactReference` and `MeasurementCaptureFrame` mapping;
-- deterministic opaque package/view IDs;
-- schema validation against Integrator-owned `mrea.contracts.v1`;
-- one-view FRONT package acceptance target from `OD-2026-09-29-001` satisfied.
-
-### R1 Phase 3 — Calibration baseline
-
-- `MeasurementMatProfile`;
-- ChArUco detection through OpenCV;
-- RANSAC homography `IMAGE_PX -> MAT_XY_MM`;
-- calibration persistence and clean-reference provenance;
-- marker/corner evidence + reprojection RMSE;
-- non-null canonical `views[].calibration`;
-- synthetic ChArUco integration test.
-
-Current canonical `calibration.quality` remains `null` until an explicit quality policy is approved.
 
 ## Verification
 
-Latest full local Chat 1 regression:
+Latest local full regression for Pass 2:
 
 ```text
-13 passed in 1.07s
+16 passed in 1.17s
 ```
 
-Verified:
+The synthetic perspective regression uses known geometry and verifies deterministic encoded output, source preservation, provenance, derived artifact separation, explicit singular-homography failure and canonical schema compatibility.
 
-- Project create/recovery and stable IDs;
-- manual capture invariants;
-- canonical Project/Capture schema validation;
-- deterministic canonical serialization;
-- synthetic 5x7 ChArUco detection with 24 corners;
-- 9-value homography;
-- reprojection RMSE `< 0.001 mm` on synthetic fixture;
-- canonical CapturePackage with calibration validates against shared schema.
+## Contract policy
 
-This is local verification; GitHub Actions CI has not yet been run.
+`CapturePackage v1` currently has no field for a rectified artifact and disallows unknown view properties. Pass 2 therefore keeps the rectified artifact internal rather than silently extending the canonical wire contract.
 
 ## Remaining work
 
-- perspective-normalized derived artifact and source → derived provenance;
-- deterministic warp test with synthetic perspective distortion;
-- physical printed Measurement Mat validation;
-- lens distortion / camera intrinsics strategy;
-- Guided Quality checks;
+- physical printed-mat validation;
+- camera lens/intrinsics strategy;
+- Guided Quality warnings;
 - native/mobile camera integration;
-- voice-trigger capture;
-- API/CI.
-
-See `docs/IMPLEMENTATION_STATE.md` for the detailed current state and `ORCHESTRATOR_HANDOFF.md` for the integration handoff to Chat 6.
+- voice-trigger capture (later roadmap gate);
+- CI.

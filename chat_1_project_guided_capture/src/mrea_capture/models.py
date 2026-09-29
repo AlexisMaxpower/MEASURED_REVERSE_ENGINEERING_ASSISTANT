@@ -170,6 +170,7 @@ class MeasurementMatProfile(StrictModel):
 
 
 class CalibrationResult(StrictModel):
+    calibration_id: UUID
     view: CaptureViewType
     source_frame_id: UUID
     mat_id: NonBlank
@@ -182,10 +183,49 @@ class CalibrationResult(StrictModel):
     quality: float | None = Field(default=None, ge=0, le=1)
     created_at: datetime = Field(default_factory=utc_now)
 
+    @model_validator(mode="before")
+    @classmethod
+    def backfill_stable_calibration_id(cls, data: Any) -> Any:
+        if (
+            isinstance(data, dict)
+            and not data.get("calibration_id")
+            and data.get("source_frame_id")
+            and data.get("mat_id")
+        ):
+            migrated = dict(data)
+            migrated["calibration_id"] = uuid5(
+                NAMESPACE_URL,
+                f"mrea:calibration:v1:{data['source_frame_id']}:{data['mat_id']}",
+            )
+            return migrated
+        return data
+
     @model_validator(mode="after")
     def validate_coordinate_system(self) -> "CalibrationResult":
         if self.coordinate_system != "MAT_XY_MM":
             raise ValueError("calibration coordinate system must be MAT_XY_MM")
+        return self
+
+
+class RectifiedReferenceRecord(StrictModel):
+    rectified_reference_id: UUID = Field(default_factory=uuid4)
+    view: CaptureViewType
+    source_frame_id: UUID
+    calibration_id: UUID
+    mat_id: NonBlank
+    artifact: ArtifactRecord
+    coordinate_system: str = "MAT_XY_MM"
+    pixels_per_mm: float = Field(gt=0)
+    width_px: int = Field(gt=0)
+    height_px: int = Field(gt=0)
+    created_at: datetime = Field(default_factory=utc_now)
+
+    @model_validator(mode="after")
+    def validate_rectified_reference(self) -> "RectifiedReferenceRecord":
+        if self.coordinate_system != "MAT_XY_MM":
+            raise ValueError("rectified coordinate system must be MAT_XY_MM")
+        if self.created_at.tzinfo is None:
+            raise ValueError("rectified reference timestamp must be timezone-aware")
         return self
 
 
@@ -205,6 +245,7 @@ class CaptureSession(StrictModel):
     views: list[CaptureViewProgress]
     frames: list[FrameRecord] = Field(default_factory=list)
     calibrations: list[CalibrationResult] = Field(default_factory=list)
+    rectified_references: list[RectifiedReferenceRecord] = Field(default_factory=list)
     started_at: datetime = Field(default_factory=utc_now)
     completed_at: datetime | None = None
 
@@ -218,6 +259,9 @@ class CaptureSession(StrictModel):
         calibration_views = [item.view for item in self.calibrations]
         if len(calibration_views) != len(set(calibration_views)):
             raise ValueError("capture session cannot contain duplicate calibrations per view")
+        rectified_views = [item.view for item in self.rectified_references]
+        if len(rectified_views) != len(set(rectified_views)):
+            raise ValueError("capture session cannot contain duplicate rectified references per view")
         if self.started_at.tzinfo is None:
             raise ValueError("started_at must be timezone-aware")
         if self.completed_at is not None and self.completed_at.tzinfo is None:

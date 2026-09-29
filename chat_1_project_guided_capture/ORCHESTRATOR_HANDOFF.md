@@ -1,7 +1,9 @@
 # ORCHESTRATOR HANDOFF — Chat 1
 
-**Pass:** 1  
-**Directive closed:** `OD-2026-09-29-001`  
+**Pass:** 2  
+**Directive:** `OD-2026-09-29-002`  
+**Branch:** `chat-1/pass-2`  
+**Implementation final SHA:** `3c23710498bce52502f39456e641a99e2441d937`  
 **Date:** 2026-09-29  
 **From:** Chat 1 — Project & Guided Capture  
 **To:** Chat 6 — Orchestrator / Repository Integrator  
@@ -9,148 +11,123 @@
 
 ## Delivered
 
-Pass 1 delivers a working Project/Capture baseline through canonical Capture output:
+Pass 2 implements the perspective-normalization gate required by OD-002:
 
 ```text
-Project + PartContext
-→ CapturePlan
-→ CaptureSession
-→ clean reference
-→ manual measurement frames
-→ ChArUco calibration
-→ canonical ProjectContract v1
-→ canonical CapturePackage v1
-→ JSON Schema validation
+immutable clean reference
++ stored IMAGE_PX -> MAT_XY_MM homography
++ MeasurementMatProfile
+-> deterministic rectified raster
+-> immutable derived artifact
+-> explicit source/calibration provenance
 ```
 
-## Canonical inputs used
+## Branch policy
 
-- `core/contracts/mrea_contracts_v1.schema.json`;
-- `core/contracts/POLICIES_V1.md`;
-- `tests/fixtures/contracts/project_v1.json`;
-- `tests/fixtures/contracts/capture_package_v1.json`.
+All Pass 2 implementation was written to:
 
-No shared contract or canonical fixture was copied or modified by Chat 1.
+`chat-1/pass-2`
 
-## Implementation delivered
+No Pass 2 implementation was committed directly to `main`.
 
-### Project/Capture domain
+## Domain changes
 
-- stable `project_id` and `part_id`;
-- deterministic legacy `part_id` backfill;
-- Project create/recovery/archive;
-- deterministic CapturePlan;
-- persistent CaptureSession;
-- offline-first JSON repositories.
+- added stable internal `calibration_id` to `CalibrationResult`;
+- legacy calibration records without `calibration_id` receive deterministic UUIDv5 backfill from `source_frame_id + mat_id`;
+- added `RectifiedReferenceRecord`;
+- `CaptureSession` persists `rectified_references`;
+- duplicate rectified reference per view is rejected.
 
-### Manual capture
+## Rectification implementation
 
-- camera metadata;
-- immutable clean-reference / measurement-frame separation;
-- content-addressed local artifact store;
-- SHA-256 integrity verification;
-- measurement-frame-before-clean-reference rejection;
-- required-view completion behavior.
+Added:
 
-### Canonical boundary
+- `PerspectiveNormalizer` protocol;
+- `OpenCvPerspectiveNormalizer`;
+- `RectificationService`;
+- `RectificationError`;
+- `RectifiedRaster`.
 
-- `CanonicalContractBuilder.project_contract()`;
-- `CanonicalContractBuilder.capture_package()`;
-- canonical `ArtifactReference` mapping;
-- canonical `MeasurementCaptureFrame` mapping;
-- deterministic opaque `capture_package_id` / `view_id`;
-- UTC/RFC3339 wire timestamps;
-- stable project/part linkage;
-- canonical FRONT schema validation.
+Behavior:
 
-### Calibration baseline
+- reuses existing stored calibration/homography;
+- validates `MAT_XY_MM` coordinate system and matching mat profile;
+- rejects singular or non-finite homography explicitly;
+- derives deterministic raster size from mat dimensions + `pixels_per_mm`;
+- fixed OpenCV interpolation, border and PNG encoding policy;
+- original clean reference is never overwritten;
+- rectified bytes are stored as a new content-addressed artifact;
+- provenance links derived artifact to exact source frame, calibration ID and mat ID.
 
-- `MeasurementMatProfile`;
-- `CalibrationResult` persistence;
-- `CalibrationDetector` abstraction;
-- `OpenCvCharucoCalibrationDetector`;
-- ChArUco marker/corner detection;
-- RANSAC homography `IMAGE_PX -> MAT_XY_MM`;
-- calibration provenance tied to clean reference;
-- objective marker/corner/RMSE evidence;
-- canonical non-null `CapturePackage.views[].calibration`.
+## Canonical contract compatibility
 
-## Verification
+Canonical `CapturePackage v1` has no rectified-artifact property and its view objects reject unknown properties.
 
-Latest full local Chat 1 regression:
+Therefore Pass 2 does not modify `core/contracts` or canonical fixtures. The rectified artifact remains internal to Chat 1. The canonical package continues to expose the original clean-reference artifact and calibration homography.
+
+The Pass 2 regression proves canonical serialization is unchanged before/after internal rectification and remains schema-valid.
+
+## Exact tests executed
+
+Local full Chat 1 regression:
 
 ```text
-13 passed in 1.07s
+pytest -q
+................                                                         [100%]
+16 passed in 1.17s
 ```
 
-Verified by tests:
+New Pass 2 coverage verifies:
 
-1. Project create/recovery and validation;
-2. stable `part_id`, including legacy backfill;
-3. CapturePlan ordering/deduplication;
-4. CaptureSession persistence;
-5. artifact SHA-256 round-trip;
-6. clean/measurement evidence separation;
-7. required FRONT completion;
-8. canonical ProjectContract schema validation;
-9. canonical FRONT CapturePackage schema validation;
-10. deterministic canonical serialization;
-11. canonical measurement-frame serialization;
-12. synthetic ChArUco calibration;
-13. canonical CapturePackage with non-null calibration validates against shared schema.
+1. synthetic 5x7 ChArUco reference warped with known perspective geometry;
+2. existing calibration recovers the source-to-mat homography;
+3. repeated normalization produces identical encoded PNG bytes;
+4. original clean-reference bytes remain retrievable and unchanged;
+5. derived artifact has separate artifact ID and SHA-256;
+6. provenance contains exact `source_frame_id`, `calibration_id`, and `mat_id`;
+7. output is 1000x1400 at 10 px/mm for the 100x140 mm mat;
+8. rectified image matches known canonical geometry with mean absolute pixel error `< 8`;
+9. canonical CapturePackage before/after rectification is unchanged and schema-valid;
+10. singular homography fails explicitly;
+11. legacy calibration without `calibration_id` receives stable deterministic identity.
 
-Synthetic calibration fixture result:
+## Acceptance target status
 
-- 5x7 ChArUco board;
-- 24 detected ChArUco corners;
-- marker detection succeeds;
-- 9-value homography;
-- reprojection RMSE `< 0.001 mm` on synthetic input.
+OD-002 requires:
 
-## Directive acceptance target
+- deterministic synthetic perspective rectification — **satisfied**;
+- preserved original artifact — **satisfied**;
+- explicit source/calibration provenance — **satisfied**;
+- canonical CapturePackage backward compatibility/schema validity — **satisfied**;
+- no fabricated scalar calibration quality — **satisfied** (`quality` remains `null`).
 
-`OD-2026-09-29-001` requested a schema-valid canonical CapturePackage for one FRONT view.
+## Limitations
 
-**Chat 1 implementation status: SATISFIED.**
+- real printed Measurement Mat accuracy is not verified;
+- camera lens distortion/intrinsics are not compensated;
+- deterministic encoded bytes are tied to the fixed current OpenCV/runtime baseline, not promised across arbitrary future OpenCV versions;
+- rectified artifact is internal because canonical v1 has no exposure field;
+- replacement/versioning for a rectified reference is not implemented;
+- mobile/native runtime and GitHub Actions CI are not verified.
 
-The same boundary now also supports non-null canonical calibration for FRONT.
+## Files changed in Pass 2
 
-## Current limitations
-
-Not yet verified/implemented:
-
-- perspective-normalized derived image artifact;
-- clean-reference → rectified-artifact provenance;
-- synthetic perspective warp regression;
-- physical printed Measurement Mat accuracy;
-- camera lens distortion/intrinsics policy;
-- Guided Quality warnings;
-- native/mobile camera runtime;
-- voice-trigger capture;
-- GitHub Actions CI.
-
-`calibration.quality` remains `null` because no canonical scalar quality formula has been approved. Objective evidence is retained instead of inventing a score.
+- `src/mrea_capture/models.py`;
+- `src/mrea_capture/rectification.py`;
+- `src/mrea_capture/__init__.py`;
+- `tests/test_rectification.py`;
+- `docs/BUILD_REUSE_CHECK_PHASE3_RECTIFICATION.md`;
+- `docs/IMPLEMENTATION_REPORT_PASS2_RECTIFICATION_2026-09-29.md`;
+- `docs/IMPLEMENTATION_STATE.md`;
+- `README.md`;
+- `ORCHESTRATOR_HANDOFF.md`.
 
 ## Acceptance requested from Chat 6
 
 Please verify:
 
-1. `OD-2026-09-29-001` is accepted/closed for Chat 1;
-2. canonical Project/Capture serialization is acceptable;
-3. ChArUco calibration mapping to canonical `views[].calibration` is acceptable;
-4. Pass 1 may be treated as the integration baseline for Chat 1;
-5. update `ORCHESTRATION_STATE.md` / `SLICE_STATUS.md` as appropriate;
-6. issue the next `ORCHESTRATOR_DIRECTIVE.md` revision before Pass 2 if cross-slice priorities changed.
-
-## Proposed next Chat 1 target
-
-Unless Chat 6 redirects the slice, next implementation target is perspective normalization:
-
-```text
-clean reference
-+ stored IMAGE_PX → MAT_XY_MM homography
-→ deterministic rectified raster
-→ immutable derived artifact
-→ explicit source → derived provenance
-→ synthetic perspective-distortion regression
-```
+1. `OD-2026-09-29-002` acceptance gate is satisfied;
+2. internal rectified-artifact exposure policy is acceptable for canonical v1;
+3. Pass 2 may be accepted as the new Chat 1 baseline;
+4. update Orchestration State / Slice Status as appropriate;
+5. issue the next directive before Pass 3.
