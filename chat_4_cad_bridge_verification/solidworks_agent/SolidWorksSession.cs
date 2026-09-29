@@ -8,7 +8,7 @@ namespace Mrea.SolidWorksCadAgent
 {
     internal sealed class SolidWorksSession : IDisposable
     {
-        private const int SupportedRevisionMajor = 34; // SOLIDWORKS 2026 API revision major.
+        private const int SupportedRevisionMajor = 34; // Project baseline for SOLIDWORKS 2026; verified on the controlled host before runtime acceptance.
 
         private dynamic _app;
         private dynamic _model;
@@ -31,47 +31,84 @@ namespace Mrea.SolidWorksCadAgent
         public static SolidWorksSession Open(AgentRequest request)
         {
             dynamic app = null;
+            dynamic model = null;
             var launched = false;
 
-            if (request.attach_to_running)
+            try
             {
-                try
+                if (request.attach_to_running)
                 {
-                    app = Marshal.GetActiveObject("SldWorks.Application");
+                    try
+                    {
+                        app = Marshal.GetActiveObject("SldWorks.Application");
+                    }
+                    catch (COMException)
+                    {
+                        app = null;
+                    }
                 }
-                catch (COMException)
+
+                if (app == null && request.allow_launch)
                 {
-                    app = null;
+                    var progId = Type.GetTypeFromProgID("SldWorks.Application", throwOnError: false);
+                    if (progId == null)
+                        throw new InvalidOperationException("SOLIDWORKS COM ProgID SldWorks.Application is not registered.");
+                    app = Activator.CreateInstance(progId);
+                    launched = true;
+                    app.Visible = true;
+                    try { app.UserControl = true; } catch { }
+                }
+
+                if (app == null)
+                    throw new InvalidOperationException("SOLIDWORKS is not running and allow_launch=false.");
+
+                string version = ReadAndValidateVersion(app);
+                var template = ResolvePartTemplate(app, request.part_template_path);
+                model = app.NewDocument(template, (int)swDwgPaperSizes_e.swDwgPaperAsize, 0.0, 0.0);
+                if (model == null)
+                    throw new InvalidOperationException("SOLIDWORKS failed to create a new part document from template: " + template);
+
+                SelectFrontPlaneWithoutLocalizedName(app, model);
+                dynamic sketchManager = model.SketchManager;
+                sketchManager.InsertSketch(true);
+                if (sketchManager.ActiveSketch == null)
+                    throw new InvalidOperationException("SOLIDWORKS did not enter a FRONT-plane sketch.");
+
+                var session = new SolidWorksSession(app, model, launched, version);
+                app = null;
+                model = null;
+                return session;
+            }
+            catch
+            {
+                CleanupFailedOpen(app, model, launched);
+                throw;
+            }
+        }
+
+        private static void CleanupFailedOpen(dynamic app, dynamic model, bool launched)
+        {
+            try
+            {
+                if (model != null && app != null)
+                {
+                    string title = null;
+                    try { title = model.GetTitle(); } catch { }
+                    if (!string.IsNullOrWhiteSpace(title))
+                    {
+                        try { app.CloseDoc(title); } catch { }
+                    }
                 }
             }
-
-            if (app == null && request.allow_launch)
+            finally
             {
-                var progId = Type.GetTypeFromProgID("SldWorks.Application", throwOnError: false);
-                if (progId == null)
-                    throw new InvalidOperationException("SOLIDWORKS COM ProgID SldWorks.Application is not registered.");
-                app = Activator.CreateInstance(progId);
-                launched = true;
-                app.Visible = true;
-                try { app.UserControl = true; } catch { }
+                ReleaseCom(model);
+                if (launched && app != null)
+                {
+                    try { app.ExitApp(); } catch { }
+                }
+                ReleaseCom(app);
             }
-
-            if (app == null)
-                throw new InvalidOperationException("SOLIDWORKS is not running and allow_launch=false.");
-
-            string version = ReadAndValidateVersion(app);
-            var template = ResolvePartTemplate(app, request.part_template_path);
-            dynamic model = app.NewDocument(template, (int)swDwgPaperSizes_e.swDwgPaperAsize, 0.0, 0.0);
-            if (model == null)
-                throw new InvalidOperationException("SOLIDWORKS failed to create a new part document from template: " + template);
-
-            SelectFrontPlaneWithoutLocalizedName(app, model);
-            dynamic sketchManager = model.SketchManager;
-            sketchManager.InsertSketch(true);
-            if (sketchManager.ActiveSketch == null)
-                throw new InvalidOperationException("SOLIDWORKS did not enter a FRONT-plane sketch.");
-
-            return new SolidWorksSession(app, model, launched, version);
         }
 
         private static string ReadAndValidateVersion(dynamic app)
@@ -214,7 +251,7 @@ namespace Mrea.SolidWorksCadAgent
                 _model = null;
                 if (_launchedByAgent)
                 {
-                    // UserControl is enabled when launched; never terminate the whole user session here.
+                    // UserControl is enabled on a successful launch; do not terminate the user's successful SOLIDWORKS session here.
                 }
                 ReleaseCom(_app);
                 _app = null;
