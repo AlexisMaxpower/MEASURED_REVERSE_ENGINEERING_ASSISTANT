@@ -43,6 +43,10 @@ Slice-local green tests do not imply system compatibility.
 
 Integration tests must exercise realistic producer output, not only normalized golden fixtures. The first required boundary gate uses actual Chat 2 canonical output with `IMAGE_PX` anchors and requires Chat 3 to normalize those anchors through CapturePackage calibration into `MAT_XY_MM`.
 
+### Expected initial state
+
+At the moment this CI baseline is introduced, `Integration / Chat 2 -> Chat 3` is expected to be RED on the uncorrected Round 1 code. That is deliberate: CI is now reproducing the already-confirmed Round 1 integration defect. Chat 3 Pass 2 is responsible for turning this gate green without making Chat 2 falsify its raw coordinates.
+
 ## SOLIDWORKS
 
 Generic CAD mapping/export/verification remains in GitHub-hosted CI.
