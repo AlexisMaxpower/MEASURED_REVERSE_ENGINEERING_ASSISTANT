@@ -6,6 +6,7 @@ on:
       - main
   push:
     branches:
+      - main
       - "chat-*/pass-*"
   workflow_dispatch:
 
@@ -148,7 +149,7 @@ jobs:
 
   integration-chat2-chat3:
     name: Integration / Chat 2 -> Chat 3
-    if: github.event_name == 'pull_request' || startsWith(github.ref, 'refs/heads/chat-3/')
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/chat-3/')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs:
@@ -175,7 +176,7 @@ jobs:
 
   integration-chat4-chat5:
     name: Integration / Chat 4 -> Chat 5
-    if: (github.event_name == 'pull_request' && startsWith(github.head_ref, 'chat-5/')) || startsWith(github.ref, 'refs/heads/chat-5/')
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'pull_request' && startsWith(github.head_ref, 'chat-5/')) || startsWith(github.ref, 'refs/heads/chat-5/')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs:
