@@ -16,30 +16,43 @@ SPEC.loader.exec_module(MODULE)
 
 class SolidWorksRuntimeInputsTests(unittest.TestCase):
     def _ready_report(self) -> dict:
+        checks = [
+            {
+                "code": code,
+                "status": "PASS",
+                "message": "ok",
+                "required": True,
+            }
+            for code in sorted(MODULE.REQUIRED_READINESS_CODES)
+        ]
+        checks.append(
+            {
+                "code": "OPTIONAL_NOTE",
+                "status": "UNVERIFIED",
+                "message": "optional",
+                "required": False,
+            }
+        )
         return {
             "schema_version": MODULE.HOST_READINESS_SCHEMA,
             "adapter_name": MODULE.ADAPTER_NAME,
             "status": "READY",
-            "checks": [
-                {
-                    "code": "OS_WINDOWS_11_X64",
-                    "status": "PASS",
-                    "message": "ok",
-                    "required": True,
-                },
-                {
-                    "code": "OPTIONAL_NOTE",
-                    "status": "UNVERIFIED",
-                    "message": "optional",
-                    "required": False,
-                },
-            ],
+            "checks": checks,
         }
 
     def test_recomputes_ready_instead_of_trusting_reported_status(self) -> None:
         report = self._ready_report()
-        report["status"] = "READY"
         report["checks"][0]["status"] = "UNVERIFIED"
+        with self.assertRaises(ValueError):
+            MODULE.recompute_host_readiness(report)
+
+    def test_missing_required_readiness_code_is_rejected(self) -> None:
+        report = self._ready_report()
+        report["checks"] = [
+            item
+            for item in report["checks"]
+            if item["code"] != "SOLIDWORKS_COM_REGISTERED"
+        ]
         with self.assertRaises(ValueError):
             MODULE.recompute_host_readiness(report)
 
