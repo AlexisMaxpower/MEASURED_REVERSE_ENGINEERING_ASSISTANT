@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, Iterator, List, Optional
 
 from .models import (
     FailureRecord,
@@ -37,6 +39,117 @@ class InMemoryLifecycleStore:
 
     _sequence: int = 0
     _physical_sequence: int = 0
+    _transaction_depth: int = field(default=0, init=False, repr=False)
+    _transaction_failed: bool = field(default=False, init=False, repr=False)
+    _transaction_snapshot: Optional[dict[str, object]] = field(
+        default=None, init=False, repr=False
+    )
+
+    @property
+    def transaction_depth(self) -> int:
+        return self._transaction_depth
+
+    def _snapshot_state(self) -> dict[str, object]:
+        return {
+            "revisions": deepcopy(self.revisions),
+            "manufacturing_records": deepcopy(self.manufacturing_records),
+            "installations": deepcopy(self.installations),
+            "tests": deepcopy(self.tests),
+            "failures": deepcopy(self.failures),
+            "events": deepcopy(self.events),
+            "physical_instances": deepcopy(self.physical_instances),
+            "physical_events": deepcopy(self.physical_events),
+            "_sequence": self._sequence,
+            "_physical_sequence": self._physical_sequence,
+        }
+
+    def _restore_state(self, snapshot: dict[str, object]) -> None:
+        self.revisions = snapshot["revisions"]  # type: ignore[assignment]
+        self.manufacturing_records = snapshot["manufacturing_records"]  # type: ignore[assignment]
+        self.installations = snapshot["installations"]  # type: ignore[assignment]
+        self.tests = snapshot["tests"]  # type: ignore[assignment]
+        self.failures = snapshot["failures"]  # type: ignore[assignment]
+        self.events = snapshot["events"]  # type: ignore[assignment]
+        self.physical_instances = snapshot["physical_instances"]  # type: ignore[assignment]
+        self.physical_events = snapshot["physical_events"]  # type: ignore[assignment]
+        self._sequence = int(snapshot["_sequence"])
+        self._physical_sequence = int(snapshot["_physical_sequence"])
+
+    def _begin_outer_transaction(self) -> None:
+        """Hook for durable repositories."""
+
+    def _commit_outer_transaction(self) -> None:
+        """Hook for durable repositories."""
+
+    def _rollback_outer_transaction(self) -> None:
+        """Hook for durable repositories."""
+
+    @contextmanager
+    def transaction(self) -> Iterator[InMemoryLifecycleStore]:
+        """Atomic nested unit of work for lifecycle mutations.
+
+        Only the outermost transaction snapshots/commits storage. Any nested failure
+        marks the whole unit of work failed even if an inner exception is caught.
+        """
+
+        outermost = self._transaction_depth == 0
+        if outermost:
+            self._transaction_snapshot = self._snapshot_state()
+            self._transaction_failed = False
+            try:
+                self._begin_outer_transaction()
+            except Exception:
+                self._transaction_snapshot = None
+                raise
+
+        self._transaction_depth += 1
+        try:
+            yield self
+        except Exception:
+            self._transaction_failed = True
+            self._transaction_depth -= 1
+            if outermost:
+                snapshot = self._transaction_snapshot
+                if snapshot is not None:
+                    self._restore_state(snapshot)
+                try:
+                    self._rollback_outer_transaction()
+                finally:
+                    self._transaction_snapshot = None
+                    self._transaction_failed = False
+            raise
+        else:
+            self._transaction_depth -= 1
+            if not outermost:
+                return
+
+            snapshot = self._transaction_snapshot
+            if self._transaction_failed:
+                if snapshot is not None:
+                    self._restore_state(snapshot)
+                try:
+                    self._rollback_outer_transaction()
+                finally:
+                    self._transaction_snapshot = None
+                    self._transaction_failed = False
+                raise LifecycleInvariantError(
+                    "nested lifecycle transaction failed and was rolled back"
+                )
+
+            try:
+                self._commit_outer_transaction()
+            except Exception:
+                if snapshot is not None:
+                    self._restore_state(snapshot)
+                try:
+                    self._rollback_outer_transaction()
+                finally:
+                    self._transaction_snapshot = None
+                    self._transaction_failed = False
+                raise
+            else:
+                self._transaction_snapshot = None
+                self._transaction_failed = False
 
     def next_sequence(self) -> int:
         self._sequence += 1
