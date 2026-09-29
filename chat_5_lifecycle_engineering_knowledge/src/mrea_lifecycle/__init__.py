@@ -1,3 +1,8 @@
+from .adapters import (
+    CANONICAL_LIFECYCLE_EVENT_SCHEMA_VERSION,
+    CANONICAL_LIFECYCLE_EVENT_TYPES,
+    CanonicalLifecycleEventAdapter,
+)
 from .models import (
     FailureRecord,
     Installation,
@@ -26,6 +31,9 @@ from .services import (
 from .store import InMemoryLifecycleStore, LifecycleInvariantError
 
 __all__ = [
+    "CANONICAL_LIFECYCLE_EVENT_SCHEMA_VERSION",
+    "CANONICAL_LIFECYCLE_EVENT_TYPES",
+    "CanonicalLifecycleEventAdapter",
     "EquipmentPartRegistry",
     "FailureRecord",
     "FailureService",
