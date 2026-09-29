@@ -1,0 +1,21 @@
+{
+  "schema_version": "mrea.project.v1",
+  "project_id": "P-GOLDEN-001",
+  "part_id": "PART-GOLDEN-001",
+  "name": "Golden flat plate",
+  "status": "ACTIVE",
+  "part": {
+    "part_type": "flat replacement plate",
+    "equipment": "TEST_RIG",
+    "assembly": "fixture",
+    "purpose": "golden integration flow",
+    "problem": "replacement required",
+    "reverse_engineering_reason": "verify MREA E2E",
+    "original_material": null,
+    "original_manufacturing_method": null,
+    "target_manufacturing_method": "FDM",
+    "comments": "Canonical R0 fixture"
+  },
+  "created_at": "2026-09-29T15:00:00Z",
+  "updated_at": "2026-09-29T15:00:00Z"
+}
