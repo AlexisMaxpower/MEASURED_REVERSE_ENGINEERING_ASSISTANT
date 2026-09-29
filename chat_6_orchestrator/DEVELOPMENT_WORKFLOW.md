@@ -41,7 +41,28 @@ Worker chat:
 - does not commit pass implementation directly to `main`;
 - records Build/Reuse decisions for non-trivial dependencies;
 - preserves explicit uncertainty/conflicts instead of hiding them;
-- raises a Change Request when a shared contract is insufficient.
+- raises a Change Request when a shared contract is insufficient;
+- pushes work to its `chat-N/pass-X` branch so GitHub Actions can execute independent CI.
+
+## CI requirement
+
+Canonical CI workflow:
+
+`.github/workflows/ci.yml`
+
+From Pass 2 onward, CI evidence is mandatory where a job is executable on GitHub-hosted runners.
+
+A worker statement such as `13 passed` is useful local evidence but is not equivalent to independent CI evidence.
+
+The required CI layers are:
+
+1. canonical contract/fixture validation;
+2. slice-local tests for Chats 1–5;
+3. executable cross-slice integration tests.
+
+A worker branch with a red required CI job cannot be accepted for integration until the failure is resolved or Chat 6 explicitly classifies it as an environment-only gate.
+
+See `chat_6_orchestrator/CI_POLICY.md`.
 
 ## Handoff requirement
 
@@ -59,10 +80,11 @@ The handoff must contain:
 6. files/modules changed;
 7. test inventory;
 8. tests actually executed and exact result;
-9. tests not executed and why;
-10. known limitations;
-11. open Change Requests;
-12. requested acceptance gate.
+9. CI run/check status and any failing job;
+10. tests not executed and why;
+11. known limitations;
+12. open Change Requests;
+13. requested acceptance gate.
 
 A worker response in chat is not the source of truth; repository handoff is.
 
@@ -74,7 +96,7 @@ Chat 6 checks:
 - ownership violations;
 - canonical contract compatibility;
 - upstream/downstream integration;
-- tests and evidence;
+- local tests and GitHub Actions evidence;
 - duplicated functionality;
 - shared invariants;
 - Change Requests;
@@ -105,7 +127,7 @@ Chat 4 → Chat 5
 
 Round state:
 
-- `GREEN`: required slice gates and required cross-slice gates pass;
+- `GREEN`: required slice gates, required CI jobs and required cross-slice gates pass;
 - `PARTIAL`: useful slice work accepted but at least one required integration gate is not green;
 - `BLOCKED`: a shared blocker prevents meaningful progress.
 
