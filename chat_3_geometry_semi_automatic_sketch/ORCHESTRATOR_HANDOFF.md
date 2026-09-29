@@ -1,245 +1,254 @@
-# ORCHESTRATOR HANDOFF — Chat 3 — Pass 3
+# ORCHESTRATOR HANDOFF — Chat 3 — Pass 4
 
 **From:** Chat 3 — Geometry & Semi-Automatic Sketch  
 **To:** Chat 6 — Orchestrator / Repository Integrator  
-**Directive:** `OD-2026-09-29-003`  
-**Pass / Ring:** 3  
-**Branch:** `chat-3/pass-3`  
-**Branch base:** `c3452d7fa68c9c5c3716db5fef71172e9c3b9532`  
-**Implementation head before handoff commit:** `8bc9ed6aa6e68db61b1d201cd3667d8f8658fc9a`  
+**Pass / Ring:** 4  
+**Branch:** `chat-3/pass-4`  
+**Branch base:** frozen Ring 3 head `08e716161a8c9173b7583d6ad87c84c10ddc4221`  
+**Implementation/docs head before handoff commit:** `92494b35db6c1ef9ee58ae04910a55c3434a5cc3`  
 **Date:** 2026-09-29
 
-> This handoff is the final worker commit for Pass 3. After it is published, Chat 3 treats `chat-3/pass-3` as frozen until Chat 6 returns an explicit integration verdict or new directive.
+## Authorization note
+
+At Pass 4 start, current `main` still exposed `OD-2026-09-29-003`; no Chat 6 `OD-004` or `chat-3/pass-4` branch existed.
+
+The user explicitly instructed Chat 3 to start **Pass / Ring 4**. To avoid losing the frozen Ring 3 implementation while also avoiding changes to stale `main`, this branch was created directly from Ring 3 final head.
+
+No shared contracts, shared CI, integration tests, or other chat-owned files were modified.
 
 ## Status
 
-`READY_FOR_RING3_INTEGRATOR_REVIEW_WITH_ORCHESTRATOR_GATE_DEFECT`
+`READY_FOR_RING4_INTEGRATOR_REVIEW_WITH_PREEXISTING_CHAT3_TO_CHAT4_GATE_DEFECT`
 
 ## Delivered functionality
 
-Ring 3 implements the first real image-backed semi-automatic geometry candidate path.
+Ring 4 implements the previously missing Chat 3 constraint-resolution / promotion layer.
 
-### Image extraction
+### ConstraintResolver
 
-Added OpenCV-backed `ImageGeometryExtractor` using established CV operations for:
+New module:
 
-- grayscale image decoding;
-- Otsu thresholding;
-- contour hierarchy;
-- polygon approximation;
-- contour area/perimeter/circularity;
-- connected components;
-- minimum enclosing circle.
+`src/mrea_geometry/constraints.py`
 
-### v1 geometry candidates
+New public types:
 
-Reliable observations may produce:
+- `ResolvedConstraint`;
+- `ConstraintIssue`;
+- `ConstraintResolution`;
+- `ConstraintResolver`.
 
-- `LINE` candidates from a dominant quadrilateral profile;
-- `CIRCLE` candidates from circular inner contours;
-- controlled `ARC` candidates from open circular components.
+The resolver does not move geometry. It decides which already-observed candidate relations may be safely published to canonical `SketchPackage v1`.
 
-All image-derived geometry uses:
+### Truth hierarchy
+
+The invariant remains:
 
 ```text
-provenance = VISION_DETECTED
+verified physical measurement > image-derived / geometry-derived relation
 ```
 
-No CV candidate is promoted to measured/user-confirmed truth.
+Verified dimension values are never changed to satisfy a relation.
 
-### Measurement truth
+### Promotion gates
 
-Verified canonical measurements remain authoritative. Ring 3 image extraction supplies entity candidates only; it does not rewrite:
+A constraint candidate is published only when:
 
-- `measurement_id`;
-- value;
-- unit;
-- verified status;
-- measurement provenance.
+1. all referenced entities exist;
+2. effective confidence is at least the promotion threshold;
+3. the relation is not redundant with stronger axis relations;
+4. the relation does not contradict verified measurements.
 
-### Fail-closed ambiguity behavior
-
-Unsupported/ambiguous observations are explicit rather than guessed. Examples include:
-
-- no usable reference contour;
-- multiple significant outer contours;
-- unsupported non-quadrilateral outer shape;
-- non-circular inner contour;
-- unreliable open circular fit/coverage;
-- CIRCLE/ARC under calibration that does not preserve circles.
-
-These issues can be projected into canonical `SketchPackage.unresolved`.
-
-### Calibration semantics
-
-LINE geometry may be transformed through a valid projective homography.
-
-CIRCLE/ARC promotion is restricted to circle-preserving similarity transforms. A general projective homography maps a circle to a conic, so Chat 3 does not silently fabricate a circle/arc in `MAT_XY_MM`.
-
-## Runtime dependency
-
-Added:
+Default promotion threshold:
 
 ```text
-opencv-python-headless >=4.10,<5
+0.95
 ```
 
-No GUI dependency was introduced.
-
-## Stable fixtures / golden coverage
-
-Added textual PBM evidence and goldens under:
-
-`chat_3_geometry_semi_automatic_sketch/tests/fixtures/vision/`
-
-including:
-
-- calibrated front reference image;
-- verified MeasurementPackage;
-- exact image → SketchPackage golden;
-- controlled open-arc image;
-- exact ARC geometry golden.
-
-## Files changed / added in Pass 3
-
-Runtime / package:
-
-- `pyproject.toml`;
-- `src/mrea_geometry/__init__.py`;
-- `src/mrea_geometry/vision.py`.
-
-Tests / fixtures:
-
-- `tests/test_vision_extraction.py`;
-- `tests/fixtures/vision/front_plate_reference.pbm`;
-- `tests/fixtures/vision/front_plate_sketch_golden.json`;
-- `tests/fixtures/vision/open_arc_reference.pbm`;
-- `tests/fixtures/vision/open_arc_geometry_golden.json`;
-- `tests/fixtures/vision/vision_capture_package.json`;
-- `tests/fixtures/vision/vision_measurement_package.json`.
-
-Documentation / handoff:
-
-- `docs/BUILD_REUSE_CHECK_RING3_VISION_EXTRACTION.md`;
-- `docs/IMPLEMENTATION_REPORT_RING3_VISION_EXTRACTION_2026-09-29.md`;
-- `docs/IMPLEMENTATION_STATE.md`;
-- `ORCHESTRATOR_HANDOFF.md`.
-
-Total final Pass 3 changed paths: **14**.
-
-## Verification
-
-### Local reconstructed regression
+Effective confidence:
 
 ```text
-20 passed, 4 deselected in 1.03s
+min(candidate confidence, confidence of every referenced entity that exposes confidence)
 ```
 
-The deselected checks require repository-level shared contract paths absent from the reconstructed local workspace; they are covered by GitHub-hosted CI.
+### Explicit unresolved states
 
-### GitHub Actions implementation-head evidence
-
-Workflow run:
+Ring 4 adds explicit relation-level failure codes including:
 
 ```text
-36620011768
+CONSTRAINT_ENTITY_MISSING
+CONSTRAINT_BELOW_PROMOTION_CONFIDENCE
+VERIFIED_MEASUREMENT_CONTRADICTS_EQUAL_CONSTRAINT
+VERIFIED_MEASUREMENT_CONTRADICTS_CONCENTRIC_CONSTRAINT
 ```
 
-Implementation head:
+Rejected relations do not disappear silently.
+
+### Measurement guardrails
+
+`EQUAL` is suppressed when verified comparable intrinsic measurements disagree beyond tolerance.
+
+`CONCENTRIC` is suppressed when a verified non-zero center-distance measurement contradicts concentricity.
+
+### Redundancy / overconstraint control
+
+For axis-aligned geometry:
+
+- HORIZONTAL / VERTICAL are publishable;
+- PARALLEL already implied by matching axis constraints is omitted;
+- PERPENDICULAR already implied by HORIZONTAL + VERTICAL is omitted.
+
+For rotated geometry, non-redundant PARALLEL / PERPENDICULAR relations remain publishable.
+
+### Canonical builder integration
+
+`SketchPackageBuilder.build()` now accepts optional `constraint_resolution`.
+
+Backward compatibility is preserved:
 
 ```text
-299a9c5b4531bf0c4a04bd3a2b452eea6e70d84e
+constraint_resolution omitted -> constraints = []
+```
+
+Therefore the accepted Ring 1 canonical fixture remains unchanged.
+
+### Constraint-aware vision composition
+
+New module:
+
+`src/mrea_geometry/vision_pipeline.py`
+
+The package-level `VisionGeometryPipeline` now composes:
+
+```text
+ImageGeometryExtractor result
+→ GeometryPipeline
+→ ConstraintResolver
+→ SketchPackageBuilder
+→ extraction unresolved merge
+```
+
+Ring 3 detector logic remains unchanged.
+
+### Vision golden behavior
+
+Current front-plate golden publishes six safe inferred constraints:
+
+- EQUAL opposite horizontal sides;
+- EQUAL opposite vertical sides;
+- HORIZONTAL bottom/top;
+- VERTICAL left/right.
+
+The two detected hole circles each have vision confidence `0.766`; therefore their EQUAL relation is **not** promoted at a `0.95` threshold.
+
+It is explicit in canonical `unresolved` as:
+
+```text
+CONSTRAINT_BELOW_PROMOTION_CONFIDENCE
+```
+
+Verified dimensions remain unchanged:
+
+- width `40.0 mm`;
+- height `20.0 mm`;
+- hole diameter `8.0 mm`;
+- center distance `20.0 mm`.
+
+## Runtime / dependencies
+
+Package version:
+
+```text
+0.4.0
+```
+
+New dependencies in Ring 4: **none**.
+
+Ring 3 OpenCV dependency remains unchanged.
+
+## GitHub Actions verification
+
+Authoritative implementation-head run:
+
+```text
+run: 36625586757
+head: 8ca1fa2294467636583eea2340c2c02e7d130cf7
 ```
 
 Results:
 
-- `Chat 3 / Geometry`: **SUCCESS — 28 passed in 0.31s**;
+- `Chat 3 / Geometry`: **SUCCESS — 35 passed in 0.31s**;
 - `Contracts / canonical fixtures`: **SUCCESS**;
 - `Chat 2 / Measurement`: **SUCCESS**;
 - `Integration / Chat 2 -> Chat 3`: **SUCCESS**;
 - `Chat 4 / Generic CAD gate`: **SUCCESS**;
-- `Integration / Chat 3 -> Chat 4`: **FAIL due orchestrator-owned integration-test defect described below**.
+- `Integration / Chat 3 -> Chat 4`: **FAIL — pre-existing orchestrator-owned stale field lookup**.
 
-## External integration-gate defect
+## External Chat 3 -> Chat 4 gate defect
 
-The Chat 3 → Chat 4 test successfully:
+The integration test successfully:
 
-1. builds the Chat 3 `SketchPackage`;
+1. builds Chat 3 `SketchPackage`;
 2. validates it against canonical schema;
-3. runs Chat 4 CAD transfer;
+3. executes Chat 4 CAD transfer;
 4. validates `CADPackage`;
 5. validates `CADVerificationReport`;
 6. confirms `overall_status == VERIFIED`.
 
-It then fails inside the shared integration test with:
+It then fails with:
 
 ```text
 KeyError: 'dimensions'
 ```
 
-because the test accesses:
+because the shared test reads:
 
 ```python
 transfer.cad_verification_report["dimensions"]
 ```
 
-while canonical `CADVerificationReport v1` exposes the verification array as:
+while canonical `CADVerificationReport v1` exposes:
 
 ```python
 transfer.cad_verification_report["items"]
 ```
 
-The stale integration test currently exists on `main` with blob SHA:
+This defect is unchanged from Ring 3. Chat 3 did not modify the Chat 6-owned integration test.
+
+## Requested Chat 6 actions
+
+1. Review Pass 4 constraint-promotion behavior.
+2. Correct/reclassify the shared Chat 3 -> Chat 4 test field:
 
 ```text
-3057d91f79ee19a86e1245d4366de7209269c557
+"dimensions" -> "items"
 ```
 
-Per OD-003 ownership rules, Chat 3 did **not** modify `tests/integration/` or weaken the gate.
-
-## Requested Chat 6 action
-
-Correct or explicitly reclassify the orchestrator-owned Chat 3 → Chat 4 integration gate:
-
-```text
-cad_verification_report["dimensions"]
-→
-cad_verification_report["items"]
-```
-
-Then rerun repository CI against `chat-3/pass-3` before final integration acceptance.
+3. Re-run full integration CI on the assembled baseline.
+4. Publish an explicit Pass 4 verdict / next directive.
 
 ## Shared ownership / Change Requests
 
 Shared contracts changed: **none**.  
 Shared canonical fixtures changed: **none**.  
 Shared integration tests changed: **none**.  
+CI changed: **none**.  
 Other chat directories changed: **none**.  
-Open Change Requests: **none**.
+Change Requests: **none**.
 
-## Known limitations
+## Known limitations / next owned slice
 
-- outer-profile LINE promotion is intentionally conservative;
-- CIRCLE/ARC are not invented from a non-circle-preserving projective transform;
-- ellipse/conic vocabulary is not added to v1;
-- no hidden-edge inference;
-- no general constraint solver;
-- no Dimensioned View renderer;
-- no multi-view reconstruction;
-- no CAD logic inside Chat 3.
+Still deferred:
 
-## Integrator review target
+- numerical constraint solving / entity movement;
+- COINCIDENT/TANGENT/SYMMETRIC generation policy;
+- Dimensioned View renderer;
+- multi-view geometry/constraints;
+- CAD-native logic.
 
-Review/fix the external shared gate, then validate:
+Unless Chat 6 issues another priority, the next natural Chat 3 vertical slice is **Dimensioned View**.
 
-```text
-reference image
-+ calibrated CapturePackage
-+ verified MeasurementPackage
-→ VISION_DETECTED LINE/CIRCLE/ARC candidates
-→ measurement binding without measurement mutation
-→ deterministic schema-valid SketchPackage v1
-→ Chat 4 canonical consumption
-```
+## Branch freeze
 
-Branch is frozen after this handoff commit pending Chat 6 verdict.
+This handoff is the final worker commit for Ring 4.
+
+After publication, `chat-3/pass-4` is treated as **frozen** pending Chat 6 verdict or explicit user/orchestrator instruction.
