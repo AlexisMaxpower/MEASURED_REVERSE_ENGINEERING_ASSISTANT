@@ -97,13 +97,14 @@ class ConstraintResolver:
                 )
                 continue
 
-            if candidate.confidence < self.minimum_confidence:
+            effective_confidence = self._effective_confidence(candidate, entities)
+            if effective_confidence < self.minimum_confidence:
                 issues.append(
                     ConstraintIssue(
                         issue_id=f"U-{candidate.constraint_id}",
                         code="CONSTRAINT_BELOW_PROMOTION_CONFIDENCE",
                         message=(
-                            f"Constraint confidence {candidate.confidence:.3f} is below "
+                            f"Constraint confidence {effective_confidence:.3f} is below "
                             f"promotion threshold {self.minimum_confidence:.3f}."
                         ),
                         entity_ids=candidate.entity_ids,
@@ -129,7 +130,7 @@ class ConstraintResolver:
                     kind=candidate.kind,
                     entity_ids=candidate.entity_ids,
                     status="INFERRED" if candidate.inferred else "DETECTED",
-                    confidence=candidate.confidence,
+                    confidence=effective_confidence,
                 )
             )
 
@@ -137,6 +138,18 @@ class ConstraintResolver:
             constraints=tuple(sorted(resolved, key=lambda item: item.constraint_id)),
             issues=tuple(sorted(issues, key=lambda item: item.issue_id)),
         )
+
+    @staticmethod
+    def _effective_confidence(
+        candidate: ConstraintCandidate,
+        entities: dict[str, object],
+    ) -> float:
+        values = [candidate.confidence]
+        for entity_id in candidate.entity_ids:
+            confidence = getattr(entities[entity_id], "confidence", None)
+            if confidence is not None:
+                values.append(float(confidence))
+        return min(values)
 
     @staticmethod
     def _deduplicate(
