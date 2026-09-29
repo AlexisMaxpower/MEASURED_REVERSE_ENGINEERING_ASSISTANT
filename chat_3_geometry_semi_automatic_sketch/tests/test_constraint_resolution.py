@@ -140,3 +140,17 @@ def test_builder_publishes_resolved_constraints_only_when_explicitly_supplied() 
         set(item) == {"constraint_id", "type", "entity_ids", "status"}
         for item in promoted["constraints"]
     )
+
+
+def test_entity_confidence_limits_constraint_promotion() -> None:
+    circles = (
+        Circle("C1", Point2D(0, 0), 5.0, confidence=0.80),
+        Circle("C2", Point2D(20, 0), 5.0, confidence=0.82),
+    )
+    draft = GeometryPipeline().build(circles, ())
+    resolution = ConstraintResolver(minimum_confidence=0.95).resolve(draft)
+
+    assert not any(item.kind == "EQUAL" for item in resolution.constraints)
+    assert [item.code for item in resolution.issues] == [
+        "CONSTRAINT_BELOW_PROMOTION_CONFIDENCE"
+    ]
