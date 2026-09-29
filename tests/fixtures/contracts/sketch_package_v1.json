@@ -1,0 +1,25 @@
+{
+  "schema_version":"mrea.sketch-package.v1",
+  "sketch_package_id":"SP-GOLDEN-001",
+  "project_id":"P-GOLDEN-001",
+  "part_id":"PART-GOLDEN-001",
+  "view_id":"VIEW-FRONT-001",
+  "coordinate_system":"MAT_XY_MM",
+  "entities":[
+    {"entity_id":"L-BOTTOM","type":"LINE","start":{"x":0,"y":0},"end":{"x":80.2,"y":0},"provenance":"GEOMETRY_DERIVED","confidence":1.0},
+    {"entity_id":"L-RIGHT","type":"LINE","start":{"x":80.2,"y":0},"end":{"x":80.2,"y":42.1},"provenance":"GEOMETRY_DERIVED","confidence":1.0},
+    {"entity_id":"L-TOP","type":"LINE","start":{"x":80.2,"y":42.1},"end":{"x":0,"y":42.1},"provenance":"GEOMETRY_DERIVED","confidence":1.0},
+    {"entity_id":"L-LEFT","type":"LINE","start":{"x":0,"y":42.1},"end":{"x":0,"y":0},"provenance":"GEOMETRY_DERIVED","confidence":1.0},
+    {"entity_id":"C-HOLE-1","type":"CIRCLE","center":{"x":10.1,"y":21.05},"radius":2.55,"provenance":"GEOMETRY_DERIVED","confidence":1.0},
+    {"entity_id":"C-HOLE-2","type":"CIRCLE","center":{"x":70.1,"y":21.05},"radius":2.55,"provenance":"GEOMETRY_DERIVED","confidence":1.0}
+  ],
+  "constraints":[],
+  "dimensions":[
+    {"dimension_id":"D-WIDTH","measurement_id":"M-WIDTH","type":"DISTANCE","value":80.2,"unit":"mm","entity_ids":["L-BOTTOM"],"verified":true,"provenance":"MANUAL_MEASURED"},
+    {"dimension_id":"D-HEIGHT","measurement_id":"M-HEIGHT","type":"DISTANCE","value":42.1,"unit":"mm","entity_ids":["L-LEFT"],"verified":true,"provenance":"MANUAL_MEASURED"},
+    {"dimension_id":"D-HOLE","measurement_id":"M-HOLE","type":"DIAMETER","value":5.1,"unit":"mm","entity_ids":["C-HOLE-1"],"verified":true,"provenance":"MANUAL_MEASURED"},
+    {"dimension_id":"D-CENTER","measurement_id":"M-CENTER","type":"DISTANCE","value":60.0,"unit":"mm","entity_ids":["C-HOLE-1","C-HOLE-2"],"verified":true,"provenance":"MANUAL_MEASURED"}
+  ],
+  "unresolved":[],
+  "source_view_ids":["VIEW-FRONT-001"]
+}
