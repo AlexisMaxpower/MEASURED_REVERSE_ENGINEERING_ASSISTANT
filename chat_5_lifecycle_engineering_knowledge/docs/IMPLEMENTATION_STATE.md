@@ -7,134 +7,60 @@
 - Branch: `main`
 - Slice: **Lifecycle & Engineering Knowledge**
 - SSOT: **MREA v0.1, 2026-09-29**
-- State: **documentation initialized; runtime implementation not started**
+- State: **Phase 1 runtime/domain baseline implemented and locally verified**
 
 ---
 
-## 1. Что выполнено
+## 1. Что реализовано
 
-Создана отдельная ownership-область Chat 5:
+В ownership-области Chat 5 теперь существуют:
 
 ```text
 chat_5_lifecycle_engineering_knowledge/
 ├── README.md
-└── docs/
-    ├── CHAT_5_ROLE.md
-    └── IMPLEMENTATION_STATE.md
+├── docs/
+│   ├── CHAT_5_ROLE.md
+│   ├── IMPLEMENTATION_STATE.md
+│   └── PHASE_1_DOMAIN_BASELINE.md
+├── src/
+│   └── mrea_lifecycle/
+│       ├── __init__.py
+│       ├── models.py
+│       ├── projections.py
+│       ├── services.py
+│       └── store.py
+└── tests/
+    ├── test_acceptance_flow.py
+    └── test_invariants.py
 ```
 
-В документации зафиксированы:
+Реализованы:
 
-- ownership Chat 5;
-- границы с соседними чатами;
-- базовая lifecycle domain model;
-- Revision / Manufacturing / Installation / Test / Failure responsibilities;
-- EquipmentPartRegistry;
-- LifecycleTimeline;
-- RevisionComparison;
-- KnowledgeQueryService;
-- AI ограничения;
-- Build / Reuse Check;
-- этапы реализации;
-- testing strategy;
-- acceptance flow;
-- Definition of Done;
-- открытые архитектурные вопросы.
-
----
-
-## 2. Что не реализовано
-
-На текущий момент **не существует реализации**, подтверждённой в области Chat 5, для:
-
+- `Revision`;
+- `ManufacturingRecord`;
+- `Installation`;
+- `TestRecord`;
+- `FailureRecord`;
+- internal `LifecycleEvent`;
+- internal `LifecycleEventType`;
+- internal `LifecycleState`;
 - `RevisionService`;
 - `ManufacturingService`;
 - `InstallationService`;
 - `TestService`;
 - `FailureService`;
-- `RevisionComparison`;
-- `EquipmentPartRegistry`;
 - `LifecycleTimeline`;
+- `EquipmentPartRegistry`;
+- `LifecycleStateProjection`;
+- `RevisionComparison`;
 - `KnowledgeQueryService`;
-- persistence;
-- REST/API endpoints;
-- lifecycle contract tests;
-- unit tests;
-- golden lifecycle fixture;
-- AI/semantic search.
-
-Наличие этих названий в SSOT или документации не означает, что код уже написан.
+- `InMemoryLifecycleStore`.
 
 ---
 
-## 3. Проверенный repository context
+## 2. Acceptance flow
 
-До создания области была проверена корневая структура repository.
-
-На момент проверки уже существовала ownership-область:
-
-```text
-chat_1_project_guided_capture/
-```
-
-В ней используется организационный шаблон:
-
-```text
-README.md
-docs/
-```
-
-Chat 5 следует тому же внешнему шаблону, не изменяя область Chat 1.
-
----
-
-## 4. Shared contracts
-
-Shared contracts не изменялись.
-
-Из SSOT для Chat 5 значимы:
-
-- `ProjectContract`;
-- `CADPackage`;
-- `CADVerificationReport`;
-- `LifecycleEvent`;
-- `ArtifactReference`.
-
-Перед реализацией необходимо проверить реальные Integrator-owned schemas/fixtures в repository.
-
----
-
-## 5. Выявленная контрактная проблема
-
-### LifecycleEvent vs LifecycleState
-
-SSOT содержит расхождение:
-
-- Product Matrix указывает output Chat 5 как `LifecycleState`;
-- shared contracts определяют `LifecycleEvent`;
-- fixture list содержит `lifecycle_event_v1.json`;
-- отдельный shared contract `LifecycleState` не определён.
-
-### Текущее локальное решение
-
-Никакого shared изменения не сделано.
-
-До решения Integrator документация использует только архитектурную гипотезу:
-
-```text
-LifecycleEvent = historical fact
-LifecycleState = derived projection
-```
-
-### Требуемое действие
-
-Integrator должен подтвердить контрактную семантику до интеграционной реализации.
-
----
-
-## 6. Acceptance target
-
-Первый обязательный end-to-end lifecycle scenario внутри Chat 5:
+Реализован и протестирован сценарий:
 
 ```text
 REV01
@@ -148,72 +74,166 @@ REV01
 → ACTIVE
 ```
 
-Требования:
+Проверяется:
 
-- REV01 history сохраняется;
+- REV01 и REV02 существуют независимо;
 - failure относится к REV01;
-- evidence доступен;
-- REV02 создаётся отдельно;
-- EquipmentPartRegistry переключает current mapping на REV02;
-- timeline содержит обе revisions;
-- current state вычисляется без удаления предыдущей истории.
+- evidence сохраняется;
+- REV02 не переписывает REV01;
+- old installation history остаётся доступной;
+- current equipment mapping указывает на REV02;
+- timeline содержит полную последовательность событий;
+- REV01 projected state = `FAILED`;
+- REV02 projected state = `ACTIVE`.
 
 ---
 
-## 7. Следующий этап
+## 3. Реализованные invariants
 
-Перед созданием production code:
-
-1. получить актуальные Integrator contracts/fixtures из repository;
-2. проверить `LifecycleEvent` schema;
-3. проверить `ArtifactReference` semantics;
-4. согласовать `LifecycleState`;
-5. определить наличие/отсутствие отдельного `PhysicalPartInstance`;
-6. после этого реализовать domain entities и invariants.
-
----
-
-## 8. Verification
-
-Проверено:
-
-- GitHub repository найден и доступен на запись;
-- default branch — `main`;
-- существующая структура Chat 1 прочитана перед изменениями;
-- область Chat 1 не изменялась;
-- shared contracts не изменялись;
-- создана только собственная ownership-область Chat 5;
-- документация основана на MREA SSOT v0.1.
-
-Не проверено:
-
-- CI, так как код Chat 5 ещё не добавлен;
-- contract tests, так как Integrator fixtures ещё не прочитаны/не существуют в доступной структуре;
-- runtime behavior;
-- database migrations;
-- API behavior;
-- cross-slice integration.
+- duplicate `revision_id` запрещён;
+- duplicate `revision_code` внутри одного part запрещён;
+- parent revision должна существовать и принадлежать тому же part;
+- manufacturing record требует существующую revision;
+- installation должна соответствовать revision своего manufacturing record;
+- test/failure не могут ссылаться на manufacturing или installation другой revision;
+- failure требует evidence artifact;
+- `estimated_cause` не становится `confirmed_cause` автоматически;
+- historical records не удаляются при создании следующей revision;
+- timeline ordering детерминирован через `occurred_at + sequence`.
 
 ---
 
-## 9. Change Requests
+## 4. Shared contracts
+
+Shared contracts не изменялись.
+
+На момент Phase 1 в корне repository существуют ownership-области Chat 1–5, но Integrator-owned contracts/fixtures ещё не были доступны в проверенной структуре.
+
+Поэтому текущие:
+
+- `LifecycleEvent`;
+- `LifecycleEventType`;
+- `LifecycleState`
+
+являются **только внутренними Chat 5 типами**.
+
+Они не считаются shared schema.
+
+---
+
+## 5. Contract question
 
 ### CR-CHAT5-001 — LifecycleEvent / LifecycleState semantics
 
-Статус: **OPEN / not submitted as repository-wide contract change**
+Статус: **OPEN**.
 
-Содержание полностью описано в `CHAT_5_ROLE.md`.
+Текущая локальная гипотеза:
+
+```text
+LifecycleEvent = historical fact
+LifecycleState = derived projection
+```
+
+До решения Integrator никакой repository-wide contract не меняется.
+
+---
+
+## 6. Verification
+
+Локально проверен тот же код, который затем записан в repository.
+
+Команда:
+
+```text
+PYTHONPATH=src pytest -q
+```
+
+Результат:
+
+```text
+4 passed
+```
+
+Покрыто:
+
+- acceptance flow;
+- failure evidence retention;
+- equipment current mapping;
+- deterministic timeline;
+- revision comparison;
+- revision-code uniqueness;
+- cross-revision installation mismatch;
+- failure evidence invariant;
+- estimated/confirmed cause separation.
+
+Во время записи в `main` был обнаружен параллельный commit другого чата. Один write получил `409`; после повторного чтения актуального HEAD запись была безопасно повторена без перезаписи чужих изменений.
+
+---
+
+## 7. Что не реализовано
+
+- PostgreSQL/SQLAlchemy persistence;
+- repository abstraction;
+- Pydantic adapters;
+- REST/API;
+- shared `LifecycleEvent` serialization;
+- `ArtifactReference` contract validation;
+- global contract fixtures/tests;
+- `REMOVED` / `REINSTALLED` / `DECOMMISSIONED` flow;
+- отдельный `PhysicalPartInstance`;
+- explicit replacement semantics;
+- concurrency/version checks;
+- migrations;
+- CI execution;
+- semantic search / AI.
+
+---
+
+## 8. Известное ограничение Phase 1
+
+`EquipmentPartRegistry` определяет current mapping как последнее событие `INSTALLED` для `equipment_id + position`.
+
+Это сохраняет историю и достаточно для первого acceptance-flow, но пока не моделирует явное снятие старой физической детали.
+
+Следовательно, это MVP projection, а не финальная field lifecycle model.
+
+---
+
+## 9. Следующий этап
+
+Перед следующей кодовой итерацией необходимо снова прочитать актуальный repository state.
+
+Если Integrator contracts/fixtures появились:
+
+1. проверить shared `LifecycleEvent`;
+2. проверить `ArtifactReference`;
+3. адаптировать internal domain через boundary adapters без изменения domain invariants.
+
+Если contracts всё ещё отсутствуют:
+
+1. ввести repository abstraction;
+2. вынести `InMemoryLifecycleStore` за repository interface;
+3. добавить persistence prototype внутри Chat 5 ownership;
+4. реализовать removal/replacement semantics;
+5. расширить tests для timeline/state transitions.
 
 ---
 
 ## 10. Готовность к интеграции
 
-Сейчас к интеграции готова только:
+Готово как внутренний Chat 5 baseline:
 
-- ownership boundary;
-- role documentation;
-- implementation plan;
-- acceptance definition;
-- выявленный contract question.
+- domain model;
+- application services;
+- deterministic projections;
+- acceptance flow;
+- invariant tests;
+- role/phase documentation.
 
-Runtime slice пока не готов к интеграции.
+Не готово как cross-slice integration:
+
+- shared contracts;
+- persistence;
+- API;
+- global fixtures;
+- release gate.
