@@ -1,0 +1,7 @@
+{
+  "schema_version": "mrea.cad-package.v1",
+  "cad_package_id": "CAD-GOLDEN-001",
+  "sketch_package_id": "SP-GOLDEN-001",
+  "adapter": "TEST_DOUBLE",
+  "artifacts": []
+}
