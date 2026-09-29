@@ -1,27 +1,60 @@
 # CHANGE_REQUEST_001 — CAD Contract Baseline
 
 **Requester:** Chat 4 — CAD Bridge & Verification  
-**Дата:** 2026-09-29
+**Дата:** 2026-09-29  
+**Status:** RESOLVED / CLOSED  
+**Resolved by:** Chat 6 / Orchestrator canonical baseline `mrea.contracts.v1`
 
-## CHANGE_REQUEST
+## Original request
 
-**Requester:** Chat 4  
-**Contract:** `SketchPackage v1`, `CADVerificationReport v1`, связанная tolerance/units policy  
-**Problem:** Chat 4 может реализовать внутренний CAD-neutral core, но не может корректно построить boundary mapper и contract tests без canonical schemas/fixtures. В repository отсутствуют утверждённые representation полей entities, dimensions, constraints, `measurement_id` mapping, verification report и tolerance policy.  
-**Current behavior:** внутренний Chat 4 core не зависит от shared DTO. `ExpectedDimension` требует tolerance явно. SVG/DXF работают только от внутреннего `CadSketch`. Shared contracts не определяются локально.  
-**Requested change:** Integrator должен опубликовать canonical v1 schemas и fixtures минимум для `SketchPackage` и `CADVerificationReport`, определить обязательный v1 entity subset, units policy и источник tolerance для CAD verification. Желательно также зафиксировать policy для unsupported entities/constraints и stable IDs.  
-**Reason:** без этого mapper `SketchPackage → internal CadSketch` и mapper `internal VerificationReport → CADVerificationReport` потребовали бы угадывать shared contract, что нарушает ownership и SSOT.  
-**Affected chats:** Integrator, Chat 3, Chat 4.  
-**Backward compatible:** N/A — canonical v1 contract ещё не опубликован.  
-**Migration:** не требуется для текущего Chat 4 internal core; после публикации schema добавляется boundary mapper без изменения internal exporter/verification APIs.
+Chat 4 запросил canonical:
 
-## Минимальные решения, требуемые от Integrator
+- `SketchPackage v1`;
+- `CADPackage v1`;
+- `CADVerificationReport v1`;
+- stable ID policy;
+- units/coordinate policy;
+- CAD transfer tolerance;
+- mandatory geometry subset;
+- unsupported geometry policy;
+- canonical fixtures.
 
-1. `SketchPackage v1` schema + `sketch_package_v1.json` fixture.
-2. `CADVerificationReport v1` schema + `cad_verification_v1.json` fixture.
-3. Representation и stable ID rules для Point/Line/Circle/Arc/Polyline/ConstructionLine либо явно меньшего v1 subset.
-4. Representation dimensions с обязательной связью `measurement_id`.
-5. Units baseline и conversion policy.
-6. Tolerance source/policy для `VERIFIED`.
-7. Representation `MISMATCH`, `MISSING`, `CONSTRAINT_CONFLICT` в report contract.
-8. Policy для unsupported entity/constraint: reject / unresolved / warning.
+## Resolution
+
+Orchestrator опубликовал:
+
+- `core/contracts/mrea_contracts_v1.schema.json`;
+- `core/contracts/POLICIES_V1.md`;
+- `tests/fixtures/contracts/sketch_package_v1.json`;
+- `tests/fixtures/contracts/cad_package_v1.json`;
+- `tests/fixtures/contracts/cad_verification_v1.json`.
+
+Canonical решения:
+
+- IDs — opaque non-empty strings;
+- `SketchPackage v1` coordinate system — `MAT_XY_MM`;
+- mandatory geometry — `POINT`, `LINE`, `CIRCLE`, `ARC`;
+- unsupported geometry — explicit `unresolved`;
+- verification primary ID — `dimension_id`;
+- `measurement_id` — nullable traceability link;
+- transfer tolerance — `1e-6 mm` / `1e-6 deg`;
+- item statuses — `VERIFIED`, `MISMATCH`, `MISSING`, `CONSTRAINT_CONFLICT`;
+- report overall status — `VERIFIED` / `FAILED`.
+
+## Chat 4 migration
+
+Выполнено:
+
+- internal verification key изменён `measurement_id → dimension_id`;
+- `measurement_id` сохранён как отдельная nullable link;
+- canonical SketchPackage mapper добавлен;
+- canonical CADPackage builder добавлен;
+- canonical CADVerificationReport mapper добавлен;
+- golden contract tests добавлены;
+- local tolerance guess заменён canonical policy.
+
+Backward-incompatible shared contract change не выполнялся.
+
+## Result
+
+Change Request закрыт. Новый Change Request нужен только при необходимости изменить `mrea.contracts.v1`.
