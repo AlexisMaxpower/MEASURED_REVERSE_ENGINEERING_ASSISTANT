@@ -147,9 +147,36 @@ jobs:
           PYTHONPATH: src
         run: python -m pytest -q
 
+  integration-chat1-chat2:
+    name: Integration / Chat 1 -> Chat 2
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'pull_request' && (startsWith(github.head_ref, 'chat-1/') || startsWith(github.head_ref, 'chat-2/'))) || startsWith(github.ref, 'refs/heads/chat-1/') || startsWith(github.ref, 'refs/heads/chat-2/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs:
+      - contracts
+      - chat1
+      - chat2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            chat_1_project_guided_capture/pyproject.toml
+            chat_2_physical_measurement/pyproject.toml
+      - name: Install cross-slice test environment
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e "./chat_1_project_guided_capture[test]" -e "./chat_2_physical_measurement[test]"
+      - name: Run real Capture -> Measurement boundary gate
+        run: python -m pytest -q tests/integration/test_chat1_to_chat2_boundary.py
+
   integration-chat2-chat3:
     name: Integration / Chat 2 -> Chat 3
-    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/chat-3/')
+    if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request' || startsWith(github.ref, 'refs/heads/chat-2/') || startsWith(github.ref, 'refs/heads/chat-3/')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs:
@@ -174,9 +201,39 @@ jobs:
       - name: Run real Measurement -> Geometry boundary gate
         run: python -m pytest -q tests/integration/test_chat2_to_chat3_boundary.py
 
+  integration-chat3-chat4:
+    name: Integration / Chat 3 -> Chat 4
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'pull_request' && (startsWith(github.head_ref, 'chat-3/') || startsWith(github.head_ref, 'chat-4/'))) || startsWith(github.ref, 'refs/heads/chat-3/') || startsWith(github.ref, 'refs/heads/chat-4/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - contracts
+      - chat3
+      - chat4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            chat_3_geometry_semi_automatic_sketch/pyproject.toml
+            chat_4_cad_bridge_verification/requirements-dev.txt
+      - name: Install cross-slice test environment
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e "./chat_3_geometry_semi_automatic_sketch[test]"
+          python -m pip install -r chat_4_cad_bridge_verification/requirements-dev.txt
+      - name: Run real Geometry -> CAD boundary gate
+        env:
+          PYTHONPATH: chat_4_cad_bridge_verification/src
+        run: python -m pytest -q tests/integration/test_chat3_to_chat4_boundary.py
+
   integration-chat4-chat5:
     name: Integration / Chat 4 -> Chat 5
-    if: github.ref == 'refs/heads/main' || (github.event_name == 'pull_request' && startsWith(github.head_ref, 'chat-5/')) || startsWith(github.ref, 'refs/heads/chat-5/')
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'pull_request' && (startsWith(github.head_ref, 'chat-4/') || startsWith(github.head_ref, 'chat-5/'))) || startsWith(github.ref, 'refs/heads/chat-4/') || startsWith(github.ref, 'refs/heads/chat-5/')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs:
