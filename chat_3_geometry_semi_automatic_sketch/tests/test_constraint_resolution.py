@@ -40,6 +40,10 @@ def test_axis_constraints_promote_and_redundant_pair_constraints_drop() -> None:
     resolution = ConstraintResolver().resolve(draft)
 
     assert [item.constraint_id for item in resolution.constraints] == [
+        "C_COINCIDENT_L-BOTTOM_L-LEFT",
+        "C_COINCIDENT_L-BOTTOM_L-RIGHT",
+        "C_COINCIDENT_L-LEFT_L-TOP",
+        "C_COINCIDENT_L-RIGHT_L-TOP",
         "C_EQUAL_L-BOTTOM_L-TOP",
         "C_EQUAL_L-LEFT_L-RIGHT",
         "C_HORIZONTAL_L-BOTTOM",
