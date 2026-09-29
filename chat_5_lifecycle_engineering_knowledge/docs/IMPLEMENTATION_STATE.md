@@ -3,12 +3,12 @@
 ## Snapshot
 
 - Date: **2026-09-30**
-- Branch: `chat-5/pass-5`
+- Branch: `chat-5/pass-6`
 - Slice: **Lifecycle & Engineering Knowledge**
 - SSOT: **MREA v0.1 + orchestration addendum v0.2**
-- Pass 5 authorization: **direct user instruction; no newer Chat-5-specific directive present on `main` at branch start**
-- Base SHA: `81a3c1c63e03fbabbd0da1c8191c5ca7ea13cb01` (frozen Chat 5 Pass 4)
-- State: **normalized relational read model + migration framework + SQL-native queries implemented; handoff pending final CI freeze**
+- Pass 6 authorization: **direct user instruction; no newer Chat-5-specific directive present on `main` at branch start**
+- Base SHA: `831460686fe3d506cce68ae2b06fd88ea30ea1bc` (frozen Chat 5 Pass 5)
+- State: **verified backup/restore + read-only query access implemented; final handoff pending downstream CI gate**
 
 ## Preserved baseline
 
@@ -24,140 +24,115 @@ Still active and unchanged:
 - removal/replacement/supersession semantics;
 - `LifecycleRepository` + `LifecycleUnitOfWork`;
 - authoritative `mrea.lifecycle-snapshot.v1` SQLite snapshot;
-- nested rollback and stale-writer protection.
+- nested rollback and stale-writer protection;
+- normalized relational schema version `2`;
+- migration/backfill and read-model self-repair;
+- SQL-native revision/failure/equipment/timeline queries.
 
 No shared contract, canonical fixture, CI workflow, integration test, or other chat-owned file was changed.
 
-## Pass 5 additions
+## Pass 6 additions
 
-### Relational schema migration framework
+### Verified database inspection
 
-Added:
+Added `inspect_lifecycle_database()`.
 
-- `SQLiteSchemaMigration`;
-- `SQLiteSchemaManager`;
-- ordered `SQLITE_MIGRATIONS`;
-- migration journal `lifecycle_schema_migrations`;
-- relational schema version `2`.
+It opens the database with SQLite `mode=ro` and validates:
 
-The first migration creates the normalized lifecycle read model and indexes.
+- `PRAGMA integrity_check`;
+- `PRAGMA foreign_key_check`;
+- snapshot schema version;
+- relational schema version;
+- authoritative snapshot/read-model version equality.
 
-Opening an already migrated database is idempotent.
+A structurally damaged or stale-projection database therefore cannot be accepted as a valid backup source.
 
-### Backward-compatible Pass 4 migration
+### Backup manifest
 
-Pass 4 database state remains authoritative and is not rewritten simply because Pass 5 introduces normalized tables.
-
-Open path:
+Added `LifecycleBackupManifest` using format:
 
 ```text
-ensure legacy lifecycle_store exists
-→ apply missing relational migrations
-→ load authoritative snapshot
-→ compare snapshot version with read-model version
-→ backfill normalized tables only when versions differ
+mrea.lifecycle-backup.v1
 ```
 
-A manually created Pass-4-format database with snapshot version `4` is verified to open under Pass 5 with:
+Manifest fields:
+
+- UTC `created_at`;
+- snapshot schema version;
+- snapshot version;
+- read-model version;
+- relational schema version;
+- SHA-256;
+- byte length.
+
+Default sidecar name:
 
 ```text
-loaded_version = 4
-read_model_version = 4
-relational_schema_version = 2
+<backup>.manifest.json
 ```
 
-The snapshot remains:
+### Consistent SQLite backup
+
+`LifecycleBackupManager.create_backup()` uses stdlib `sqlite3.Connection.backup()` from a read-only source connection.
+
+The backup is first written to a unique temporary file, validated, hashed, and only then atomically published with `os.replace()`.
+
+Creation fails closed when:
+
+- source integrity check fails;
+- source foreign keys are invalid;
+- snapshot/read-model versions differ;
+- source/backup metadata differ;
+- destination already exists without explicit overwrite;
+- backup timestamp is naive.
+
+### Backup verification
+
+`LifecycleBackupManager.verify_backup()` validates:
+
+1. manifest format;
+2. byte length;
+3. SHA-256;
+4. SQLite integrity;
+5. foreign keys;
+6. lifecycle schema versions;
+7. snapshot/read-model synchronization;
+8. database metadata against manifest.
+
+A modified backup file or modified manifest is rejected before restore.
+
+### Verified restore
+
+`LifecycleBackupManager.restore_backup()` first performs full backup verification.
+
+Restore then uses SQLite native backup into a unique temporary destination, validates the restored image against the verified backup, and atomically publishes it.
+
+Existing targets are protected unless `overwrite=True` is explicit.
+
+### Read-only lifecycle session
+
+Added `SQLiteLifecycleReadOnlySession`.
+
+Connection guarantees:
 
 ```text
-schema_version = mrea.lifecycle-snapshot.v1
-version = 4
+SQLite URI mode=ro
+PRAGMA query_only = ON
+PRAGMA foreign_keys = ON
 ```
 
-### Normalized relational read model
+The session exposes the existing `SQLiteLifecycleQueryRepository` as `.queries`.
 
-Added tables:
+It rejects:
 
-- `lifecycle_revisions`;
-- `lifecycle_cad_artifacts`;
-- `lifecycle_manufacturing`;
-- `lifecycle_physical_instances`;
-- `lifecycle_installations`;
-- `lifecycle_tests`;
-- `lifecycle_test_artifacts`;
-- `lifecycle_failures`;
-- `lifecycle_failure_evidence`;
-- `lifecycle_events_relational`;
-- `lifecycle_physical_events_relational`;
-- `lifecycle_read_model_meta`.
+- unsupported snapshot schema;
+- unsupported relational schema;
+- missing persistence metadata;
+- stale relational projection.
 
-The schema uses indexes for part, revision, verification status, manufacturing, equipment/position, instance history and event timelines.
+The read-only process does not self-repair the database. A writable `SQLiteLifecycleStore` must perform repair first.
 
-The read model preserves existing domain semantics rather than adding new ones. In particular, multiple physical instances may reference the same manufacturing record.
-
-### Atomic projection update
-
-Pass 5 durable commit path:
-
-```text
-BEGIN IMMEDIATE
-→ stale-writer check
-→ update authoritative lifecycle_store snapshot
-→ rebuild normalized relational projection
-→ set lifecycle_read_model_meta.snapshot_version
-→ COMMIT
-```
-
-If relational projection generation fails:
-
-- snapshot update rolls back;
-- normalized tables roll back;
-- read-model version metadata rolls back;
-- in-memory Unit-of-Work state rolls back.
-
-### Read-model version and repair
-
-`read_model_version` is explicit and must represent the same committed version as `loaded_version` after a successful commit.
-
-On reopen, a stale or deliberately damaged projection is repaired from the authoritative snapshot whenever:
-
-```text
-read_model_version != snapshot version
-```
-
-This makes relational data reconstructible rather than an independent source of truth.
-
-### SQL-native query repository
-
-`SQLiteLifecycleQueryRepository` exposes committed-state SQL queries.
-
-#### `revision_history(part_id)`
-
-Returns deterministic `RevisionQueryResult` rows ordered by creation time and revision ID.
-
-#### `failure_history(revision_id=..., instance_id=...)`
-
-Returns deterministic `FailureQueryResult` rows and joins installation context to expose equipment/position where available.
-
-#### `equipment_occupancy(equipment_id=..., position=...)`
-
-Derives the latest physical event per instance directly in SQL.
-
-Occupying event/state semantics:
-
-```text
-INSTALLED
-TESTED
-ACTIVATED -> ACTIVE
-FAILED
-```
-
-`REMOVED` and `SUPERSEDED` are not occupying.
-
-A failed instance therefore remains visible as equipment occupancy until explicit removal, matching the Pass 3 domain projection.
-
-#### `physical_timeline(instance_id)`
-
-Returns deterministic physical event rows ordered by explicit sequence.
+`refresh()` closes/reopens the reader and returns the newly observed snapshot version.
 
 ## Build / Reuse
 
@@ -165,17 +140,18 @@ No third-party dependency was added.
 
 Reused:
 
-- Python stdlib `sqlite3`;
-- Pass 4 snapshot serializer/deserializer;
-- Pass 4 Unit of Work;
-- Pass 4 stale-writer guard;
-- existing lifecycle and physical domain services.
+- Python stdlib `sqlite3` backup API;
+- `hashlib`, `json`, `os`, `pathlib`;
+- Pass 4 snapshot/versioning model;
+- Pass 5 relational schema/version metadata;
+- Pass 5 `SQLiteLifecycleQueryRepository`.
 
 Not introduced:
 
+- external backup utility;
+- external database driver;
 - ORM;
-- external migration package;
-- external DB driver;
+- encryption library;
 - REST framework;
 - AI layer;
 - shared contract amendment.
@@ -184,35 +160,37 @@ Not introduced:
 
 ### New tests
 
-`tests/test_relational_persistence.py` verifies:
+`tests/test_backup_readonly.py` verifies:
 
-1. migration from manually constructed Pass-4-format database;
-2. snapshot version/schema preserved during relational migration;
-3. normalized backfill;
-4. migration idempotence on reopen;
-5. SQL-native revision history;
-6. SQL-native physical timeline;
-7. ACTIVE equipment occupancy;
-8. failure history with equipment/position context;
-9. FAILED remains occupying;
-10. REMOVED releases occupancy;
-11. snapshot/read-model version equality;
-12. forced read-model failure rolls back snapshot + relational state;
-13. reopen repairs stale/damaged projection;
-14. multiple physical instances may share one manufacturing record.
+1. committed database backup creation;
+2. backup manifest timestamp/versions/hash/size;
+3. backup verification;
+4. source mutations after backup do not alter the backup image;
+5. restore returns the backed-up version rather than later source state;
+6. tampered backup bytes rejected;
+7. tampered manifest hash rejected;
+8. restore overwrite blocked by default;
+9. explicit overwrite works;
+10. stale relational projection blocks backup;
+11. writable reopen repairs projection and then backup succeeds;
+12. read-only SQL-native query access;
+13. SQLite write attempts through read-only handle fail;
+14. closed read-only session rejects queries;
+15. later committed writer state is visible to a fresh reader;
+16. stale relational projection blocks read-only session until repaired.
 
 ### GitHub-hosted Chat 5 suite
 
-Implementation SHA:
+Implementation/documentation SHA:
 
 ```text
-fc1402132092379c94e59332c2d14bfa1e7a367a
+52ebc6614064c6541c65651a5af58d99bb5e65c4
 ```
 
 Exact result:
 
 ```text
-25 passed in 1.09s
+31 passed in 3.73s
 ```
 
 Status: **SUCCESS**.
@@ -227,20 +205,23 @@ Contracts / canonical fixtures
 
 Status: **SUCCESS**.
 
+### Chat 4 generic gate
+
+Status: **SUCCESS**.
+
 ### Cross-slice boundary
 
 `Integration / Chat 4 -> Chat 5` remains the required final downstream gate before handoff freeze.
 
-## Files added in Pass 5
+## Files added in Pass 6
 
-- `src/mrea_lifecycle/sqlite_schema.py`;
-- `src/mrea_lifecycle/relational.py`;
-- `tests/test_relational_persistence.py`;
-- `docs/PASS_5_RELATIONAL_READ_MODEL.md`.
+- `src/mrea_lifecycle/backup.py`;
+- `src/mrea_lifecycle/read_only.py`;
+- `tests/test_backup_readonly.py`;
+- `docs/PASS_6_BACKUP_RESTORE_READ_ONLY.md`.
 
-## Files modified in Pass 5
+## Files modified in Pass 6
 
-- `src/mrea_lifecycle/persistence.py`;
 - `src/mrea_lifecycle/__init__.py`;
 - `README.md`;
 - `docs/IMPLEMENTATION_STATE.md`;
@@ -250,16 +231,17 @@ Status: **SUCCESS**.
 
 Still open:
 
-- incremental read-model updates instead of full deterministic rebuild per successful writer transaction;
-- larger engineering knowledge query catalogue;
-- dedicated read-only connection/process strategy;
-- backup/restore tooling;
+- encrypted/off-host backup transport;
+- retention/rotation policy;
+- scheduled backup orchestration;
+- incremental relational projection updates;
+- richer engineering knowledge query catalogue;
 - REST/API;
 - field-device synchronization;
 - AI / semantic failure analysis.
 
-The current full projection rebuild is intentionally correctness-first. It keeps a single authoritative write image and allows later optimization without changing lifecycle contracts.
+The current backup primitive is local and deterministic by design. Scheduling, remote storage, encryption and retention belong to later deployment/orchestration layers.
 
 ## Handoff rule
 
-After `ORCHESTRATOR_HANDOFF.md` is updated, `chat-5/pass-5` is frozen. No later commit is allowed unless Chat 6 explicitly requests a correction.
+After `ORCHESTRATOR_HANDOFF.md` is updated, `chat-5/pass-6` is frozen. No later commit is allowed unless Chat 6 explicitly requests a correction.
