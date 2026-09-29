@@ -4,7 +4,7 @@
 
 ## Ownership
 
-Chat 4 отвечает за вертикальный слайс `CAD Bridge & Verification`:
+Chat 4 отвечает за vertical slice `CAD Bridge & Verification`:
 
 - canonical `SketchPackage` intake;
 - SVG/DXF export;
@@ -42,7 +42,7 @@ MappedSketchPackage
       CadAdapter
           ↓
 CadDimensionBinding + normalized CadReadBack
-          ↓
+          ↓ identity / traceability / unit validation
       VerificationEngine
           ↓
 internal VerificationReport
@@ -61,6 +61,7 @@ Generic layer:
 - normalized CAD read-back in `mm` / `deg`;
 - deterministic `TestDoubleCadAdapter`;
 - full canonical golden flow without installed SOLIDWORKS;
+- adapter identity, binding identity, `measurement_id` traceability and unit-drift guards;
 - no-silent-correction verification statuses.
 
 ## Dependencies
@@ -86,17 +87,15 @@ pip install -r requirements-dev.txt
 PYTHONPATH=src python -m unittest discover -s tests -v
 ```
 
-Repository test inventory after the adapter-baseline change: **20 tests**.
+Repository test inventory after hardening: **23 tests**.
 
-Последний clean baseline до этой итерации: **14 tests, OK**. Новый adapter/pipeline набор отдельно выполнен: **6 tests, OK**. Fresh full 20-test checkout run остаётся integration verification item, потому что текущий execution container не имеет outbound DNS к GitHub.
-
-Contract tests читают реальные canonical schema/fixtures из repository root, а не локальные копии.
+Последний clean repository baseline до adapter work: **14 tests, OK**. В reconstructed local harness выполнены exporters + verification + все 9 adapter/pipeline tests: **18 tests, OK**. Пять schema contract tests не перезапускались в текущем container из-за отсутствия outbound GitHub DNS; shared schema/contract tests этим patch не изменяются.
 
 ## Текущий следующий этап
 
-Generic CAD gate закрыт. Следующий vendor-specific этап — SOLIDWORKS C#/.NET/COM adapter за уже существующим normalized boundary.
+Generic CAD gate закрыт. Следующий vendor-specific этап — SOLIDWORKS C#/.NET/COM adapter за существующим normalized boundary.
 
-До реализации необходимо зафиксировать target environment:
+Открыт `docs/CHANGE_REQUEST_002_SOLIDWORKS_ENVIRONMENT.md`; требуется canonical решение Chat 6 по:
 
 - supported SOLIDWORKS version;
 - .NET target;

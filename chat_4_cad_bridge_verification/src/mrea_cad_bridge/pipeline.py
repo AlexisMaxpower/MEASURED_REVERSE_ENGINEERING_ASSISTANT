@@ -34,14 +34,39 @@ def execute_cad_transfer_v1(
     mapped = map_sketch_package_v1(sketch_package)
     adapter_result = adapter.transfer(mapped)
 
+    if adapter_result.adapter_name != adapter.adapter_name:
+        raise CadAdapterError(
+            f"adapter identity mismatch: interface={adapter.adapter_name!r}, "
+            f"result={adapter_result.adapter_name!r}"
+        )
+
     expected_by_id = {
         item.dimension_id: item for item in mapped.expected_dimensions
     }
-    read_back_units = adapter_result.read_back.units()
-    unknown = set(read_back_units) - set(expected_by_id)
-    if unknown:
+
+    binding_ids = {binding.dimension_id for binding in adapter_result.bindings}
+    unknown_bindings = binding_ids - set(expected_by_id)
+    if unknown_bindings:
         raise CadAdapterError(
-            f"adapter returned unknown dimension IDs: {sorted(unknown)!r}"
+            "adapter returned bindings for unknown dimensions: "
+            f"{sorted(unknown_bindings)!r}"
+        )
+
+    for binding in adapter_result.bindings:
+        expected_measurement_id = expected_by_id[binding.dimension_id].measurement_id
+        if binding.measurement_id != expected_measurement_id:
+            raise CadAdapterError(
+                f"measurement_id mismatch for {binding.dimension_id}: "
+                f"expected {expected_measurement_id!r}, "
+                f"got {binding.measurement_id!r}"
+            )
+
+    read_back_units = adapter_result.read_back.units()
+    unknown_read_back = set(read_back_units) - set(expected_by_id)
+    if unknown_read_back:
+        raise CadAdapterError(
+            "adapter returned unknown read-back dimension IDs: "
+            f"{sorted(unknown_read_back)!r}"
         )
 
     for dimension_id, unit in read_back_units.items():

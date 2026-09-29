@@ -141,6 +141,105 @@ class AdapterPipelineTests(unittest.TestCase):
         with self.assertRaises(CadAdapterError):
             self.execute(BadUnitAdapter())
 
+    def test_adapter_identity_mismatch_is_rejected(self) -> None:
+        class BadIdentityAdapter:
+            adapter_name = "DECLARED"
+
+            def transfer(self, package):
+                bindings = tuple(
+                    CadDimensionBinding(
+                        dimension_id=item.dimension_id,
+                        measurement_id=item.measurement_id,
+                        vendor_dimension_ref=f"BAD::{item.dimension_id}",
+                    )
+                    for item in package.expected_dimensions
+                )
+                dimensions = tuple(
+                    CadReadBackDimension(
+                        dimension_id=item.dimension_id,
+                        actual_value=item.expected_value,
+                        unit=item.unit,
+                    )
+                    for item in package.expected_dimensions
+                )
+                return CadAdapterResult(
+                    adapter_name="RETURNED",
+                    bindings=bindings,
+                    read_back=CadReadBack(dimensions=dimensions),
+                )
+
+        with self.assertRaises(CadAdapterError):
+            self.execute(BadIdentityAdapter())
+
+    def test_measurement_id_traceability_mismatch_is_rejected(self) -> None:
+        class BadMeasurementAdapter:
+            adapter_name = "BAD_MEASUREMENT"
+
+            def transfer(self, package):
+                bindings = []
+                for index, item in enumerate(package.expected_dimensions):
+                    bindings.append(
+                        CadDimensionBinding(
+                            dimension_id=item.dimension_id,
+                            measurement_id=(
+                                "M-WRONG" if index == 0 else item.measurement_id
+                            ),
+                            vendor_dimension_ref=f"BAD::{item.dimension_id}",
+                        )
+                    )
+                dimensions = tuple(
+                    CadReadBackDimension(
+                        dimension_id=item.dimension_id,
+                        actual_value=item.expected_value,
+                        unit=item.unit,
+                    )
+                    for item in package.expected_dimensions
+                )
+                return CadAdapterResult(
+                    adapter_name=self.adapter_name,
+                    bindings=tuple(bindings),
+                    read_back=CadReadBack(dimensions=dimensions),
+                )
+
+        with self.assertRaises(CadAdapterError):
+            self.execute(BadMeasurementAdapter())
+
+    def test_binding_for_unknown_dimension_is_rejected(self) -> None:
+        class ExtraBindingAdapter:
+            adapter_name = "EXTRA_BINDING"
+
+            def transfer(self, package):
+                bindings = tuple(
+                    CadDimensionBinding(
+                        dimension_id=item.dimension_id,
+                        measurement_id=item.measurement_id,
+                        vendor_dimension_ref=f"BAD::{item.dimension_id}",
+                    )
+                    for item in package.expected_dimensions
+                ) + (
+                    CadDimensionBinding(
+                        dimension_id="D-EXTRA",
+                        measurement_id=None,
+                        vendor_dimension_ref="BAD::D-EXTRA",
+                    ),
+                )
+                dimensions = tuple(
+                    CadReadBackDimension(
+                        dimension_id=item.dimension_id,
+                        actual_value=item.expected_value,
+                        unit=item.unit,
+                    )
+                    for item in package.expected_dimensions
+                )
+                return CadAdapterResult(
+                    adapter_name=self.adapter_name,
+                    bindings=bindings,
+                    read_back=CadReadBack(dimensions=dimensions),
+                )
+
+        with self.assertRaises(CadAdapterError):
+            self.execute(ExtraBindingAdapter())
+
 
 if __name__ == "__main__":
     unittest.main()
