@@ -1,4 +1,7 @@
+from io import StringIO
 import unittest
+
+import ezdxf
 
 from mrea_cad_bridge import (
     ArcEntity,
@@ -39,17 +42,17 @@ class ExporterTests(unittest.TestCase):
         self.assertIn('id="P1"', first.content)
         self.assertIn('stroke-dasharray="1,1"', first.content)
 
-    def test_dxf_is_deterministic_and_contains_supported_entities(self) -> None:
+    def test_dxf_is_deterministic_parseable_and_contains_supported_entities(self) -> None:
         exporter = DxfExporter()
         first = exporter.export(self.sketch)
         second = exporter.export(self.sketch)
         self.assertEqual(first.content, second.content)
         self.assertEqual(first.file_extension, ".dxf")
-        self.assertIn("\nLINE\n", first.content)
-        self.assertIn("\nCIRCLE\n", first.content)
-        self.assertIn("\nARC\n", first.content)
-        self.assertIn("\nPOLYLINE\n", first.content)
-        self.assertTrue(first.content.endswith("0\nEOF\n"))
+
+        document = ezdxf.read(StringIO(first.content))
+        entities = list(document.modelspace())
+        self.assertEqual([entity.dxftype() for entity in entities], ["ARC", "CIRCLE", "LINE", "POLYLINE"])
+        self.assertEqual(entities[-1].dxf.linetype, "DASHED")
 
     def test_sketch_rejects_duplicate_entity_ids(self) -> None:
         with self.assertRaises(ValueError):
