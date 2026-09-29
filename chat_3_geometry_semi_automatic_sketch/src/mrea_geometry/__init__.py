@@ -2,6 +2,7 @@
 
 from .constraints import ConstraintIssue, ConstraintResolution, ConstraintResolver, ResolvedConstraint
 from .contracts import CanonicalGeometryInput, CanonicalInputAdapter
+from .dimensioned_view import DimensionedViewArtifact, DimensionedViewRenderer, ReferenceImageLayer
 from .core import (
     AnchorEntityMatcher,
     ConstraintCandidateEngine,
@@ -42,6 +43,8 @@ __all__ = [
     "ConstraintResolution",
     "ConstraintResolver",
     "DimensionBinder",
+    "DimensionedViewArtifact",
+    "DimensionedViewRenderer",
     "DimensionBinding",
     "GeometryConflict",
     "GeometryConflictDetector",
@@ -54,6 +57,7 @@ __all__ = [
     "MeasurementRef",
     "Point2D",
     "PointEntity",
+    "ReferenceImageLayer",
     "ResolvedConstraint",
     "SketchPackageBuilder",
     "UnresolvedBinding",
