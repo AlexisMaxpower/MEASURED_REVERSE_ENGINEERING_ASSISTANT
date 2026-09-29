@@ -1,165 +1,142 @@
-# ORCHESTRATOR HANDOFF — Chat 3 — Pass 6
+# ORCHESTRATOR HANDOFF — Chat 3 — Pass 7
 
 **From:** Chat 3 — Geometry & Semi-Automatic Sketch  
 **To:** Chat 6 — Orchestrator / Repository Integrator  
-**Pass / Ring:** 6  
-**Branch:** `chat-3/pass-6`  
-**Branch base:** frozen Ring 5 head `f450b3a857fc7353c3b0f8881050cae0ae3199d5`  
-**Implementation/docs head before handoff commit:** `3286cef855fa105b5845e96653bbd08dbb3b24cf`  
+**Pass / Ring:** 7  
+**Branch:** `chat-3/pass-7`  
+**Branch base:** frozen Ring 6 head `28d4373b0e9cfdb25a1a833e9ca646c2a06f9d14`  
+**Implementation/docs head before handoff commit:** `0cc87292b9b8f4f3dd6d17116573701451e5d2db`  
 **Date:** 2026-09-30
 
 ## Authorization / baseline note
 
-Ring 6 was started by explicit user instruction. At start, current `main` still exposed Chat 3 directive `OD-2026-09-29-003`; no newer Chat 3 worker directive had been published.
+Ring 7 was started by explicit user instruction. At start, current `main` still exposed Chat 3 directive `OD-2026-09-29-003`; no newer Chat 3 worker directive had been published.
 
-To preserve the complete user-authorized Ring 5 work, `chat-3/pass-6` was created directly from frozen Ring 5 head.
+To preserve the complete user-authorized Ring 6 work, `chat-3/pass-7` was created directly from frozen Ring 6 head.
 
 No shared contracts, CI, integration tests, or other chat-owned files were modified.
 
 ## Status
 
-`READY_FOR_RING6_INTEGRATOR_REVIEW`
+`READY_FOR_RING7_INTEGRATOR_REVIEW`
 
 ## Delivered functionality
 
-Ring 6 extends deterministic Semi-Automatic Sketch relation detection to the remaining conservative canonical v1 constraint families:
+Ring 7 adds a read-only geometric satisfaction boundary between constraint detection and canonical publication.
 
-- `COINCIDENT`;
-- `TANGENT`;
-- `SYMMETRIC`.
+New runtime:
 
-### COINCIDENT
+- `ConstraintSatisfaction`;
+- `ConstraintSatisfactionAnalyzer`.
 
-Generated only from observable finite contact:
+### Supported diagnostics
 
-- explicit POINT on another primitive;
-- LINE endpoint on another primitive;
-- ARC endpoint on another primitive;
-- endpoint-to-endpoint contact.
+The analyzer covers:
 
-Pure interior/interior crossings are deliberately not promoted as COINCIDENT.
+- COINCIDENT;
+- HORIZONTAL;
+- VERTICAL;
+- PARALLEL;
+- PERPENDICULAR;
+- TANGENT;
+- CONCENTRIC;
+- EQUAL;
+- SYMMETRIC.
 
-### TANGENT
+Axis/angular relations use normalized residuals with default tolerance `1e-3`.
 
-Supported candidate pairs:
+Linear/topological relations use mm residuals with default tolerance `0.05 mm`.
 
-- LINE ↔ CIRCLE;
-- LINE ↔ ARC;
-- CIRCLE ↔ CIRCLE;
-- CIRCLE ↔ ARC;
-- ARC ↔ ARC.
+### Resolver integration
 
-LINE tangency respects finite segment bounds. ARC tangency requires the contact point to lie on the observed arc span. Round/round checks support external and internal tangency and reject concentric degeneracy.
+`ConstraintResolver` promotion order is now:
 
-### SYMMETRIC
+1. entity existence;
+2. effective confidence;
+3. geometric satisfaction;
+4. redundancy filtering;
+5. verified-measurement conflict checks;
+6. canonical publication.
 
-Symmetry requires an explicit LINE entity as axis.
+A stale or false relation is not silently published. It becomes explicit canonical unresolved:
 
-Ring 6 conservatively supports:
+`UNSATISFIED_CONSTRAINT`
 
-- POINT ↔ POINT;
-- equal-radius CIRCLE ↔ CIRCLE.
+The diagnostic message includes relation kind, residual, tolerance and residual unit.
 
-The candidate entity ordering convention is:
+### Safety / truth hierarchy
 
-```text
-(peer_a, peer_b, symmetry_axis_line)
-```
+The analyzer is read-only. It does not:
 
-No implicit symmetry axis is invented.
+- move geometry;
+- modify entity coordinates;
+- alter verified measurements;
+- change measurement ids/provenance;
+- solve an over-constrained system.
 
-### Determinism and truth hierarchy
+Invariant remains:
 
-All candidate generation is deterministic under primitive input reordering.
+`verified physical measurement > image/geometry-derived relation`
 
-New candidates still pass through existing `ConstraintResolver` confidence/measurement gates. The engine does not move geometry, solve constraints, or alter verified measurements.
+### Tests
 
-```text
-verified physical measurement > image-derived / geometry-derived relation
-```
+New module:
 
-### Vision golden
+`tests/test_constraint_satisfaction.py`
 
-The existing front-plate image naturally contains four connected outer-corner endpoint pairs, so the vision golden now publishes four additional inferred COINCIDENT constraints.
+Coverage includes:
 
-All verified physical dimensions remain unchanged. The two low-confidence hole circles still do not promote their EQUAL relation; that relation remains explicit unresolved.
+- valid/stale HORIZONTAL residuals;
+- rejection of interior-line-crossing COINCIDENT candidate;
+- valid/stale LINE/CIRCLE tangency;
+- explicit-axis symmetry residual;
+- resolver conversion of stale relation to `UNSATISFIED_CONSTRAINT`;
+- regression that normal generated rectangle candidates remain publishable.
 
 ## Runtime / dependencies
 
 Package version:
 
-```text
-0.6.0
-```
+`0.7.0`
 
-New dependencies in Ring 6: **none**.
-
-## Tests
-
-New acceptance module:
-
-```text
-tests/test_topology_constraint_candidates.py
-```
-
-It verifies:
-
-- real endpoint coincidence;
-- rejection of pure interior crossings;
-- explicit point contact;
-- finite line/circle tangency;
-- arc-span-aware tangency;
-- external/internal round tangency;
-- symmetry requiring an explicit axis;
-- equal-radius circle symmetry;
-- deterministic candidate output.
-
-Existing constraint-resolution acceptance was updated for the newly explicit rectangle corner topology.
+New dependencies: **none**.
 
 ## GitHub Actions verification
 
 Authoritative implementation head:
 
-```text
-14feaad3e08d622cf17f5f7da60ac09565df908e
-```
+`8527a4ad9c711b18c6fc1bcd61dbfe537c6d53d5`
 
 Workflow run:
 
-```text
-36643777256
-```
+`36645593928`
 
 Results:
 
-- `Chat 3 / Geometry`: **SUCCESS — 50 passed in 0.38s**;
+- `Chat 3 / Geometry`: **SUCCESS — 56 passed in 0.44s**;
 - `Contracts / canonical fixtures`: **SUCCESS**;
+- `Chat 1 / Capture`: **SUCCESS**;
 - `Chat 2 / Measurement`: **SUCCESS**;
-- `Integration / Chat 2 -> Chat 3`: **SUCCESS**;
 - `Chat 4 / Generic CAD gate`: **SUCCESS**;
-- `Integration / Chat 3 -> Chat 4`: **FAIL only because frozen Ring 5 ancestry contains the old shared field lookup**.
+- `Chat 5 / Lifecycle`: **SUCCESS**;
+- `Integration / Chat 2 -> Chat 3`: **SUCCESS**;
+- `Integration / Chat 3 -> Chat 4`: **FAIL only because frozen worker ancestry contains the stale shared field lookup**.
 
 ## Chat 3 -> Chat 4 baseline drift
 
-The inherited worker-branch integration test reaches successful SketchPackage generation, canonical validation, Chat 4 CAD transfer, CADPackage validation, CADVerificationReport validation and `overall_status == VERIFIED`, then fails with:
+The inherited worker-branch integration test reaches successful SketchPackage generation, schema validation, CAD transfer, CADPackage validation, CADVerificationReport validation and `overall_status == VERIFIED`, then fails with:
 
-```text
-KeyError: 'dimensions'
-```
+`KeyError: 'dimensions'`
 
 because that old shared test reads:
 
-```python
-transfer.cad_verification_report["dimensions"]
-```
+`transfer.cad_verification_report["dimensions"]`
 
-Current `main` has already corrected the test to canonical:
+Current `main` already uses canonical:
 
-```python
-transfer.cad_verification_report["items"]
-```
+`transfer.cad_verification_report["items"]`
 
-Chat 3 did not backport or modify the Chat-6-owned shared integration test. Integrator should replay/merge the Ring 6 worker diff onto the current corrected shared baseline.
+Chat 3 did not backport or modify the Chat-6-owned shared integration test. Integrator should replay/merge Ring 7 worker diff onto the current corrected shared baseline.
 
 ## Shared ownership / Change Requests
 
@@ -174,30 +151,24 @@ Change Requests: **none**.
 
 Validate on current shared baseline:
 
-```text
-observed geometry
-→ deterministic constraint candidates
-→ COINCIDENT / TANGENT / SYMMETRIC
-→ ConstraintResolver confidence/truth gates
-→ canonical SketchPackage v1 constraints/unresolved
-```
+`constraint candidates -> confidence gate -> geometric satisfaction -> verified-measurement gate -> SketchPackage constraints/unresolved`
 
-Confirm that verified measurements remain unchanged and that unsupported/weak relations remain fail-closed.
+Confirm that stale relations become explicit unresolved and that verified measurements remain unchanged.
 
 ## Known limitations / next owned work
 
 Deferred unless Chat 6 reprioritizes:
 
 - numerical constraint solving/entity movement;
-- broader symmetry families such as LINE/ARC peers;
-- richer tolerance/confidence models for noisy detected geometry;
-- multi-view geometric relationships;
+- global over-constrained-system diagnosis;
+- uncertainty-aware/noisy-vision tolerance models;
+- multi-view geometry relationships;
 - CAD-native logic.
 
 ## Branch freeze
 
-This handoff is the final normal worker commit for Ring 6.
+This handoff is the final normal worker commit for Ring 7.
 
-After publication, `chat-3/pass-6` is treated as **frozen** pending Chat 6 verdict or explicit user/orchestrator instruction.
+After publication, `chat-3/pass-7` is treated as **frozen** pending Chat 6 verdict or explicit user/orchestrator instruction.
 
-The only permitted post-handoff write is a minimal repair if the mandatory final GitHub upload audit proves that a claimed Ring 6 file failed to land or does not match the intended payload. Any such repair must itself be re-audited.
+The only permitted post-handoff write is a minimal repair if the mandatory final GitHub upload audit proves that a claimed Ring 7 file failed to land or does not match the intended payload. Any such repair must itself be re-audited.
