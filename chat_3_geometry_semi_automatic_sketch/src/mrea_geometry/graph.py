@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from math import cos, radians, sin
 
-from .models import Arc, GeometryPrimitive, Line, Point2D
+from .models import Arc, GeometryPrimitive, Line, Point2D, PointEntity
 
 
 def _point_key(point: Point2D, precision: int = 9) -> tuple[float, float]:
@@ -32,7 +32,9 @@ class GeometryGraph:
         incidence: dict[tuple[float, float], list[str]] = {}
         for entity in entities:
             points: tuple[Point2D, ...] = ()
-            if isinstance(entity, Line):
+            if isinstance(entity, PointEntity):
+                points = (entity.point,)
+            elif isinstance(entity, Line):
                 points = (entity.start, entity.end)
             elif isinstance(entity, Arc):
                 points = (
