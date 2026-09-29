@@ -125,7 +125,7 @@ def test_projective_transform_keeps_lines_but_does_not_invent_circles() -> None:
 def test_unsupported_profile_stays_explicit_unresolved() -> None:
     result = ImageGeometryExtractor().extract_profile(
         FIXTURES / "open_arc_reference.pbm",
-        [1.0, 0.0, -15.0, 0.0, -1.0, 15.0, 0.0, 0.0, 1.0],
+        [1.0, 0.0, -5.0, 0.0, -1.0, 5.0, 0.0, 0.0, 1.0],
     )
 
     assert result.primitives == ()
@@ -151,7 +151,7 @@ def test_candidate_issue_projects_to_canonical_sketch_unresolved() -> None:
     )
     extraction = ImageGeometryExtractor().extract_profile(
         FIXTURES / "open_arc_reference.pbm",
-        [1.0, 0.0, -15.0, 0.0, -1.0, 15.0, 0.0, 0.0, 1.0],
+        [1.0, 0.0, -5.0, 0.0, -1.0, 5.0, 0.0, 0.0, 1.0],
     )
     sketch = VisionGeometryPipeline().build_sketch(
         extraction, context, sketch_package_id="SP-VISION-UNRESOLVED"
@@ -165,7 +165,7 @@ def test_candidate_issue_projects_to_canonical_sketch_unresolved() -> None:
 def test_open_arc_fixture_matches_golden_geometry_exactly() -> None:
     result = ImageGeometryExtractor().extract_open_arcs(
         FIXTURES / "open_arc_reference.pbm",
-        [1.0, 0.0, -15.0, 0.0, -1.0, 15.0, 0.0, 0.0, 1.0],
+        [1.0, 0.0, -5.0, 0.0, -1.0, 5.0, 0.0, 0.0, 1.0],
     )
     actual = {
         "primitives": [item.to_dict() for item in result.primitives],
