@@ -80,7 +80,7 @@ def _create_normalized_read_model(connection: sqlite3.Connection) -> None:
             instance_id TEXT PRIMARY KEY,
             part_id TEXT NOT NULL,
             revision_id TEXT NOT NULL,
-            manufacturing_id TEXT NOT NULL UNIQUE,
+            manufacturing_id TEXT NOT NULL,
             material TEXT NOT NULL,
             method TEXT NOT NULL,
             manufactured_at TEXT NOT NULL,
@@ -96,6 +96,8 @@ def _create_normalized_read_model(connection: sqlite3.Connection) -> None:
         );
         CREATE INDEX IF NOT EXISTS ix_lifecycle_instances_part
             ON lifecycle_physical_instances(part_id, revision_id);
+        CREATE INDEX IF NOT EXISTS ix_lifecycle_instances_manufacturing
+            ON lifecycle_physical_instances(manufacturing_id, instance_id);
 
         CREATE TABLE IF NOT EXISTS lifecycle_installations (
             installation_id TEXT PRIMARY KEY,
@@ -248,6 +250,14 @@ def _create_normalized_read_model(connection: sqlite3.Connection) -> None:
             ON lifecycle_physical_events_relational(
                 equipment_id, position, sequence
             );
+
+        CREATE TABLE IF NOT EXISTS lifecycle_read_model_meta (
+            singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+            snapshot_version INTEGER NOT NULL
+        );
+        INSERT OR IGNORE INTO lifecycle_read_model_meta(
+            singleton, snapshot_version
+        ) VALUES (1, -1);
         """
     )
 
