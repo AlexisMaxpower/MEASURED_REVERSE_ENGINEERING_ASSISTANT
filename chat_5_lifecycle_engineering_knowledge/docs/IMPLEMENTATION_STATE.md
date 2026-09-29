@@ -8,7 +8,7 @@
 - SSOT: **MREA v0.1 + orchestration addendum v0.2**
 - Pass 6 authorization: **direct user instruction; no newer Chat-5-specific directive present on `main` at branch start**
 - Base SHA: `831460686fe3d506cce68ae2b06fd88ea30ea1bc` (frozen Chat 5 Pass 5)
-- State: **verified backup/restore + read-only query access implemented; final handoff pending downstream CI gate**
+- State: **verified backup/restore + read-only query access implemented; required pre-handoff CI gates green; handoff published and branch frozen after final reconciliation**
 
 ## Preserved baseline
 
@@ -181,10 +181,10 @@ Not introduced:
 
 ### GitHub-hosted Chat 5 suite
 
-Implementation/documentation SHA:
+Pre-handoff SHA:
 
 ```text
-52ebc6614064c6541c65651a5af58d99bb5e65c4
+861edbdf3ded1b9a164ba3bb4599260d968e3d3e
 ```
 
 Exact result:
@@ -197,7 +197,7 @@ Status: **SUCCESS**.
 
 ### Canonical contracts
 
-Same workflow run:
+Workflow run `36643488899`:
 
 ```text
 Contracts / canonical fixtures
@@ -211,7 +211,15 @@ Status: **SUCCESS**.
 
 ### Cross-slice boundary
 
-`Integration / Chat 4 -> Chat 5` remains the required final downstream gate before handoff freeze.
+`Integration / Chat 4 -> Chat 5`:
+
+```text
+2 passed, 1 warning in 0.66s
+```
+
+Status: **SUCCESS**.
+
+The warning is the existing Chat 4 `TestDoubleCadAdapter` pytest collection warning and is outside Chat 5 ownership.
 
 ## Files added in Pass 6
 
@@ -244,4 +252,4 @@ The current backup primitive is local and deterministic by design. Scheduling, r
 
 ## Handoff rule
 
-After `ORCHESTRATOR_HANDOFF.md` is updated, `chat-5/pass-6` is frozen. No later commit is allowed unless Chat 6 explicitly requests a correction.
+`ORCHESTRATOR_HANDOFF.md` is the final worker commit after this state reconciliation. `chat-5/pass-6` is frozen after that commit. No later commit is allowed unless Chat 6 explicitly requests a correction.
