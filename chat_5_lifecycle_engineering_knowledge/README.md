@@ -1,11 +1,11 @@
 # Chat 5 — Lifecycle & Engineering Knowledge
 
-Статус: **Pass 6 verified backup/restore + read-only access implemented**  
+Статус: **Pass 7 deterministic engineering knowledge queries implemented**  
 Проект: **MREA — Measured Reverse Engineering Assistant**  
 Источник истины: **MREA SSOT v0.1 + orchestration addendum v0.2**  
-Запуск Pass 6: **direct user instruction; newer Chat-5-specific directive was absent on `main`**  
-Рабочая ветка: `chat-5/pass-6`  
-База ветки: `831460686fe3d506cce68ae2b06fd88ea30ea1bc` (frozen Pass 5 handoff)
+Запуск Pass 7: **direct user instruction; newer Chat-5-specific directive was absent on `main`**  
+Рабочая ветка: `chat-5/pass-7`  
+База ветки: `68791080a5440c6426ef28329302c99a323344b0` (frozen Pass 6 handoff)
 
 ## Назначение области
 
@@ -21,112 +21,87 @@ Revision
 → Failed
 → Removed
 → Superseded by replacement
+→ deterministic engineering knowledge queries
 ```
 
 ## Реализовано
 
-### Pass 1
+### Pass 1–3
 
 - Revision / Manufacturing / Installation / Test / Failure domain;
-- deterministic lifecycle queries/projections;
-- canonical `LifecycleEvent v1` adapter.
+- canonical LifecycleEvent v1 adapter;
+- CAD verification → manufacturing gate;
+- PhysicalPartInstance identity/state machine;
+- exact installation/test/failure evidence linkage;
+- removal/replacement/supersession.
 
-### Pass 2
+### Pass 4–6
 
-- canonical CADPackage + CADVerificationReport → lifecycle Revision;
-- CAD traceability retention;
-- only VERIFIED CAD revisions may manufacture.
+- LifecycleRepository + LifecycleUnitOfWork;
+- SQLite durable snapshot and atomic rollback;
+- stale-writer protection;
+- normalized relational schema and migration/backfill;
+- SQL-native lifecycle queries;
+- verified backup/restore;
+- read-only SQLite session.
 
-### Pass 3
+### Pass 7
 
-- `PhysicalPartInstance`;
-- physical state machine;
-- exact instance linkage on installation/test/failure;
-- PASSED test gate before ACTIVE;
-- removal/replacement/supersession;
-- equipment/position occupancy protection.
-
-### Pass 4
-
-- `LifecycleRepository` persistence port;
-- `LifecycleUnitOfWork`;
-- nested rollback-capable transactions;
-- `SQLiteLifecycleStore`;
-- authoritative `mrea.lifecycle-snapshot.v1` durable snapshot;
-- stale-writer protection and explicit reload;
-- atomic canonical + physical persistence.
-
-### Pass 5
-
-- `SQLiteSchemaManager` + ordered migration journal;
-- relational schema version `2`;
-- Pass-4-compatible migration/backfill;
-- normalized relational lifecycle read model;
-- snapshot/read-model version synchronization and self-repair;
-- SQL-native revision/failure/equipment/timeline queries.
-
-### Pass 6
-
-Добавлен operational recovery/read layer:
-
-- `LifecycleBackupManager`;
-- backup manifest `mrea.lifecycle-backup.v1`;
-- native SQLite consistent backup via `sqlite3.Connection.backup()`;
-- pre-backup `integrity_check` + `foreign_key_check`;
-- requirement `snapshot_version == read_model_version` before backup;
-- SHA-256 + byte-size manifest verification;
-- verified restore through temporary database + atomic `os.replace()`;
-- overwrite protection unless explicitly requested;
-- `SQLiteLifecycleReadOnlySession` using SQLite `mode=ro`;
-- `PRAGMA query_only = ON`;
-- read-only stale-projection rejection;
-- explicit reader `refresh()`.
-
-## Persistence / recovery model
-
-Write path remains unchanged from Pass 5:
-
-```text
-LifecycleUnitOfWork
-→ authoritative aggregate
-→ lifecycle_store snapshot
-→ normalized SQL read model
-→ read-model snapshot_version
-→ COMMIT
-```
-
-Backup path:
-
-```text
-committed lifecycle.db
-→ read-only integrity + version inspection
-→ SQLite native backup API
-→ inspect backup image
-→ SHA-256 manifest
-→ atomic publish
-```
-
-Restore path:
-
-```text
-backup + manifest
-→ verify hash/size/schema/versions/integrity
-→ restore into temp SQLite file
-→ inspect restored image
-→ atomic replace destination
-```
-
-## Read-only query surface
+Added `SQLiteEngineeringKnowledgeRepository`, exposed as:
 
 ```python
 with SQLiteLifecycleReadOnlySession("lifecycle.db") as session:
-    session.queries.revision_history("PART-0042")
-    session.queries.failure_history(instance_id="PI-001")
-    session.queries.equipment_occupancy(equipment_id="RACK-01")
-    session.queries.physical_timeline("PI-001")
+    session.knowledge.revision_lineage("PART-0042")
+    session.knowledge.revision_outcomes("PART-0042")
+    session.knowledge.equipment_position_history(
+        equipment_id="RACK-01",
+        position="LEFT",
+    )
+    session.knowledge.failure_patterns(part_id="PART-0042")
+    session.knowledge.replacement_chain("PI-001")
 ```
 
-The read-only session never repairs or writes the database. If the normalized projection is stale relative to the authoritative snapshot it fails with `LifecycleReadOnlyStaleError`; repair remains the responsibility of the writable `SQLiteLifecycleStore`.
+Queries are deterministic and factual only.
+
+They return:
+
+- revision ancestry and lineage depth;
+- per-revision manufacturing/instance/activation/failure/removal/supersession counts;
+- complete equipment/position history;
+- recurring exact failure-pattern groups;
+- explicit physical replacement chains.
+
+They do **not**:
+
+- infer an unrecorded root cause;
+- rank revisions as better/worse;
+- recommend design changes;
+- convert estimated cause into confirmed cause;
+- use AI-generated conclusions.
+
+## Integrity behavior
+
+The knowledge layer fails closed when structured facts are inconsistent, including:
+
+- cyclic revision ancestry;
+- missing revision parent;
+- cyclic replacement chain;
+- replacement link to a missing physical instance;
+- physical instance without a valid state.
+
+No new SQLite migration was needed in Pass 7 because Pass 5 already normalized all required lifecycle facts.
+
+## Read-only guarantee
+
+Engineering knowledge is exposed through the same Pass-6 `SQLiteLifecycleReadOnlySession`:
+
+```text
+SQLite URI mode=ro
+PRAGMA query_only = ON
+snapshot_version == read_model_version
+```
+
+Knowledge queries cannot mutate or repair the lifecycle database.
 
 ## Shared-contract boundary
 
@@ -140,17 +115,17 @@ Canonical `mrea.lifecycle-event.v1` remains limited to:
 - `TESTED`;
 - `FAILED`.
 
-Backup manifests, read-only session state, physical states and relational persistence details remain internal to Chat 5.
+Knowledge summaries are internal Chat 5 projections over committed facts.
 
 ## Verification
 
-Independent GitHub-hosted Chat 5 CI on Pass-6 implementation/documentation SHA `52ebc6614064c6541c65651a5af58d99bb5e65c4`:
+GitHub-hosted Chat 5 CI on implementation SHA `adca8d3dd60b2c727689c9969d4d0ba0d8178384`:
 
 ```text
-31 passed in 3.73s
+35 passed in 1.32s
 ```
 
-Canonical contract checks and Chat 4 generic CAD gate passed on the same workflow run. Final handoff is published only after the downstream `Integration / Chat 4 -> Chat 5` gate is green on the final pre-handoff state.
+Final handoff is published only after required contracts and `Integration / Chat 4 -> Chat 5` gates are green on the final pre-handoff state.
 
 ## Documentation
 
@@ -158,16 +133,16 @@ Canonical contract checks and Chat 4 generic CAD gate passed on the same workflo
 - `docs/PASS_4_PERSISTENCE_UOW.md`
 - `docs/PASS_5_RELATIONAL_READ_MODEL.md`
 - `docs/PASS_6_BACKUP_RESTORE_READ_ONLY.md`
+- `docs/PASS_7_ENGINEERING_KNOWLEDGE_QUERIES.md`
 - `docs/IMPLEMENTATION_STATE.md`
 - `ORCHESTRATOR_HANDOFF.md`
 
 ## Still intentionally out of scope
 
-- encrypted/off-host backup transport;
-- retention/rotation/scheduled backup orchestration;
-- incremental SQL projection updates instead of deterministic full rebuild per write transaction;
-- richer engineering knowledge query catalogue;
+- AI / semantic interpretation;
+- design recommendations;
+- confidence scoring for inferred conclusions;
 - REST/API;
+- large-history pagination/materialized analytical aggregates;
 - field-device synchronization;
-- AI / semantic failure analysis;
 - shared contract expansion for physical-only events.
