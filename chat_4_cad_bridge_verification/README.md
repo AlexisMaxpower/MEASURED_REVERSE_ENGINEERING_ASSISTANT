@@ -20,6 +20,24 @@ Chat 4 отвечает за вертикальный слайс `CAD Bridge & V
 
 Chat 4 не владеет capture, measurement extraction, geometry semantics, lifecycle или shared contracts и не изменяет их без решения Integrator.
 
+## Реализованный baseline
+
+Внутри Chat 4 уже есть независимый CAD-core:
+
+- immutable internal 2D CAD model;
+- deterministic SVG exporter;
+- DXF R12 exporter через `ezdxf`;
+- pure verification engine;
+- unit tests;
+- Build / Reuse Check;
+- Change Request для отсутствующих canonical CAD contracts.
+
+DXF serialization низкого уровня самостоятельно не реализуется. Используется:
+
+```text
+ezdxf==1.4.4
+```
+
 ## Технологический baseline
 
 SOLIDWORKS integration:
@@ -29,23 +47,50 @@ SOLIDWORKS integration:
 - SOLIDWORKS API;
 - COM.
 
-Generic CAD bridge должен начинаться с форматов:
+Generic CAD bridge:
 
 - SVG;
 - DXF;
-- JSON `SketchPackage` как входного контракта.
+- JSON `SketchPackage` как будущий canonical input boundary.
 
 ## Структура
 
-- `README.md` — границы рабочей области Chat 4.
-- `docs/CHAT_4_ROLE.md` — подробная документация роли, контрактов, архитектурных правил и acceptance criteria.
-- `docs/IMPLEMENTATION_STATE.md` — текущее состояние реализации, зависимости, блокеры и последовательность разработки.
+```text
+chat_4_cad_bridge_verification/
+├─ README.md
+├─ requirements.txt
+├─ src/
+│  └─ mrea_cad_bridge/
+│     ├─ model.py
+│     ├─ adapter.py
+│     ├─ verification.py
+│     └─ exporters/
+│        ├─ svg.py
+│        └─ dxf.py
+├─ tests/
+│  ├─ test_exporters.py
+│  └─ test_verification.py
+└─ docs/
+   ├─ CHAT_4_ROLE.md
+   ├─ IMPLEMENTATION_STATE.md
+   ├─ BUILD_REUSE_CHECK_CAD_CORE.md
+   └─ CHANGE_REQUEST_001_CAD_CONTRACT_BASELINE.md
+```
 
-## Текущее состояние
+## Локальная проверка
 
-На момент подключения Chat 4 в репозитории существует область Chat 1, но отсутствуют canonical shared-contract schemas/fixtures и runtime-код CAD bridge.
+```text
+pip install -r requirements.txt
+PYTHONPATH=src python -m unittest discover -s tests -v
+```
 
-Код Chat 4 пока не реализован. До интеграционной реализации необходимо получить утверждённый Integrator-ом `SketchPackage` fixture/schema и canonical `CADVerificationReport` contract. Локальные adapter abstractions и export/verification design могут разрабатываться без изменения shared contracts.
+Текущий baseline: 9 tests, `OK`.
+
+DXF test не ограничивается проверкой строк: generated DXF повторно читается через `ezdxf.read()`.
+
+## Текущий blocker
+
+Canonical shared-contract schemas/fixtures для `SketchPackage` и `CADVerificationReport` пока не опубликованы Integrator-ом. Поэтому Chat 4 намеренно не создаёт собственные shared DTO и не реализует contract boundary по догадкам.
 
 ## Главный инвариант
 

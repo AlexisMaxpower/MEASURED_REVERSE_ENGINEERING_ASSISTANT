@@ -9,23 +9,17 @@
 
 ## Current repository state
 
-Перед этой итерацией повторно проверен актуальный `main`.
-
-В корне уже присутствуют изолированные области Chat 1–5. Canonical Integrator-owned directories/contracts/fixtures по-прежнему не опубликованы. Chat 3 также зафиксировал отсутствие canonical `SketchPackage` schema/fixture и пока не реализовал runtime `SketchPackage` generation.
-
-Chat 4 продолжает работать только внутри:
+Актуальный `main` повторно проверяется перед каждой интеграцией, поскольку Chat 1/3/5 активно коммитят параллельно. Chat 4 работает только внутри:
 
 ```text
 chat_4_cad_bridge_verification/
 ```
 
-Чужие ownership-зоны и shared contracts не изменяются.
+Canonical Integrator-owned `SketchPackage` / `CADVerificationReport` schemas и fixtures пока не опубликованы. Shared contracts и чужие ownership-зоны Chat 4 не изменяет.
 
 ---
 
-## Implemented in this iteration
-
-Добавлен первый runtime CAD-core, который не требует выдумывать shared contracts.
+## Implemented
 
 ### Internal CAD model
 
@@ -39,28 +33,28 @@ chat_4_cad_bridge_verification/
 - `PolylineEntity`;
 - `CadSketch`.
 
-Свойства baseline:
+Baseline rules:
 
-- единицы: mm;
+- единицы — mm;
 - finite numeric validation;
 - positive radius validation;
-- unique `entity_id` requirement;
+- unique `entity_id`;
 - deterministic entity ordering.
 
-Это внутренний Chat 4 model, а не `SketchPackage` contract.
+Это internal Chat 4 model, а не shared `SketchPackage`.
 
-### Generic exporter interface
+### Generic exporter boundary
 
-Добавлены:
+Реализованы:
 
 - `CadArtifact`;
 - `CadExporter` protocol.
 
-Vendor-specific и format-specific implementation отделены от internal model.
+Format-specific implementation отделена от internal model.
 
 ### SVG exporter
 
-Поддерживается internal subset:
+Поддерживает:
 
 - point;
 - line;
@@ -69,21 +63,29 @@ Vendor-specific и format-specific implementation отделены от internal
 - polyline/polygon;
 - construction geometry как dashed representation.
 
-Output deterministic при одинаковом internal input.
+Одинаковый internal input создаёт deterministic SVG output.
 
 ### DXF exporter
 
-Добавлен dependency-free ASCII DXF R12 baseline для:
+Первоначальный low-level DXF writer удалён после Build / Reuse проверки. Текущий exporter использует готовую библиотеку:
 
-- POINT;
-- LINE;
-- CIRCLE;
-- ARC;
-- POLYLINE/VERTEX/SEQEND.
+```text
+ezdxf==1.4.4
+```
 
-Construction geometry помещается на отдельный `CONSTRUCTION` layer.
+Implementation:
 
-Это намеренно минимальный exporter. Chat 4 не строит собственную полноценную DXF library; при расширении scope он должен быть заменён зрелой библиотекой за тем же exporter boundary.
+- `ezdxf.addons.r12writer.r12writer`;
+- ASCII DXF R12;
+- `fixed_tables=True`;
+- `POINT`;
+- `LINE`;
+- `CIRCLE`;
+- `ARC`;
+- 2D `POLYLINE`;
+- construction geometry → `DASHED` linetype.
+
+Chat 4 пишет только mapping internal entities → public `ezdxf` API и не реализует DXF group-code serialization самостоятельно.
 
 ### Verification core
 
@@ -95,83 +97,97 @@ Construction geometry помещается на отдельный `CONSTRUCTION
 - internal `VerificationReport`;
 - `VerificationEngine`.
 
-Поддерживаемые статусы:
+Statuses:
 
 - `VERIFIED`;
 - `MISMATCH`;
 - `MISSING`;
 - `CONSTRAINT_CONFLICT`.
 
-Ключевые правила:
+Rules:
 
-- tolerance не угадывается и передаётся явно;
-- mismatch не исправляет expected value;
+- tolerance передаётся явно и не угадывается;
+- mismatch не изменяет expected value;
 - expected и actual сохраняются раздельно;
-- отсутствующий read-back даёт `MISSING`;
-- explicit constraint conflict имеет отдельный статус;
-- output сортируется по `measurement_id` для детерминизма;
+- отсутствующий read-back → `MISSING`;
+- explicit constraint conflict → `CONSTRAINT_CONFLICT`;
+- output deterministic по `measurement_id`;
 - duplicate expected `measurement_id` отклоняется.
 
 Internal report не выдаётся за shared `CADVerificationReport`.
 
 ---
 
-## Tests
+## Dependencies
 
-Добавлены standard-library `unittest` tests без внешних test dependencies.
+Локальный dependency manifest:
+
+```text
+requirements.txt
+└─ ezdxf==1.4.4
+```
+
+Отдельная test framework dependency не используется; tests построены на standard-library `unittest`.
+
+---
+
+## Tests
 
 Проверяется:
 
 - SVG determinism;
-- DXF determinism;
-- supported entity emission;
-- construction geometry representation;
+- supported SVG entities;
+- construction SVG representation;
 - duplicate entity ID rejection;
+- DXF determinism;
+- DXF structural read-back через `ezdxf.read()`;
+- ожидаемые DXF entity types;
+- `DASHED` linetype для construction polyline;
 - `VERIFIED`;
 - `MISMATCH` без silent correction;
 - `MISSING`;
 - `CONSTRAINT_CONFLICT`;
-- deterministic report order;
+- deterministic verification order;
 - duplicate `measurement_id` rejection.
 
-### Verification result
+### Local verification
 
-До записи в GitHub тот же набор source/test files был выполнен локально:
+На том же source/test наборе до публикации:
 
 ```text
 Ran 9 tests
 OK
 ```
 
-Это подтверждает pure Python core/tests. Это не подтверждает GitHub CI, canonical contract integration или работу в SOLIDWORKS.
+Проверено с `ezdxf 1.4.4`.
+
+Не проверено этим прогоном:
+
+- GitHub CI;
+- canonical contract integration;
+- AutoCAD/SOLIDWORKS application import;
+- SOLIDWORKS API/COM runtime.
 
 ---
 
 ## Build / Reuse
 
-Добавлен `BUILD_REUSE_CHECK_CAD_CORE.md`.
+`docs/BUILD_REUSE_CHECK_CAD_CORE.md` обновлён.
 
-Принятые решения baseline:
-
-- internal model — минимальный собственный domain boundary, без CAD kernel;
-- SVG — без внешней runtime dependency;
-- DXF — минимальный ASCII R12 baseline, с явным fallback на зрелую library при росте scope;
-- verification — собственная MREA domain logic поверх стандартной арифметики;
-- shared contracts не дублируются.
+Ключевое изменение: DXF теперь реализован через mature external library, а не low-level proprietary writer Chat 4. Это соответствует SSOT правилу не переписывать DXF tooling без причины.
 
 ---
 
 ## Change Request
 
-Добавлен `CHANGE_REQUEST_001_CAD_CONTRACT_BASELINE.md` для Integrator.
+`docs/CHANGE_REQUEST_001_CAD_CONTRACT_BASELINE.md` остаётся активным.
 
-Запрошены:
+Integrator должен предоставить минимум:
 
 - canonical `SketchPackage v1` schema + fixture;
 - canonical `CADVerificationReport v1` schema + fixture;
 - обязательный v1 entity subset;
-- stable ID representation;
-- dimension → `measurement_id` mapping;
+- dimension → `measurement_id` representation;
 - units policy;
 - tolerance source/policy;
 - unsupported entity/constraint policy.
@@ -181,15 +197,14 @@ OK
 ## Not implemented yet
 
 - `SketchPackage → CadSketch` boundary mapper;
-- `VerificationReport → CADVerificationReport` boundary mapper;
+- internal dimension/constraint mapping from canonical contract;
+- `VerificationReport → CADVerificationReport` mapper;
 - canonical contract tests;
 - canonical golden fixture tests;
 - CADPackage generation;
-- constraint representation in internal CAD model;
-- dimension objects in SVG/DXF artifacts;
 - SOLIDWORKS C#/.NET project;
 - SOLIDWORKS COM/API connection;
-- sketch/entity/dimension/constraint creation in SOLIDWORKS;
+- SOLIDWORKS sketch/entity/dimension/constraint creation;
 - persistent `measurement_id` mapping inside SOLIDWORKS;
 - CAD read-back adapter;
 - SOLIDWORKS integration tests;
@@ -199,42 +214,34 @@ OK
 
 ## Remaining blockers
 
-### 1. Canonical `SketchPackage v1`
+### Canonical contracts
 
-Без schema/fixture нельзя честно реализовать upstream mapper.
+Без Integrator-owned `SketchPackage` и `CADVerificationReport` нельзя корректно реализовать boundary mappers.
 
-### 2. Canonical `CADVerificationReport v1`
+### Tolerance policy
 
-Без schema/fixture internal report нельзя объявлять downstream contract.
+Core уже требует explicit tolerance, но его canonical source должен определить Integrator.
 
-### 3. Tolerance policy
+### SOLIDWORKS target environment
 
-Core поддерживает explicit tolerance, но источник tolerance должен определить Integrator/shared contract.
-
-### 4. SOLIDWORKS target environment
-
-До vendor adapter нужно подтвердить:
+Нужно определить:
 
 - target SOLIDWORKS version;
 - target .NET runtime/framework;
-- interop strategy;
+- interop package/COM strategy;
 - Windows test environment.
 
 ---
 
 ## Next implementation sequence
 
-После публикации Integrator baseline:
-
-1. прочитать canonical `SketchPackage` schema/fixture;
-2. реализовать boundary mapper `SketchPackage → CadSketch`;
-3. добавить contract tests и negative unsupported-entity tests;
-4. прочитать `CADVerificationReport` schema;
+1. получить canonical `SketchPackage` schema/fixture;
+2. реализовать `SketchPackage → CadSketch` mapper;
+3. добавить contract + unsupported entity tests;
+4. получить `CADVerificationReport` schema;
 5. реализовать downstream report mapper;
-6. прогнать golden 80.20 / 42.10 / 5.10 / 60.00 case;
-7. только после этого начинать C# SOLIDWORKS adapter spike.
-
-До canonical contracts можно независимо расширять pure exporter/verification tests, но нельзя придумывать shared DTO.
+6. прогнать golden values `80.20 / 42.10 / 5.10 / 60.00`;
+7. после contract boundary начать SOLIDWORKS C# adapter spike.
 
 ---
 
@@ -244,14 +251,15 @@ Core поддерживает explicit tolerance, но источник toleranc
 
 - internal CAD-neutral model;
 - exporter abstraction;
-- SVG baseline;
-- DXF R12 baseline;
+- deterministic SVG;
+- DXF R12 через `ezdxf`;
+- DXF parse-back unit verification;
 - pure verification core;
 - 9 unit tests;
 - Build / Reuse Check;
 - formal Change Request.
 
-Не готово для product integration:
+Не готово для full product integration:
 
 - shared contract boundaries;
 - canonical fixtures;
