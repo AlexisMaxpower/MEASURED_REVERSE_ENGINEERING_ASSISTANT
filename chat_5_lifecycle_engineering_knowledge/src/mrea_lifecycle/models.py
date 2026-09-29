@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Optional, Tuple
+from typing import Mapping, Optional, Tuple
 
 
 class LifecycleEventType(str, Enum):
@@ -26,6 +26,44 @@ class LifecycleState(str, Enum):
     FAILED = "FAILED"
 
 
+class RevisionOrigin(str, Enum):
+    """Internal provenance for how a lifecycle revision entered Chat 5."""
+
+    MANUAL = "MANUAL"
+    CAD_TRANSFER = "CAD_TRANSFER"
+
+
+class CADVerificationStatus(str, Enum):
+    """Internal snapshot of canonical CADVerificationReport.overall_status."""
+
+    VERIFIED = "VERIFIED"
+    FAILED = "FAILED"
+
+
+@dataclass(frozen=True, slots=True)
+class CADArtifactReference:
+    """Internal snapshot of a canonical ArtifactReference from CADPackage."""
+
+    artifact_id: str
+    kind: str
+    uri: str
+    media_type: Optional[str] = None
+    sha256: Optional[str] = None
+    metadata: Mapping[str, object] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class CADRevisionLink:
+    """Traceability retained when a Revision is prepared from canonical CAD output."""
+
+    cad_package_id: str
+    sketch_package_id: str
+    cad_verification_report_id: str
+    cad_adapter: str
+    verification_status: CADVerificationStatus
+    artifacts: Tuple[CADArtifactReference, ...] = ()
+
+
 @dataclass(frozen=True, slots=True)
 class Revision:
     revision_id: str
@@ -35,6 +73,8 @@ class Revision:
     parent_revision_id: Optional[str] = None
     notes: Optional[str] = None
     source_cad_artifact_id: Optional[str] = None
+    origin: RevisionOrigin = RevisionOrigin.MANUAL
+    cad_link: Optional[CADRevisionLink] = None
 
 
 @dataclass(frozen=True, slots=True)
