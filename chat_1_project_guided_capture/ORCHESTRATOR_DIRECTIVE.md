@@ -1,18 +1,24 @@
 # ORCHESTRATOR DIRECTIVE — Chat 1
 **Revision:** OD-2026-09-29-002  
+**Owner:** Chat 6
 **Pass:** 2  
-**Owner:** Chat 6  
-**Round 1 verdict:** ACCEPTED
+**Branch:** `chat-1/pass-2`
 
-Read this file before any Pass 2 implementation.
+Read before coding.
 
-## Branch policy
+## Accepted from Pass 1
+Canonical `ProjectContract v1` / `CapturePackage v1` boundary and the ChArUco calibration baseline are accepted.
 
-Pass 2 work MUST be performed on:
+## Pass 2 priority
+Produce a deterministic perspective-normalized derived reference artifact for one calibrated FRONT view.
 
-`chat-1/pass-2`
-
-Do not commit Pass 2 implementation directly to `main`.
+Requirements:
+- use existing calibration/homography;
+- do not replace the original clean-reference artifact;
+- preserve explicit source → derived provenance;
+- preserve pixel dimensions/media metadata;
+- do not invent metric truth from the warp itself;
+- keep canonical CapturePackage backward compatible unless a Change Request is approved.
 
 ## Canonical inputs
 - `core/contracts/mrea_contracts_v1.schema.json`
@@ -20,53 +26,17 @@ Do not commit Pass 2 implementation directly to `main`.
 - `tests/fixtures/contracts/project_v1.json`
 - `tests/fixtures/contracts/capture_package_v1.json`
 
-## Accepted baseline
-
-OD-001 is closed for Chat 1. Canonical Project/Capture serialization and the ChArUco calibration baseline are accepted as the Pass 1 integration baseline.
-
-Do not rewrite that baseline unless a regression requires it.
-
-## Pass 2 priority — perspective normalization
-
-Implement a deterministic derived reference image path:
-
-```text
-immutable clean reference
-+ stored IMAGE_PX → MAT_XY_MM homography
-→ deterministic perspective-normalized/rectified raster
-→ immutable derived artifact
-→ explicit source → derived provenance
-```
-
-Requirements:
-
-1. original clean reference remains immutable and retrievable;
-2. derived artifact has its own artifact identity/hash;
-3. provenance links derived artifact to source clean frame and calibration used;
-4. use the existing calibration/homography rather than inventing a second calibration model;
-5. add synthetic perspective-warp regression using known geometry;
-6. failures/invalid homography are explicit;
-7. do not fabricate a scalar calibration-quality score merely to fill `quality`.
-
-## Integration context
-
-Round 1 exposed a Chat 2 → Chat 3 coordinate-space gap. Chat 1 already publishes the required homography; therefore Chat 1 does NOT need to change the shared contract for that issue.
+## CI requirement
+Push Pass 2 work only to `chat-1/pass-2`. GitHub Actions in `.github/workflows/ci.yml` must remain green for Chat 1 and shared contract checks. Record CI status in `ORCHESTRATOR_HANDOFF.md`.
 
 ## Acceptance target
-
-Demonstrate with tests:
-
-- deterministic rectification from a synthetic perspective-distorted reference;
-- preserved original artifact;
-- explicit source/calibration provenance;
-- canonical CapturePackage remains schema-valid and backward-compatible.
+Synthetic non-identity perspective case produces a deterministic normalized image artifact, while the original evidence image remains addressable and canonical package serialization remains schema-valid.
 
 ## Do not
+- modify `core/contracts` or canonical fixtures;
+- move measurement semantics into Capture;
+- overwrite evidence images;
+- commit Pass 2 implementation directly to `main`.
 
-- edit `core/contracts` or canonical fixtures;
-- absorb measurement/geometry semantics;
-- begin voice-trigger/native-camera work before the perspective-normalization gate unless this directive is revised.
-
-## Required handoff
-
-Update `ORCHESTRATOR_HANDOFF.md` with Pass 2 branch, final SHA, exact tests executed, limitations and requested acceptance gate.
+## Handoff
+Finish Pass 2 with `ORCHESTRATOR_HANDOFF.md` per `chat_6_orchestrator/DEVELOPMENT_WORKFLOW.md`.
