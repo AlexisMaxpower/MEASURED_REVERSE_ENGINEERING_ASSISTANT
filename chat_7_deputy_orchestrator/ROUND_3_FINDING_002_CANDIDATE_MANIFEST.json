@@ -1,0 +1,62 @@
+{
+  "schema": "mrea.round3.finding002.candidate-manifest.v1",
+  "stage": 2,
+  "status": "CANDIDATE_READY_FOR_FINAL_REVIEW",
+  "finding_002_closed": false,
+  "candidate": {
+    "branch": "integration/pass-3-candidate",
+    "sha": "1c9ccb432664e57a24be8fe586bb07ad13fd5075",
+    "tree_sha": "435dda140d3980256ca32c42bd07d81b15c4328c",
+    "parent_sha": "dcdb1b7a1399415522a1a17a7979dda536f116f4",
+    "parent_count": 1,
+    "pull_request": 27
+  },
+  "ci": {
+    "workflow": "MREA CI",
+    "run_id": 36644505122,
+    "event": "push",
+    "head_sha": "1c9ccb432664e57a24be8fe586bb07ad13fd5075",
+    "conclusion": "success",
+    "required_jobs": {
+      "Contracts / canonical fixtures": "success",
+      "Chat 1 / Capture": "success",
+      "Chat 2 / Measurement": "success",
+      "Chat 3 / Geometry": "success",
+      "Chat 4 / Generic CAD gate": "success",
+      "Chat 5 / Lifecycle": "success",
+      "Integration / Chat 1 -> Chat 2": "success",
+      "Integration / Chat 2 -> Chat 3": "success",
+      "Integration / Chat 3 -> Chat 4": "success",
+      "Integration / Chat 4 -> Chat 5": "success",
+      "Integration / Round 3 golden path": "success"
+    }
+  },
+  "frozen_worker_heads": {
+    "chat_1": "55918486d49a28ac85bf83a95e9917e40add79e2",
+    "chat_2": "7311d95000d457e1010c95dbefe6ed0ad588203d",
+    "chat_3": "08e716161a8c9173b7583d6ad87c84c10ddc4221",
+    "chat_4": "08beb9c45cdc1bbbcdebe220059a64288a880095",
+    "chat_5": "cdc5baceb281b657680d1e38cc49ea8094669ad8"
+  },
+  "frozen_worker_trees": {
+    "chat_1_project_guided_capture": "8c0be3cba0fbebc9505565c2d4cabfd216e802da",
+    "chat_2_physical_measurement": "9cf8811b8565b4101ea2ecf87657882e44543243",
+    "chat_3_geometry_semi_automatic_sketch": "dee35a8f5d4781365b5613e8309ebb1f86f3d916",
+    "chat_4_cad_bridge_verification": "c19331c4d91c8069e52e04a2a213e1f13d16dcdd",
+    "chat_5_lifecycle_engineering_knowledge": "9e66264d5d19932883a34e753f320cefb8e76a8b"
+  },
+  "golden_test": {
+    "path": "tests/integration/test_round3_golden_path.py",
+    "blob_sha": "2e05dab6f2b82499b0bc23496a6e029d43d3e765"
+  },
+  "pre_merge_main_evidence": {
+    "ci_fix_sha": "dcdb1b7a1399415522a1a17a7979dda536f116f4",
+    "run_id": 36643094207,
+    "conclusion": "failure",
+    "golden_job_executed": true,
+    "failure_reason": "Round-3 golden test and accepted worker tree are absent from pre-merge main"
+  },
+  "external_gate": "REAL_SOLIDWORKS_2026_HOST_UNVERIFIED",
+  "final_review": "PENDING_CHAT_8",
+  "post_merge_main_golden": "PENDING"
+}
