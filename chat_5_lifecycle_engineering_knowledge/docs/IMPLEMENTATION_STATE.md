@@ -8,7 +8,7 @@
 - SSOT: **MREA v0.1 + orchestration addendum v0.2**
 - Pass 7 authorization: **direct user instruction; no newer Chat-5-specific directive present on `main` at branch start**
 - Base SHA: `68791080a5440c6426ef28329302c99a323344b0` (frozen Chat 5 Pass 6)
-- State: **deterministic engineering knowledge query layer implemented; final handoff pending required gates**
+- State: **deterministic engineering knowledge query layer implemented; required pre-handoff gates green; handoff published and branch ready for final freeze commit**
 
 ## Preserved baseline
 
@@ -148,7 +148,26 @@ Exact result:
 
 Status: **SUCCESS**.
 
-Required canonical contract and Chat 4 -> Chat 5 gates are rechecked on the documented pre-handoff SHA before branch freeze.
+### Pre-handoff required gates
+
+SHA:
+
+```text
+f61ec8a880624f40e1b4e6c7b5042fd9135f7195
+```
+
+Workflow run:
+
+```text
+36645177818
+```
+
+Results:
+
+- `Chat 5 / Lifecycle` — **SUCCESS**;
+- `Contracts / canonical fixtures` — **SUCCESS**;
+- `Chat 4 / Generic CAD gate` — **SUCCESS**;
+- `Integration / Chat 4 -> Chat 5` — **SUCCESS**.
 
 ## Files added in Pass 7
 
@@ -177,4 +196,4 @@ Still open:
 
 ## Handoff rule
 
-After `ORCHESTRATOR_HANDOFF.md` is updated, `chat-5/pass-7` is frozen. No later commit is allowed unless a real correction is required by final verification or Chat 6 explicitly requests it.
+`ORCHESTRATOR_HANDOFF.md` is the final worker commit after this state reconciliation. `chat-5/pass-7` is frozen after that commit. No later commit is allowed unless final verification finds a real missing/incorrect GitHub file or Chat 6 explicitly requests a correction.
