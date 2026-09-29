@@ -6,11 +6,20 @@ import sys
 from pathlib import Path
 
 import pytest
+from jsonschema import Draft202012Validator
 
 ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = ROOT.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from mrea_geometry import CanonicalInputAdapter, Circle, GeometryPipeline, Line, Point2D, SketchPackageBuilder
+from mrea_geometry import (
+    CanonicalInputAdapter,
+    Circle,
+    GeometryPipeline,
+    Line,
+    Point2D,
+    SketchPackageBuilder,
+)
 
 
 def _chat2_package() -> dict:
@@ -19,6 +28,25 @@ def _chat2_package() -> dict:
             encoding="utf-8"
         )
     )
+
+
+def _schema() -> dict:
+    return json.loads(
+        (REPO_ROOT / "core/contracts/mrea_contracts_v1.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+
+def _validate(definition: str, payload: dict) -> None:
+    schema = _schema()
+    Draft202012Validator(
+        {
+            "$schema": schema["$schema"],
+            "$defs": schema["$defs"],
+            "$ref": f"#/$defs/{definition}",
+        }
+    ).validate(payload)
 
 
 def _capture(*, homography: list[float] | None = None) -> dict:
@@ -61,12 +89,54 @@ def _scale_homography() -> list[float]:
 
 def _front_primitives() -> tuple:
     return (
-        Line("L-BOTTOM", Point2D(0.0, 0.0), Point2D(80.2, 0.0), "EDGE_BOTTOM", "GEOMETRY_DERIVED", 1.0),
-        Line("L-RIGHT", Point2D(80.2, 0.0), Point2D(80.2, 42.1), "EDGE_RIGHT", "GEOMETRY_DERIVED", 1.0),
-        Line("L-TOP", Point2D(80.2, 42.1), Point2D(0.0, 42.1), "EDGE_TOP", "GEOMETRY_DERIVED", 1.0),
-        Line("L-LEFT", Point2D(0.0, 42.1), Point2D(0.0, 0.0), "EDGE_LEFT", "GEOMETRY_DERIVED", 1.0),
-        Circle("C-HOLE-1", Point2D(10.1, 21.05), 2.55, "HOLE_1", "GEOMETRY_DERIVED", 1.0),
-        Circle("C-HOLE-2", Point2D(70.1, 21.05), 2.55, "HOLE_2", "GEOMETRY_DERIVED", 1.0),
+        Line(
+            "L-BOTTOM",
+            Point2D(0.0, 0.0),
+            Point2D(80.2, 0.0),
+            "EDGE_BOTTOM",
+            "GEOMETRY_DERIVED",
+            1.0,
+        ),
+        Line(
+            "L-RIGHT",
+            Point2D(80.2, 0.0),
+            Point2D(80.2, 42.1),
+            "EDGE_RIGHT",
+            "GEOMETRY_DERIVED",
+            1.0,
+        ),
+        Line(
+            "L-TOP",
+            Point2D(80.2, 42.1),
+            Point2D(0.0, 42.1),
+            "EDGE_TOP",
+            "GEOMETRY_DERIVED",
+            1.0,
+        ),
+        Line(
+            "L-LEFT",
+            Point2D(0.0, 42.1),
+            Point2D(0.0, 0.0),
+            "EDGE_LEFT",
+            "GEOMETRY_DERIVED",
+            1.0,
+        ),
+        Circle(
+            "C-HOLE-1",
+            Point2D(10.1, 21.05),
+            2.55,
+            "HOLE_1",
+            "GEOMETRY_DERIVED",
+            1.0,
+        ),
+        Circle(
+            "C-HOLE-2",
+            Point2D(70.1, 21.05),
+            2.55,
+            "HOLE_2",
+            "GEOMETRY_DERIVED",
+            1.0,
+        ),
     )
 
 
@@ -79,6 +149,10 @@ def _build_from_chat2(package: dict | None = None) -> tuple[dict, object]:
         draft, context, sketch_package_id="SP-IMAGEPX-001"
     )
     return sketch, context
+
+
+def test_chat2_style_specimen_is_canonical_measurement_package() -> None:
+    _validate("MeasurementPackage", _chat2_package())
 
 
 def test_image_px_anchor_is_normalized_with_non_identity_homography() -> None:
@@ -104,8 +178,9 @@ def test_image_px_anchor_is_normalized_with_non_identity_homography() -> None:
     ]
 
 
-def test_chat2_style_image_px_package_reaches_existing_geometry_pipeline() -> None:
+def test_chat2_style_image_px_package_reaches_schema_valid_sketch_package() -> None:
     sketch, _ = _build_from_chat2()
+    _validate("SketchPackage", sketch)
 
     assert sketch["schema_version"] == "mrea.sketch-package.v1"
     assert sketch["coordinate_system"] == "MAT_XY_MM"
@@ -134,9 +209,15 @@ def test_projective_homogeneous_divide_is_applied() -> None:
     context = CanonicalInputAdapter().from_packages(
         _capture(
             homography=[
-                1.0, 0.0, 0.0,
-                0.0, 1.0, 0.0,
-                0.5, 0.0, 1.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.5,
+                0.0,
+                1.0,
             ]
         ),
         package,
