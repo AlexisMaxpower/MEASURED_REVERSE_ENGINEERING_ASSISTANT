@@ -122,14 +122,14 @@ python -m pytest -q
 Result:
 
 ```text
-19 passed in 0.86s
+20 passed in 0.85s
 ```
 
 Inventory:
 
 - 6 Phase 1 geometry tests;
 - 4 canonical FRONT tests;
-- 9 Ring 2 coordinate-normalization tests.
+- 10 Ring 2 coordinate-normalization tests.
 
 Also executed:
 
@@ -149,7 +149,8 @@ Rejected explicitly:
 - wrong homography length;
 - non-finite coefficients;
 - degenerate matrix;
-- degenerate/non-finite homogeneous output;
+- zero/degenerate homogeneous divisor;
+- non-finite homogeneous output;
 - unsupported coordinate space.
 
 ## Not implemented / intentionally deferred
