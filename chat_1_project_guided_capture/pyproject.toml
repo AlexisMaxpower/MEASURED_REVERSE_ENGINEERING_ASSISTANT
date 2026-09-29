@@ -12,9 +12,15 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+vision = [
+  "numpy>=2,<3",
+  "opencv-contrib-python-headless>=4.13,<5",
+]
 test = [
   "pytest>=8,<10",
   "jsonschema>=4.23,<5",
+  "numpy>=2,<3",
+  "opencv-contrib-python-headless>=4.13,<5",
 ]
 
 [tool.setuptools.packages.find]
