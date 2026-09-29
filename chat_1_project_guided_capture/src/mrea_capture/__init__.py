@@ -1,9 +1,15 @@
 """Chat 1 domain/application baseline for MREA Project & Guided Capture."""
 
 from .artifacts import ArtifactNotFoundError, FileSystemArtifactStore
+from .calibration import (
+    CalibrationDetectionError,
+    CalibrationService,
+    OpenCvCharucoCalibrationDetector,
+)
 from .contracts import CanonicalContractBuilder, CanonicalContractError
 from .models import (
     ArtifactRecord,
+    CalibrationResult,
     CameraMetadata,
     CapturePlan,
     CapturePlanItem,
@@ -13,6 +19,7 @@ from .models import (
     CaptureViewType,
     FrameKind,
     FrameRecord,
+    MeasurementMatProfile,
     PartContext,
     Project,
     ProjectStatus,
@@ -33,6 +40,9 @@ from .services import (
 __all__ = [
     "ArtifactNotFoundError",
     "ArtifactRecord",
+    "CalibrationDetectionError",
+    "CalibrationResult",
+    "CalibrationService",
     "CameraMetadata",
     "CanonicalContractBuilder",
     "CanonicalContractError",
@@ -51,6 +61,8 @@ __all__ = [
     "FrameRecord",
     "JsonCaptureSessionRepository",
     "JsonProjectRepository",
+    "MeasurementMatProfile",
+    "OpenCvCharucoCalibrationDetector",
     "PartContext",
     "Project",
     "ProjectNotFoundError",
