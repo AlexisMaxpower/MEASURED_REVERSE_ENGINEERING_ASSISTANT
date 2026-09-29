@@ -172,3 +172,30 @@ jobs:
           python -m pip install -e "./chat_2_physical_measurement[test]" -e "./chat_3_geometry_semi_automatic_sketch[test]"
       - name: Run real Measurement -> Geometry boundary gate
         run: python -m pytest -q tests/integration/test_chat2_to_chat3_boundary.py
+
+  integration-chat4-chat5:
+    name: Integration / Chat 4 -> Chat 5
+    if: (github.event_name == 'pull_request' && startsWith(github.head_ref, 'chat-5/')) || startsWith(github.ref, 'refs/heads/chat-5/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - contracts
+      - chat4
+      - chat5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: chat_4_cad_bridge_verification/requirements-dev.txt
+      - name: Install cross-slice test environment
+        run: |
+          python -m pip install --upgrade pip pytest
+          python -m pip install -r chat_4_cad_bridge_verification/requirements-dev.txt
+      - name: Run real CAD -> Lifecycle boundary gate
+        env:
+          PYTHONPATH: chat_4_cad_bridge_verification/src:chat_5_lifecycle_engineering_knowledge/src
+        run: python -m pytest -q tests/integration/test_chat4_to_chat5_boundary.py
