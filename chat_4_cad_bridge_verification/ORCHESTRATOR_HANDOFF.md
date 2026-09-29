@@ -1,138 +1,163 @@
-# ORCHESTRATOR HANDOFF — Chat 4
+# ORCHESTRATOR HANDOFF — Chat 4 / Pass 2
 
 **From:** Chat 4 — CAD Bridge & Verification  
 **To:** Chat 6 — Orchestrator / Repository Integrator  
-**Directive completed against:** `OD-2026-09-29-001`  
+**Directive completed against:** `OD-2026-09-29-002`  
+**Pass:** 2  
+**Branch:** `chat-4/pass-2`  
+**Implementation SHA:** `3e60683785302644e3b74b69e6fb4d39a150806c`  
 **Date:** 2026-09-29
 
 ## Status
 
-`READY_FOR_INTEGRATOR_GENERIC_CAD_GATE`
+`READY_FOR_INTEGRATOR_SOLIDWORKS_AGENT_GATE`
 
-## Directive target
-
-Complete the pure CAD verification/generic-export boundary before the SOLIDWORKS-specific stage:
-
-```text
-canonical SketchPackage
-→ internal CAD representation
-→ SVG / DXF
-→ vendor-neutral CadAdapter boundary
-→ normalized CAD read-back
-→ VerificationEngine
-→ canonical CADPackage
-→ canonical CADVerificationReport
-```
-
-Golden fixture target:
-
-- four `VERIFIED` numerical-transfer results;
-- explicit negative coverage for `MISMATCH` and `MISSING`;
-- no silent correction of verified physical values.
+Real SOLIDWORKS host status: **UNVERIFIED**.
 
 ## Delivered
 
-- canonical `SketchPackage v1` mapper;
-- mandatory v1 entity support: `POINT`, `LINE`, `CIRCLE`, `ARC`;
-- internal CAD model with deterministic ordering;
-- deterministic SVG exporter;
-- DXF R12 exporter via `ezdxf` with parse-back validation;
-- canonical `CADPackage v1` builder;
-- pure `VerificationEngine` using canonical `dimension_id` identity;
-- canonical `CADVerificationReport v1` builder;
-- statuses `VERIFIED`, `MISMATCH`, `MISSING`, `CONSTRAINT_CONFLICT`;
-- vendor-neutral `CadAdapter` / `CadAdapterResult` / normalized read-back boundary;
-- explicit `dimension_id ↔ measurement_id ↔ vendor_dimension_ref` traceability;
-- deterministic `TestDoubleCadAdapter`;
-- full canonical TEST_DOUBLE pipeline;
-- adapter identity, unknown binding, `measurement_id` traceability and unit-drift guards;
-- Build/Reuse documentation for generic CAD core and adapter boundary.
+```text
+canonical SketchPackage v1
+→ existing MappedSketchPackage
+→ SolidWorksAgentAdapter (Python)
+→ mrea.solidworks-agent.v1 process request
+→ C# .NET Framework 4.8 x64 STA CAD Agent
+→ SOLIDWORKS 2026 COM/API
+→ normalized bindings + read-back + native artifact
+→ existing CadAdapterResult
+→ existing VerificationEngine
+→ canonical CADPackage + CADVerificationReport
+```
 
-## Canonical inputs consumed
+Added:
 
-- `core/contracts/mrea_contracts_v1.schema.json`;
-- `core/contracts/POLICIES_V1.md`;
-- `tests/fixtures/contracts/sketch_package_v1.json`;
-- `tests/fixtures/contracts/cad_package_v1.json`.
+- production Python `SolidWorksAgentAdapter`;
+- out-of-process subprocess runner with timeout/error handling;
+- unresolved/unsupported preflight before COM;
+- C# `Mrea.SolidWorksCadAgent` project targeting .NET Framework 4.8 / x64;
+- `[STAThread]` one-shot worker;
+- attach-to-running / launch-if-allowed SOLIDWORKS path;
+- new part creation using explicit or configured part template;
+- localization-independent FRONT-plane selection using reference-plane transforms;
+- LINE/CIRCLE creation using canonical mm → SOLIDWORKS meters conversion;
+- DISTANCE/DIAMETER/RADIUS dimension paths, including circle-center distance;
+- canonical `dimension_id` / nullable `measurement_id` preservation and vendor dimension ref;
+- SOLIDWORKS system-value read-back normalized to canonical units;
+- native `.SLDPRT` SaveAs and SHA-256 artifact metadata;
+- Windows build script and real-host golden runner;
+- Build/Reuse, smoke-test and Pass 2 implementation documentation.
 
-Canonical output checked against:
-
-- `tests/fixtures/contracts/cad_verification_v1.json`.
+## Shared contracts / ownership
 
 No shared contract was modified by Chat 4.
 
-## Verification evidence
+The branch already contained Chat 6-owned CI additions before the implementation commit:
 
-Repository test inventory after hardening:
+- `.github/workflows/ci.yml`;
+- `tests/contracts/test_canonical_fixtures.py`.
 
-- exporter tests: 3;
-- verification tests: 6;
-- canonical contract tests: 5;
-- adapter/pipeline tests: 9;
-- total: **23 tests**.
+Chat 4 preserved them and did not edit them.
 
-Recorded execution evidence:
+## Safety / no-silent-approximation gates
+
+Before vendor execution the Python adapter rejects:
+
+- any non-empty canonical constraints in the current Pass 2 slice;
+- verified-dimension relevant `unresolved.entity_ids`;
+- verified-dimension relevant `unresolved.measurement_ids`;
+- real-worker geometry outside LINE/CIRCLE;
+- verified dimension types outside DISTANCE/DIAMETER/RADIUS;
+- verified units outside mm.
+
+Agent/protocol failures remain adapter failures; they are never converted into `VERIFIED`.
+
+## Exact executed verification
+
+Executed in the ChatGPT Linux sandbox against the Pass 2 staging content:
 
 ```text
-previous clean repository baseline: 14 tests — OK
-reconstructed harness: exporters + verification + 9 adapter/pipeline tests = 18 tests — OK
+PYTHONPATH=src python -m unittest \
+  tests/test_exporters.py \
+  tests/test_verification.py \
+  tests/test_adapter_pipeline.py \
+  tests/test_solidworks_agent.py -v
+
+Ran 27 tests
+OK
 ```
 
-A fresh clean-checkout execution of all 23 tests remains an Integrator verification item because the ChatGPT execution container could not clone GitHub through outbound DNS. This limitation is explicitly documented; no unexecuted suite is represented as passed.
+Breakdown:
 
-Real SOLIDWORKS API/COM runtime has not yet been tested.
+- exporter: 3;
+- verification: 6;
+- existing adapter/pipeline: 9;
+- new SOLIDWORKS-agent pure boundary: 9.
 
-## Important invariants for Integrator review
+Also checked:
 
-1. `dimension_id` is the primary CAD verification identity.
-2. nullable `measurement_id` is preserved as traceability and cannot silently drift.
-3. CAD read-back is normalized to canonical `mm` / `deg` before numerical comparison.
-4. transfer tolerance is canonical `1e-6 mm` / `1e-6 deg` and is not manufacturing tolerance.
-5. mismatch never rewrites the verified physical value.
-6. adapter/read-back failures are not converted into verification success.
+- Python source/test/smoke-runner syntax with `py_compile` / AST;
+- `.csproj` XML parsing;
+- balanced C# structural delimiters.
+
+Not executed in this sandbox:
+
+- the 5 schema contract tests (shared schema was not materialized in the local staging checkout; Pass 2 does not alter them or the shared schema);
+- C# compilation (no MSBuild/.NET Framework/SOLIDWORKS interop toolchain on this Linux host);
+- any real SOLIDWORKS COM call;
+- native `.SLDPRT` generation/read-back.
+
+Therefore neither C# compilation nor real-host transfer is claimed as PASS.
+
+## Repository test inventory after Pass 2 code
+
+Chat 4 test inventory: **32 tests** = previous 23 + 9 SOLIDWORKS-agent tests.
+
+Chat 6 additionally placed repository-level canonical/cross-slice CI gates on this pass branch.
+
+## Real-host acceptance command
+
+On the ADR-001 host (Windows 11 x64 + SOLIDWORKS 2026 x64):
+
+```powershell
+cd chat_4_cad_bridge_verification
+.\scripts\build_solidworks_agent.ps1 -SolidWorksInstallDir "C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS"
+.\scripts\run_solidworks_golden.ps1 `
+  -Agent ".\solidworks_agent\bin\Release\Mrea.SolidWorksCadAgent.exe" `
+  -OutputDir ".\artifacts\solidworks-golden"
+```
+
+Acceptance requires the runner to print:
+
+```text
+REAL_HOST_RESULT=VERIFIED
+```
+
+with all four canonical dimensions VERIFIED and a native `.SLDPRT` artifact.
+
+Until that happens the vendor runtime gate is **UNVERIFIED**, never PASS.
+
+## Known Pass 2 limitations
+
+- real worker slice currently supports LINE/CIRCLE only;
+- canonical constraints are not yet translated to SOLIDWORKS sketch relations;
+- ANGLE is not in the first real-host slice;
+- POINT/ARC are supported by generic Chat 4 representation/export but not yet by this real worker;
+- vendor constraint-conflict extraction from SOLIDWORKS solver remains future work;
+- automated Windows/SOLIDWORKS CI host is not established.
 
 ## Change Requests
 
-### Closed
+- CR-001: CLOSED;
+- CR-002: RESOLVED by `ADR_001_SOLIDWORKS_2026_CAD_AGENT.md`;
+- no new shared-contract Change Request.
 
-`docs/CHANGE_REQUEST_001_CAD_CONTRACT_BASELINE.md`
+## Acceptance requested from Chat 6
 
-Canonical contracts, fixtures and policies are now published.
+1. review Pass 2 branch diff and ownership;
+2. run repository/canonical CI gates;
+3. run the full Chat 4 suite from a complete checkout;
+4. keep real-host gate UNVERIFIED until Windows/SOLIDWORKS golden succeeds;
+5. evaluate C# worker/API design against ADR-001;
+6. if structurally accepted, issue the next directive for real-host validation and/or POINT/ARC/constraints expansion.
 
-### Open
-
-`docs/CHANGE_REQUEST_002_SOLIDWORKS_ENVIRONMENT.md`
-
-Chat 4 requests a canonical decision for:
-
-- supported SOLIDWORKS version/range;
-- Windows target;
-- x64/process architecture;
-- .NET target;
-- SOLIDWORKS interop reference strategy;
-- COM apartment/threading policy;
-- adapter process/service topology;
-- Windows/SOLIDWORKS integration-test host;
-- release-gate behavior when SOLIDWORKS is unavailable;
-- native CAD artifact storage/registration boundary.
-
-No shared-contract change is requested by CR-002.
-
-## Integrator gate requested
-
-Please verify:
-
-1. `OD-2026-09-29-001` generic Chat 4 acceptance target is satisfied;
-2. golden `SketchPackage → TEST_DOUBLE → CADVerificationReport` is acceptable;
-3. no shared-contract/ownership violation exists;
-4. run the full 23-test Chat 4 suite in a repository checkout with dependencies installed;
-5. accept or amend `CHANGE_REQUEST_002_SOLIDWORKS_ENVIRONMENT.md`;
-6. if accepted, update Orchestration State / Slice Status and publish the next Chat 4 directive for the SOLIDWORKS adapter stage.
-
-## Detailed state
-
-- `README.md`
-- `docs/IMPLEMENTATION_STATE.md`
-- `docs/IMPLEMENTATION_REPORT_CANONICAL_CAD_BOUNDARY_2026-09-29.md`
-- `docs/BUILD_REUSE_CHECK_CAD_CORE.md`
-- `docs/BUILD_REUSE_CHECK_ADAPTER_BOUNDARY.md`
+The commit containing this handoff is metadata-only after the implementation SHA above; review branch head for the handoff commit itself.

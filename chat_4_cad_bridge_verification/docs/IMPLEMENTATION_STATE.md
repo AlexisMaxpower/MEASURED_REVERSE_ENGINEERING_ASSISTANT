@@ -4,7 +4,8 @@
 **Repository:** `AlexisMaxpower/MEASURED_REVERSE_ENGINEERING_ASSISTANT`  
 **Role:** Chat 4 — CAD Bridge & Verification  
 **Canonical baseline:** `mrea.contracts.v1`  
-**Orchestrator directive:** `OD-2026-09-29-001`
+**Orchestrator directive:** `OD-2026-09-29-002`  
+**Pass 2 branch:** `chat-4/pass-2`
 
 ## Source of truth
 
@@ -115,54 +116,77 @@ Repository test inventory after adapter-boundary hardening:
 - verification tests: 6;
 - canonical contract tests: 5;
 - adapter/pipeline tests: 9;
-- total: **23**.
+- SOLIDWORKS-agent boundary tests: 9;
+- total: **32**.
 
 Verification evidence:
 
 - previous repository baseline: `14 tests — OK`;
 - first adapter/pipeline set: `6 tests — OK` in reconstructed local harness;
-- hardened reconstructed harness covering exporters + verification + 9 adapter/pipeline tests: `18 tests — OK`.
+- hardened reconstructed harness covering exporters + verification + 9 adapter/pipeline tests: `18 tests — OK`;
+- Pass 2 harness covering exporters + verification + existing adapter/pipeline + 9 SOLIDWORKS-agent tests: `27 tests — OK`.
 
-The 5 schema contract tests were not re-executed in the current container because outbound GitHub DNS is unavailable and a clean checkout cannot be materialized there. Those tests and shared contract files are unchanged by the hardening patch. A fresh full 23-test checkout run remains an integration verification item.
+The 5 schema contract tests were not re-executed in the current container because outbound GitHub DNS is unavailable and a clean checkout cannot be materialized there. Those tests and shared contract files are unchanged by the hardening patch. A fresh full 32-test checkout run remains an Integrator verification item.
 
 Real SOLIDWORKS API/COM runtime is not yet verified.
+
+## Pass 2 — SOLIDWORKS 2026 CAD Agent
+
+ADR-001 resolves the vendor environment baseline:
+
+- Windows 11 x64;
+- SOLIDWORKS 2026 x64;
+- C# / .NET Framework 4.8;
+- x64 out-of-process user-session agent;
+- `[STAThread]` COM context;
+- local official SOLIDWORKS interop references;
+- no proprietary binaries committed.
+
+Implemented slice-local production path:
+
+- `SolidWorksAgentConfig`;
+- `SubprocessSolidWorksAgentRunner`;
+- `SolidWorksAgentAdapter`;
+- protocol `mrea.solidworks-agent.v1`;
+- preflight for unresolved verified geometry/measurements;
+- explicit rejection of unsupported constraints/entities/units/dimension types;
+- C# agent project under `solidworks_agent/`;
+- attach/launch SOLIDWORKS;
+- create a part and FRONT sketch;
+- LINE/CIRCLE creation in SOLIDWORKS system units;
+- DISTANCE/DIAMETER/RADIUS dimension creation path;
+- `dimension_id ↔ measurement_id ↔ vendor_dimension_ref` bindings;
+- read-back to canonical mm;
+- `.SLDPRT` save + SHA-256 ArtifactReference-compatible data;
+- build and real-host golden scripts.
+
+### Real-host status
+
+**UNVERIFIED.** The current execution environment is Linux and has neither MSBuild/.NET Framework tooling nor SOLIDWORKS 2026 COM/interop runtime. C# files therefore have not been represented as compiled or COM-tested. Python AST, csproj XML, and pure adapter boundary behavior were checked.
 
 ## Build / Reuse
 
 - `BUILD_REUSE_CHECK_CAD_CORE.md`;
-- `BUILD_REUSE_CHECK_ADAPTER_BOUNDARY.md`.
+- `BUILD_REUSE_CHECK_ADAPTER_BOUNDARY.md`;
+- `BUILD_REUSE_CHECK_SOLIDWORKS_AGENT.md`.
 
-TEST_DOUBLE is test infrastructure only. No custom CAD kernel or custom COM wrapper is being invented.
+Official SOLIDWORKS API/interop is reused; no CAD kernel, COM replacement, proprietary DLL copy, or second artifact-storage system is introduced.
 
 ## Change requests
 
 - `CHANGE_REQUEST_001_CAD_CONTRACT_BASELINE.md` — resolved;
-- `CHANGE_REQUEST_002_SOLIDWORKS_ENVIRONMENT.md` — open.
+- `CHANGE_REQUEST_002_SOLIDWORKS_ENVIRONMENT.md` — resolved by ADR-001;
+- no new shared-contract Change Request in Pass 2.
 
-`CHANGE_REQUEST_002` asks Chat 6 to publish the canonical SOLIDWORKS/.NET/Windows/interop/test-host baseline. No shared contract change is requested.
+## Remaining after Pass 2
 
-## Not implemented yet
+- real Windows 11 + SOLIDWORKS 2026 build/smoke/golden execution;
+- POINT/ARC mapping in real vendor worker;
+- ANGLE dimension mapping;
+- canonical constraint → SOLIDWORKS relation mapping and conflict extraction;
+- broader vendor capability reporting;
+- Windows-hosted automated integration gate.
 
-- artifact persistence/registry integration;
-- canonical artifact URI production;
-- SOLIDWORKS C#/.NET project;
-- SOLIDWORKS COM/API connection;
-- native sketch/entity/dimension/constraint creation;
-- native persistent mapping for `dimension_id` / `measurement_id`;
-- real SOLIDWORKS read-back;
-- SOLIDWORKS integration tests;
-- Windows/SOLIDWORKS CI/test host.
+## Next acceptance action
 
-## External SOLIDWORKS research
-
-Official SOLIDWORKS 2026 documentation confirms that the SOLIDWORKS API is COM-based and supports C#, and that the API SDK provides a Visual C# add-in template. Official installation documentation also lists .NET Framework 4.8.1 as a SOLIDWORKS 2026 prerequisite on supported Windows systems. These facts inform `CHANGE_REQUEST_002`, but do not override Chat 6's authority to choose the repository target environment.
-
-## Next action
-
-1. merge adapter-boundary hardening;
-2. wait for / detect an updated Chat 6 directive resolving `CHANGE_REQUEST_002`;
-3. once resolved, create the C# SOLIDWORKS adapter project behind the existing normalized boundary;
-4. implement canonical POINT/LINE/CIRCLE/ARC creation;
-5. implement dimension naming/binding and read-back;
-6. verify the same four golden dimensions through real SOLIDWORKS;
-7. add constraints and Windows-hosted integration tests.
+Chat 6 should review branch `chat-4/pass-2`, rerun ordinary tests from a complete checkout, and classify the vendor runtime as `UNVERIFIED` until `scripts/run_solidworks_golden.ps1` returns `REAL_HOST_RESULT=VERIFIED` on the supported host.
