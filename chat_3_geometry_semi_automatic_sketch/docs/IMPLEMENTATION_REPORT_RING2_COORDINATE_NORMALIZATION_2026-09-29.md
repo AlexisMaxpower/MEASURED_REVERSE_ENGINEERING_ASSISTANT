@@ -64,11 +64,12 @@ Chat-2-style IMAGE_PX MeasurementPackage
 3. `feature_id = null` coordinate fallback;
 4. schema-valid downstream `SketchPackage`;
 5. projective case с `w != 1` и homogeneous divide;
-6. wrong reference frame rejection;
-7. missing calibration rejection;
-8. degenerate homography rejection;
-9. MAT_XY_MM pass-through без calibration lookup;
-10. deterministic output при изменении порядка anchors.
+6. explicit rejection zero homogeneous divisor;
+7. wrong reference frame rejection;
+8. missing calibration rejection;
+9. degenerate homography rejection;
+10. MAT_XY_MM pass-through без calibration lookup;
+11. deterministic output при изменении порядка anchors.
 
 ## Runtime verification
 
@@ -84,14 +85,14 @@ python -m pytest -q
 Результат:
 
 ```text
-19 passed in 0.86s
+20 passed in 0.85s
 ```
 
 Полный suite включает:
 
 - 6 Phase 1 geometry-core tests;
 - 4 existing canonical FRONT tests;
-- 9 Ring 2 coordinate-normalization tests.
+- 10 Ring 2 coordinate-normalization tests.
 
 Также выполнялось:
 
