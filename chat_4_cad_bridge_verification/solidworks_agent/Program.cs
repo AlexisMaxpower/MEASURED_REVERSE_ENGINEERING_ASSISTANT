@@ -22,6 +22,7 @@ namespace Mrea.SolidWorksCadAgent
                 var serializer = NewSerializer();
                 var request = serializer.Deserialize<AgentRequest>(File.ReadAllText(requestPath, Encoding.UTF8));
                 ValidateRequestEnvelope(request);
+                SolidWorksTransfer.ValidateRequest(request);
 
                 AgentResponse response;
                 using (var session = SolidWorksSession.Open(request))
@@ -111,6 +112,7 @@ namespace Mrea.SolidWorksCadAgent
             if (string.IsNullOrWhiteSpace(request.output_directory))
                 throw new InvalidDataException("output_directory is required.");
             request.entities = request.entities ?? new List<EntitySpec>();
+            request.constraints = request.constraints ?? new List<ConstraintSpec>();
             request.dimensions = request.dimensions ?? new List<DimensionSpec>();
         }
 
