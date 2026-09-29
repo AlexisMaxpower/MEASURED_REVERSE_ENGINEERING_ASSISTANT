@@ -46,9 +46,13 @@ namespace Mrea.SolidWorksCadAgent
         public string protocol_version { get; set; }
         public string status { get; set; }
         public string adapter_name { get; set; }
+        public bool real_host_executed { get; set; }
+        public string solidworks_version { get; set; }
+        public int exit_code { get; set; }
         public List<DimensionBindingDto> bindings { get; set; }
         public ReadBackDto read_back { get; set; }
         public List<ArtifactDto> artifacts { get; set; }
+        public List<DiagnosticDto> diagnostics { get; set; }
         public ErrorDto error { get; set; }
     }
 
@@ -82,9 +86,22 @@ namespace Mrea.SolidWorksCadAgent
         public Dictionary<string, object> metadata { get; set; }
     }
 
+    internal sealed class DiagnosticDto
+    {
+        public string code { get; set; }
+        public string stage { get; set; }
+        public string message { get; set; }
+        public string severity { get; set; }
+        public Dictionary<string, object> details { get; set; }
+    }
+
     internal sealed class ErrorDto
     {
         public string type { get; set; }
+        public string code { get; set; }
+        public string stage { get; set; }
         public string message { get; set; }
+        public string severity { get; set; }
+        public Dictionary<string, object> details { get; set; }
     }
 }
