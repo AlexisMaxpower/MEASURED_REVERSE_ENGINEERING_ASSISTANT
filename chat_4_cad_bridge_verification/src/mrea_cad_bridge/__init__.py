@@ -26,6 +26,14 @@ from .runtime_evidence import (
     parse_runtime_diagnostic,
     require_host_ready,
 )
+from .runtime_receipt import (
+    RUNTIME_RECEIPT_SCHEMA,
+    CadRuntimeReceiptError,
+    build_runtime_receipt_v1,
+    canonical_json_bytes,
+    sha256_json,
+    verify_runtime_receipt_v1,
+)
 from .runtime_validation import (
     SOLIDWORKS_2026_REVISION_MAJOR,
     CadRuntimeValidationExecution,
@@ -78,6 +86,7 @@ __all__ = [
     "CadReadBack",
     "CadReadBackDimension",
     "CadRuntimeEvidenceError",
+    "CadRuntimeReceiptError",
     "CadRuntimeValidationExecution",
     "CadSketch",
     "CadTransferExecution",
@@ -98,6 +107,7 @@ __all__ = [
     "PointEntity",
     "PolylineEntity",
     "RUNTIME_EVIDENCE_SCHEMA",
+    "RUNTIME_RECEIPT_SCHEMA",
     "ReadinessCheckStatus",
     "RuntimeDiagnostic",
     "RuntimeEvidenceStatus",
@@ -120,8 +130,10 @@ __all__ = [
     "build_cad_package_v1",
     "build_cad_verification_report_v1",
     "build_runtime_evidence",
+    "build_runtime_receipt_v1",
     "build_solidworks_agent_request",
     "build_solidworks_runtime_evidence_from_inputs_v1",
+    "canonical_json_bytes",
     "evaluate_solidworks_runtime_inputs_v1",
     "execute_cad_runtime_validation_v1",
     "execute_cad_transfer_v1",
@@ -131,4 +143,6 @@ __all__ = [
     "parse_solidworks_agent_response",
     "parse_solidworks_runtime_inputs_v1",
     "require_host_ready",
+    "sha256_json",
+    "verify_runtime_receipt_v1",
 ]
