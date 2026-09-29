@@ -17,10 +17,15 @@ class SketchPackageBuilder:
         sketch_package_id: str,
     ) -> dict:
         entities = self._ordered_entities(draft)
-        dimensions = sorted(
-            (self._dimension(item, draft) for item in draft.dimensions),
-            key=self._dimension_sort_key,
+        dimension_records = [
+            (self._dimension(item, draft), item.measurement_type)
+            for item in draft.dimensions
+        ]
+        dimension_records.sort(
+            key=lambda pair: self._dimension_sort_key(pair[0], pair[1])
         )
+        dimensions = [item for item, _ in dimension_records]
+
         unresolved = [
             {
                 "unresolved_id": f"U-{item.measurement_id}",
@@ -67,7 +72,10 @@ class SketchPackageBuilder:
 
         ordered: list = []
         if lines:
-            midpoints = [((item.start.x + item.end.x) / 2, (item.start.y + item.end.y) / 2) for item in lines]
+            midpoints = [
+                ((item.start.x + item.end.x) / 2, (item.start.y + item.end.y) / 2)
+                for item in lines
+            ]
             center_x = sum(value[0] for value in midpoints) / len(midpoints)
             center_y = sum(value[1] for value in midpoints) / len(midpoints)
 
@@ -78,7 +86,9 @@ class SketchPackageBuilder:
                 return phase, line.entity_id
 
             ordered.extend(sorted(lines, key=contour_key))
-        ordered.extend(sorted(circles, key=lambda item: (item.center.x, item.center.y, item.entity_id)))
+        ordered.extend(
+            sorted(circles, key=lambda item: (item.center.x, item.center.y, item.entity_id))
+        )
         ordered.extend(
             sorted(
                 arcs,
@@ -92,7 +102,9 @@ class SketchPackageBuilder:
                 ),
             )
         )
-        ordered.extend(sorted(points, key=lambda item: (item.point.x, item.point.y, item.entity_id)))
+        ordered.extend(
+            sorted(points, key=lambda item: (item.point.x, item.point.y, item.entity_id))
+        )
         return [self._entity(item) for item in ordered]
 
     @staticmethod
@@ -129,7 +141,6 @@ class SketchPackageBuilder:
             "entity_ids": list(self._canonical_dimension_entities(item, draft)),
             "verified": item.verified,
             "provenance": item.source,
-            "_measurement_type": item.measurement_type,
         }
 
     @staticmethod
@@ -169,9 +180,13 @@ class SketchPackageBuilder:
         return item.target_entity_ids
 
     @staticmethod
-    def _dimension_sort_key(item: dict) -> tuple[int, int, str]:
-        measurement_type = item.pop("_measurement_type")
-        if measurement_type in {"LINEAR_EXTERNAL", "LINEAR_INTERNAL", "THICKNESS", "SLOT_WIDTH"}:
+    def _dimension_sort_key(item: dict, measurement_type: str) -> tuple[int, int, str]:
+        if measurement_type in {
+            "LINEAR_EXTERNAL",
+            "LINEAR_INTERNAL",
+            "THICKNESS",
+            "SLOT_WIDTH",
+        }:
             entity_id = item["entity_ids"][0] if item["entity_ids"] else ""
             orientation = 0 if "BOTTOM" in entity_id or "TOP" in entity_id else 1
             return 10, orientation, item["dimension_id"]
