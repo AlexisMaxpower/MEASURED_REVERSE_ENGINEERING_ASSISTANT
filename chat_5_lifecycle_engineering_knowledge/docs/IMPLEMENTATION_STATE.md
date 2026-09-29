@@ -2,205 +2,264 @@
 
 ## Snapshot
 
-- Date: **2026-09-29**
-- Branch: `chat-5/pass-4`
+- Date: **2026-09-30**
+- Branch: `chat-5/pass-5`
 - Slice: **Lifecycle & Engineering Knowledge**
 - SSOT: **MREA v0.1 + orchestration addendum v0.2**
-- Pass 4 authorization: **direct user instruction; no OD-004 present in GitHub at branch start**
-- Base SHA: `cdc5baceb281b657680d1e38cc49ea8094669ad8` (frozen Chat 5 Pass 3)
-- State: **durable persistence + Unit of Work implemented; final handoff pending downstream gate**
+- Pass 5 authorization: **direct user instruction; no newer Chat-5-specific directive present on `main` at branch start**
+- Base SHA: `81a3c1c63e03fbabbd0da1c8191c5ca7ea13cb01` (frozen Chat 5 Pass 4)
+- State: **normalized relational read model + migration framework + SQL-native queries implemented; handoff pending final CI freeze**
 
 ## Preserved baseline
 
-Still active:
+Still active and unchanged:
 
 - Revision / Manufacturing / Installation / Test / Failure domain;
-- CAD-linked Revision preparation;
-- CAD verification manufacturing eligibility gate;
+- canonical CADPackage + CADVerificationReport transfer;
+- VERIFIED manufacturing eligibility gate;
 - canonical `LifecycleEvent v1` adapter;
-- physical part identity/state machine;
+- physical-instance state machine;
+- exact instance/evidence linkage;
 - equipment/position occupancy protection;
-- exact failure evidence linkage;
-- removal/replacement/supersession semantics.
+- removal/replacement/supersession semantics;
+- `LifecycleRepository` + `LifecycleUnitOfWork`;
+- authoritative `mrea.lifecycle-snapshot.v1` SQLite snapshot;
+- nested rollback and stale-writer protection.
 
-No shared MREA contract or canonical fixture was changed.
+No shared contract, canonical fixture, CI workflow, integration test, or other chat-owned file was changed.
 
-## Pass 4 additions
+## Pass 5 additions
 
-### Repository port
+### Relational schema migration framework
 
-Added internal `LifecycleRepository` protocol for the lifecycle aggregate.
+Added:
 
-It exposes the existing revision/manufacturing/test/failure/canonical-event and physical-instance/event collections plus a transaction boundary.
+- `SQLiteSchemaMigration`;
+- `SQLiteSchemaManager`;
+- ordered `SQLITE_MIGRATIONS`;
+- migration journal `lifecycle_schema_migrations`;
+- relational schema version `2`.
 
-### Unit of Work
+The first migration creates the normalized lifecycle read model and indexes.
 
-Added `LifecycleUnitOfWork`.
+Opening an already migrated database is idempotent.
 
-It reuses existing services and provides one outer transaction spanning:
+### Backward-compatible Pass 4 migration
 
-- revision creation;
-- CAD revision preparation;
-- manufacturing;
-- installation;
-- test;
-- failure;
-- physical instance transitions.
+Pass 4 database state remains authoritative and is not rewritten simply because Pass 5 introduces normalized tables.
 
-This allows canonical and physical writes to succeed or roll back together.
-
-### In-memory transaction semantics
-
-`InMemoryLifecycleStore` now has:
-
-- nested transaction depth;
-- outer state snapshot;
-- rollback of all collections;
-- rollback of canonical and physical sequence counters;
-- rollback-only behavior after nested failure;
-- overridable begin/commit/rollback hooks for durable repositories.
-
-Existing non-transactional in-memory callers remain backward compatible.
-
-### SQLite durable store
-
-Added `SQLiteLifecycleStore` using only Python stdlib `sqlite3`.
-
-Durable snapshot schema:
+Open path:
 
 ```text
-mrea.lifecycle-snapshot.v1
+ensure legacy lifecycle_store exists
+→ apply missing relational migrations
+→ load authoritative snapshot
+→ compare snapshot version with read-model version
+→ backfill normalized tables only when versions differ
 ```
 
-SQLite table:
+A manually created Pass-4-format database with snapshot version `4` is verified to open under Pass 5 with:
 
 ```text
-lifecycle_store(
-    singleton,
-    schema_version,
-    version,
-    payload
-)
+loaded_version = 4
+read_model_version = 4
+relational_schema_version = 2
 ```
 
-The complete current lifecycle aggregate is committed as one deterministic JSON snapshot so revision-level canonical history and physical-instance history share one atomic persistence boundary.
+The snapshot remains:
 
-Persisted data includes:
+```text
+schema_version = mrea.lifecycle-snapshot.v1
+version = 4
+```
 
-- Revision and CAD linkage;
-- CAD artifact metadata;
-- ManufacturingRecord including Decimal cost;
-- Installation/Test/Failure records;
-- canonical LifecycleEvent sequence;
-- PhysicalPartInstance;
-- physical lifecycle events and test outcomes;
-- replacement identity.
+### Normalized relational read model
 
-### Optimistic concurrency
+Added tables:
 
-Each SQLite repository tracks `loaded_version`.
+- `lifecycle_revisions`;
+- `lifecycle_cad_artifacts`;
+- `lifecycle_manufacturing`;
+- `lifecycle_physical_instances`;
+- `lifecycle_installations`;
+- `lifecycle_tests`;
+- `lifecycle_test_artifacts`;
+- `lifecycle_failures`;
+- `lifecycle_failure_evidence`;
+- `lifecycle_events_relational`;
+- `lifecycle_physical_events_relational`;
+- `lifecycle_read_model_meta`.
 
-Writer begin sequence:
+The schema uses indexes for part, revision, verification status, manufacturing, equipment/position, instance history and event timelines.
+
+The read model preserves existing domain semantics rather than adding new ones. In particular, multiple physical instances may reference the same manufacturing record.
+
+### Atomic projection update
+
+Pass 5 durable commit path:
 
 ```text
 BEGIN IMMEDIATE
-→ read DB version
-→ require DB version == loaded_version
+→ stale-writer check
+→ update authoritative lifecycle_store snapshot
+→ rebuild normalized relational projection
+→ set lifecycle_read_model_meta.snapshot_version
+→ COMMIT
 ```
 
-A stale writer receives `LifecycleConcurrencyError` and must `reload()` before continuing.
+If relational projection generation fails:
 
-This prevents silent overwrite of a newer lifecycle snapshot.
+- snapshot update rolls back;
+- normalized tables roll back;
+- read-model version metadata rolls back;
+- in-memory Unit-of-Work state rolls back.
 
-### Transaction-required durable writes
+### Read-model version and repair
 
-SQLite mutation outside `LifecycleUnitOfWork.transaction()` raises `LifecycleTransactionRequiredError`.
+`read_model_version` is explicit and must represent the same committed version as `loaded_version` after a successful commit.
 
-If a legacy service already staged an in-memory mapping mutation before event append, the durable store reloads the last committed state before raising. Therefore the unsafe mutation does not remain visible or survive reopen.
-
-## Independent verification
-
-GitHub workflow run on implementation SHA `5a529bfbe4f51e0632d0d5d76b342a66d38d299d`:
-
-### Chat 5 / Lifecycle
+On reopen, a stale or deliberately damaged projection is repaired from the authoritative snapshot whenever:
 
 ```text
-20 passed in 0.17s
+read_model_version != snapshot version
+```
+
+This makes relational data reconstructible rather than an independent source of truth.
+
+### SQL-native query repository
+
+`SQLiteLifecycleQueryRepository` exposes committed-state SQL queries.
+
+#### `revision_history(part_id)`
+
+Returns deterministic `RevisionQueryResult` rows ordered by creation time and revision ID.
+
+#### `failure_history(revision_id=..., instance_id=...)`
+
+Returns deterministic `FailureQueryResult` rows and joins installation context to expose equipment/position where available.
+
+#### `equipment_occupancy(equipment_id=..., position=...)`
+
+Derives the latest physical event per instance directly in SQL.
+
+Occupying event/state semantics:
+
+```text
+INSTALLED
+TESTED
+ACTIVATED -> ACTIVE
+FAILED
+```
+
+`REMOVED` and `SUPERSEDED` are not occupying.
+
+A failed instance therefore remains visible as equipment occupancy until explicit removal, matching the Pass 3 domain projection.
+
+#### `physical_timeline(instance_id)`
+
+Returns deterministic physical event rows ordered by explicit sequence.
+
+## Build / Reuse
+
+No third-party dependency was added.
+
+Reused:
+
+- Python stdlib `sqlite3`;
+- Pass 4 snapshot serializer/deserializer;
+- Pass 4 Unit of Work;
+- Pass 4 stale-writer guard;
+- existing lifecycle and physical domain services.
+
+Not introduced:
+
+- ORM;
+- external migration package;
+- external DB driver;
+- REST framework;
+- AI layer;
+- shared contract amendment.
+
+## Verification
+
+### New tests
+
+`tests/test_relational_persistence.py` verifies:
+
+1. migration from manually constructed Pass-4-format database;
+2. snapshot version/schema preserved during relational migration;
+3. normalized backfill;
+4. migration idempotence on reopen;
+5. SQL-native revision history;
+6. SQL-native physical timeline;
+7. ACTIVE equipment occupancy;
+8. failure history with equipment/position context;
+9. FAILED remains occupying;
+10. REMOVED releases occupancy;
+11. snapshot/read-model version equality;
+12. forced read-model failure rolls back snapshot + relational state;
+13. reopen repairs stale/damaged projection;
+14. multiple physical instances may share one manufacturing record.
+
+### GitHub-hosted Chat 5 suite
+
+Implementation SHA:
+
+```text
+fc1402132092379c94e59332c2d14bfa1e7a367a
+```
+
+Exact result:
+
+```text
+25 passed in 1.09s
 ```
 
 Status: **SUCCESS**.
 
-### Contracts / canonical fixtures
+### Canonical contracts
+
+Same workflow run:
+
+```text
+Contracts / canonical fixtures
+```
 
 Status: **SUCCESS**.
 
-### Chat 4 generic prerequisite
+### Cross-slice boundary
 
-Status: **SUCCESS**.
+`Integration / Chat 4 -> Chat 5` remains the required final downstream gate before handoff freeze.
 
-### Integration / Chat 4 -> Chat 5
+## Files added in Pass 5
 
-Final handoff waits for this downstream job to complete on the Pass-4 implementation/documentation head.
+- `src/mrea_lifecycle/sqlite_schema.py`;
+- `src/mrea_lifecycle/relational.py`;
+- `tests/test_relational_persistence.py`;
+- `docs/PASS_5_RELATIONAL_READ_MODEL.md`.
 
-## New tests
+## Files modified in Pass 5
 
-`tests/test_persistence_uow.py` adds deterministic coverage for:
-
-1. VERIFIED CAD revision durable round-trip;
-2. CAD artifact metadata retention;
-3. Decimal manufacturing cost retention;
-4. physical instance/install/test/ACTIVE durable round-trip;
-5. unchanged canonical LifecycleEvent v1 after reload;
-6. forced failure between canonical and physical writes rolls both back;
-7. failed transaction does not advance durable version;
-8. stale writer rejection;
-9. reload then successful continuation;
-10. direct SQLite mutation outside Unit of Work rejected and discarded;
-11. in-memory transaction rollback.
-
-## Files added in Pass 4
-
-- `src/mrea_lifecycle/repository.py`;
-- `src/mrea_lifecycle/unit_of_work.py`;
 - `src/mrea_lifecycle/persistence.py`;
-- `tests/test_persistence_uow.py`;
-- `docs/PASS_4_PERSISTENCE_UOW.md`.
-
-## Files modified in Pass 4
-
-- `src/mrea_lifecycle/store.py`;
 - `src/mrea_lifecycle/__init__.py`;
 - `README.md`;
 - `docs/IMPLEMENTATION_STATE.md`;
 - `ORCHESTRATOR_HANDOFF.md` at final freeze.
 
-## Build / Reuse
-
-No third-party dependency was introduced.
-
-Reused:
-
-- Python `sqlite3`;
-- all existing Chat 5 domain models;
-- existing lifecycle services;
-- physical state machine;
-- canonical lifecycle adapter.
-
 ## Known limitations
 
-Not implemented yet:
+Still open:
 
-- normalized/query-optimized relational model;
-- explicit migration framework;
-- repository-native query API;
-- automatic long-lived reader refresh;
+- incremental read-model updates instead of full deterministic rebuild per successful writer transaction;
+- larger engineering knowledge query catalogue;
+- dedicated read-only connection/process strategy;
+- backup/restore tooling;
 - REST/API;
-- database backup/restore tooling;
 - field-device synchronization;
-- AI / semantic engineering knowledge analysis.
+- AI / semantic failure analysis.
 
-`LifecycleUnitOfWork` currently adapts the pre-existing services structurally while their constructor type annotations still name `InMemoryLifecycleStore`. Runtime behavior is repository-compatible; a future cleanup can migrate those annotations to the protocol without changing behavior.
+The current full projection rebuild is intentionally correctness-first. It keeps a single authoritative write image and allows later optimization without changing lifecycle contracts.
 
 ## Handoff rule
 
-After `ORCHESTRATOR_HANDOFF.md` is updated, `chat-5/pass-4` is frozen. No later commit is allowed unless Chat 6 explicitly requests a correction.
+After `ORCHESTRATOR_HANDOFF.md` is updated, `chat-5/pass-5` is frozen. No later commit is allowed unless Chat 6 explicitly requests a correction.
