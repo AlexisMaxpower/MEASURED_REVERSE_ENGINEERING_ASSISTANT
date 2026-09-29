@@ -19,7 +19,7 @@ from mrea_lifecycle import (
     PhysicalTestOutcome,
     Revision,
     RevisionService,
-    TestRecord,
+    TestRecord as LifecycleTestRecord,
 )
 
 
@@ -107,7 +107,7 @@ def test_physical_instance_full_lifecycle_failure_removal_and_replacement() -> N
     assert states.for_instance("PI-001") is PhysicalPartState.INSTALLED
 
     lifecycle.test(
-        TestRecord(
+        LifecycleTestRecord(
             test_id="T1",
             revision_id="R1",
             manufacturing_id="M1",
@@ -206,7 +206,7 @@ def test_physical_instance_full_lifecycle_failure_removal_and_replacement() -> N
         physical_event_id="PH-I2",
     )
     lifecycle.test(
-        TestRecord(
+        LifecycleTestRecord(
             test_id="T2",
             revision_id="R2",
             manufacturing_id="M2",
@@ -305,7 +305,7 @@ def test_invalid_physical_transitions_and_occupied_position_are_rejected() -> No
     )
 
     lifecycle.test(
-        TestRecord(
+        LifecycleTestRecord(
             test_id="T1",
             revision_id="R1",
             manufacturing_id="M1",
