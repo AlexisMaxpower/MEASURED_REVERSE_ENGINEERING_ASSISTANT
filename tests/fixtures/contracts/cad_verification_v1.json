@@ -1,0 +1,14 @@
+{
+  "schema_version":"mrea.cad-verification.v1",
+  "report_id":"VR-GOLDEN-001",
+  "cad_package_id":"CAD-GOLDEN-001",
+  "sketch_package_id":"SP-GOLDEN-001",
+  "policy":{"kind":"NUMERICAL_TRANSFER","default_length_tolerance_mm":0.000001,"default_angle_tolerance_deg":0.000001},
+  "items":[
+    {"dimension_id":"D-WIDTH","measurement_id":"M-WIDTH","expected":80.2,"actual":80.2,"unit":"mm","tolerance":0.000001,"difference":0.0,"status":"VERIFIED"},
+    {"dimension_id":"D-HEIGHT","measurement_id":"M-HEIGHT","expected":42.1,"actual":42.1,"unit":"mm","tolerance":0.000001,"difference":0.0,"status":"VERIFIED"},
+    {"dimension_id":"D-HOLE","measurement_id":"M-HOLE","expected":5.1,"actual":5.1,"unit":"mm","tolerance":0.000001,"difference":0.0,"status":"VERIFIED"},
+    {"dimension_id":"D-CENTER","measurement_id":"M-CENTER","expected":60.0,"actual":60.0,"unit":"mm","tolerance":0.000001,"difference":0.0,"status":"VERIFIED"}
+  ],
+  "overall_status":"VERIFIED"
+}
