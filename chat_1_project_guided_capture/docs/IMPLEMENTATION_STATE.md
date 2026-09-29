@@ -2,9 +2,11 @@
 
 **Date:** 2026-09-29  
 **Role:** Chat 1 — Project & Guided Capture  
-**Current pass:** 2  
+**Current product pass:** 2  
+**Current coordination pass:** 3 (CI / acceptance closure only)  
 **Directive:** `OD-2026-09-29-002`  
-**Working branch:** `chat-1/pass-2`
+**Working branch:** `chat-1/pass-2`  
+**Review PR:** `#16`
 
 ## Source-of-truth order
 
@@ -75,10 +77,12 @@ No shared contract change.
 
 ## Verification
 
-Latest full local Chat 1 regression:
+### Local
+
+Latest full local Chat 1 regression on exact branch-equivalent bytes:
 
 ```text
-16 passed in 1.17s
+16 passed in 1.13s
 ```
 
 Pass 2 synthetic perspective test verifies:
@@ -95,6 +99,31 @@ Pass 2 synthetic perspective test verifies:
 - singular homography explicit failure;
 - stable legacy calibration-ID backfill.
 
+### GitHub Actions / PR integration
+
+PR `#16` (`chat-1/pass-2 -> main`) has successful MREA CI evidence.
+
+Successful workflow run:
+
+- run ID: `36610773229`;
+- run number: `28`;
+- conclusion: `success`;
+- branch/PR head checked by the run: `b1cabe7627bba984319ac40c942b1d13b424cce9`.
+
+Successful executable jobs:
+
+- Contracts / canonical fixtures;
+- Chat 1 / Capture;
+- Chat 2 / Measurement;
+- Chat 3 / Geometry;
+- Chat 4 / Generic CAD gate;
+- Chat 5 / Lifecycle;
+- Integration / Chat 2 -> Chat 3.
+
+`Integration / Chat 4 -> Chat 5` was skipped by workflow condition because this is a Chat 1 PR; this is expected, not a failure.
+
+Earlier red runs on the evolving branch are superseded by successful run `36610773229`.
+
 ## Current limitations
 
 - no real printed-mat accuracy validation;
@@ -103,7 +132,7 @@ Pass 2 synthetic perspective test verifies:
 - rectified artifact is internal until/if Chat 6 creates a canonical exposure path;
 - no rectified-reference replacement/versioning policy;
 - no Guided Quality implementation yet;
-- native/mobile runtime and CI are not verified.
+- native/mobile runtime is not verified.
 
 ## Integration readiness
 
@@ -114,6 +143,7 @@ Ready for Chat 6 Pass 2 acceptance review:
 - explicit source/calibration provenance;
 - source evidence preservation;
 - canonical backward compatibility;
-- full local regression passing.
+- full local regression passing;
+- PR-level GitHub Actions green.
 
-Next work must follow the next Chat 6 directive after Pass 2 acceptance.
+No new product functionality is started in coordination Pass 3 because `OD-003` has not yet been issued. Next product work must follow the next Chat 6 directive after Pass 2 acceptance.
