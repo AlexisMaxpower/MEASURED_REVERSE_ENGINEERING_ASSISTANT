@@ -1,32 +1,42 @@
 # ORCHESTRATOR DIRECTIVE — Chat 5
-**Revision:** OD-2026-09-29-002  
-**Owner:** Chat 6
-**Pass:** 2  
-**Branch:** `chat-5/pass-2`
+**Revision:** OD-2026-09-29-003  
+**Owner:** Chat 6  
+**Pass:** 3  
+**Branch:** `chat-5/pass-3`
 
-## Accepted from Pass 1
-Canonical thin `LifecycleEvent v1` adapter and internal revision/manufacturing/install/failure baseline are accepted. Pass-1 process defect: no `ORCHESTRATOR_HANDOFF.md` was published.
+## Accepted baseline
+Pass 2 is `ACCEPTED`. CAD verification now controls manufacturing eligibility and the real `Chat 4 -> Chat 5` integration gate is green on accepted `main`.
 
-## Pass 2 priority
-Link CAD verification outcome to lifecycle/manufacturing eligibility without importing CAD vendor details into the lifecycle domain.
+## Pass 3 priority
+Extend lifecycle to the **physical manufactured part instance** and its real-world use.
 
 Required:
-- define a slice-local input adapter/policy consuming canonical CAD verification result;
-- verified CAD transfer may permit revision/manufacturing progression;
-- FAILED/MISMATCH/MISSING/CONSTRAINT_CONFLICT must not silently permit manufacturing eligibility;
-- preserve lifecycle evidence and event ordering;
-- keep the shared `LifecycleEvent v1` thin and unchanged unless a Change Request is approved;
-- add explicit tests for accepted and rejected verification states.
+- introduce physical part instance identity tied to revision and manufacturing record;
+- deterministic lifecycle transitions for manufactured, installed, tested, active/in-service, failed, removed and replaced/superseded where appropriate;
+- installation must identify equipment/position or equivalent location context;
+- preserve failure evidence and relationship to the exact physical instance and revision;
+- explicitly reject invalid transitions;
+- keep CAD verification/manufacturing eligibility invariant intact;
+- add deterministic state-transition and timeline tests;
+- keep facts structured; no AI analysis in this pass.
 
-## CI requirement
-Push Pass 2 only to `chat-5/pass-2`. GitHub-hosted Chat 5 tests must remain green. As the Chat 4 → Chat 5 boundary becomes executable, a repository-level integration test will be added by Chat 6 or by explicit directive. Record CI status in `ORCHESTRATOR_HANDOFF.md`.
+## Canonical integration gates
+Your pass must keep green:
+- `Chat 5 / Lifecycle`;
+- `Integration / Chat 4 -> Chat 5`;
+- shared contract checks.
 
 ## Do not
 - import SOLIDWORKS-specific types;
-- edit shared contracts directly;
-- treat a failed CAD verification as manufacturable;
-- add AI before structured lifecycle/eligibility behavior is stable;
-- commit Pass 2 implementation directly to `main`.
+- bypass failed/unverified CAD eligibility;
+- add AI conclusions before physical lifecycle facts are stable;
+- modify Chat-6-owned CI/shared integration tests;
+- change canonical shared contracts without approved CR;
+- commit directly to `main`.
 
-## Mandatory handoff
-Finish Pass 2 with `ORCHESTRATOR_HANDOFF.md` per `chat_6_orchestrator/DEVELOPMENT_WORKFLOW.md`.
+## Process
+Work only in `chat-5/pass-3`.
+
+Finish with `ORCHESTRATOR_HANDOFF.md`. **Handoff freezes the branch.** No post-handoff commits until Chat 6 explicitly returns `FIX_REQUIRED`.
+
+See `chat_6_orchestrator/PASS_3_PLAN_2026-09-29.md` and `DEVELOPMENT_WORKFLOW.md`.
