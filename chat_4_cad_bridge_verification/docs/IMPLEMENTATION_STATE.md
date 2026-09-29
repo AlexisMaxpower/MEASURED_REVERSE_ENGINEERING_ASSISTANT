@@ -9,289 +9,252 @@
 
 ## Current repository state
 
-При подключении Chat 4 в `main` уже существовала изолированная область Chat 1:
+Перед этой итерацией повторно проверен актуальный `main`.
 
-```text
-chat_1_project_guided_capture/
-```
+В корне уже присутствуют изолированные области Chat 1–5. Canonical Integrator-owned directories/contracts/fixtures по-прежнему не опубликованы. Chat 3 также зафиксировал отсутствие canonical `SketchPackage` schema/fixture и пока не реализовал runtime `SketchPackage` generation.
 
-Canonical shared-contract directories/schemas, application runtime и CAD implementation в корне репозитория на момент проверки отсутствовали.
-
-Создана изолированная область Chat 4:
+Chat 4 продолжает работать только внутри:
 
 ```text
 chat_4_cad_bridge_verification/
-├─ README.md
-└─ docs/
-   ├─ CHAT_4_ROLE.md
-   └─ IMPLEMENTATION_STATE.md
 ```
 
-Никакие файлы Chat 1, shared contracts или чужие ownership-модули не изменялись.
+Чужие ownership-зоны и shared contracts не изменяются.
 
 ---
 
-## Implemented
+## Implemented in this iteration
 
-На текущей итерации реализована только организационная и документационная часть:
+Добавлен первый runtime CAD-core, который не требует выдумывать shared contracts.
 
-- repository access verified;
-- write access verified;
-- актуальная структура `main` проверена перед изменениями;
-- область Chat 4 изолирована в собственной директории;
-- ownership и non-ownership границы зафиксированы;
-- upstream/downstream contracts перечислены;
-- CAD bridge stages документированы;
-- verification statuses документированы;
-- главный no-silent-correction invariant зафиксирован;
-- SOLIDWORKS baseline зафиксирован;
-- test strategy документирована;
-- dependency/blocker state относительно Integrator зафиксирован;
-- implementation sequence определена без создания вымышленных runtime-файлов.
+### Internal CAD model
+
+Реализованы immutable internal entities:
+
+- `Point2D`;
+- `PointEntity`;
+- `LineEntity`;
+- `CircleEntity`;
+- `ArcEntity`;
+- `PolylineEntity`;
+- `CadSketch`.
+
+Свойства baseline:
+
+- единицы: mm;
+- finite numeric validation;
+- positive radius validation;
+- unique `entity_id` requirement;
+- deterministic entity ordering.
+
+Это внутренний Chat 4 model, а не `SketchPackage` contract.
+
+### Generic exporter interface
+
+Добавлены:
+
+- `CadArtifact`;
+- `CadExporter` protocol.
+
+Vendor-specific и format-specific implementation отделены от internal model.
+
+### SVG exporter
+
+Поддерживается internal subset:
+
+- point;
+- line;
+- circle;
+- arc;
+- polyline/polygon;
+- construction geometry как dashed representation.
+
+Output deterministic при одинаковом internal input.
+
+### DXF exporter
+
+Добавлен dependency-free ASCII DXF R12 baseline для:
+
+- POINT;
+- LINE;
+- CIRCLE;
+- ARC;
+- POLYLINE/VERTEX/SEQEND.
+
+Construction geometry помещается на отдельный `CONSTRUCTION` layer.
+
+Это намеренно минимальный exporter. Chat 4 не строит собственную полноценную DXF library; при расширении scope он должен быть заменён зрелой библиотекой за тем же exporter boundary.
+
+### Verification core
+
+Реализованы:
+
+- `VerificationStatus`;
+- `ExpectedDimension`;
+- `DimensionVerification`;
+- internal `VerificationReport`;
+- `VerificationEngine`.
+
+Поддерживаемые статусы:
+
+- `VERIFIED`;
+- `MISMATCH`;
+- `MISSING`;
+- `CONSTRAINT_CONFLICT`.
+
+Ключевые правила:
+
+- tolerance не угадывается и передаётся явно;
+- mismatch не исправляет expected value;
+- expected и actual сохраняются раздельно;
+- отсутствующий read-back даёт `MISSING`;
+- explicit constraint conflict имеет отдельный статус;
+- output сортируется по `measurement_id` для детерминизма;
+- duplicate expected `measurement_id` отклоняется.
+
+Internal report не выдаётся за shared `CADVerificationReport`.
+
+---
+
+## Tests
+
+Добавлены standard-library `unittest` tests без внешних test dependencies.
+
+Проверяется:
+
+- SVG determinism;
+- DXF determinism;
+- supported entity emission;
+- construction geometry representation;
+- duplicate entity ID rejection;
+- `VERIFIED`;
+- `MISMATCH` без silent correction;
+- `MISSING`;
+- `CONSTRAINT_CONFLICT`;
+- deterministic report order;
+- duplicate `measurement_id` rejection.
+
+### Verification result
+
+До записи в GitHub тот же набор source/test files был выполнен локально:
+
+```text
+Ran 9 tests
+OK
+```
+
+Это подтверждает pure Python core/tests. Это не подтверждает GitHub CI, canonical contract integration или работу в SOLIDWORKS.
+
+---
+
+## Build / Reuse
+
+Добавлен `BUILD_REUSE_CHECK_CAD_CORE.md`.
+
+Принятые решения baseline:
+
+- internal model — минимальный собственный domain boundary, без CAD kernel;
+- SVG — без внешней runtime dependency;
+- DXF — минимальный ASCII R12 baseline, с явным fallback на зрелую library при росте scope;
+- verification — собственная MREA domain logic поверх стандартной арифметики;
+- shared contracts не дублируются.
+
+---
+
+## Change Request
+
+Добавлен `CHANGE_REQUEST_001_CAD_CONTRACT_BASELINE.md` для Integrator.
+
+Запрошены:
+
+- canonical `SketchPackage v1` schema + fixture;
+- canonical `CADVerificationReport v1` schema + fixture;
+- обязательный v1 entity subset;
+- stable ID representation;
+- dimension → `measurement_id` mapping;
+- units policy;
+- tolerance source/policy;
+- unsupported entity/constraint policy.
 
 ---
 
 ## Not implemented yet
 
-Пока отсутствуют:
-
-- runtime source code;
-- SVG exporter;
-- DXF exporter;
-- normalized CAD model/read-back model;
-- verification engine;
-- verification report builder;
-- CAD adapter interface;
+- `SketchPackage → CadSketch` boundary mapper;
+- `VerificationReport → CADVerificationReport` boundary mapper;
+- canonical contract tests;
+- canonical golden fixture tests;
+- CADPackage generation;
+- constraint representation in internal CAD model;
+- dimension objects in SVG/DXF artifacts;
 - SOLIDWORKS C#/.NET project;
 - SOLIDWORKS COM/API connection;
-- sketch creation;
-- entity creation;
-- dimension creation;
-- constraint creation;
-- `measurement_id` mapping implementation;
-- CAD read-back implementation;
-- unit tests;
-- contract tests;
-- golden tests;
+- sketch/entity/dimension/constraint creation in SOLIDWORKS;
+- persistent `measurement_id` mapping inside SOLIDWORKS;
+- CAD read-back adapter;
 - SOLIDWORKS integration tests;
-- CI configuration for CAD tests.
+- Windows/SOLIDWORKS CI strategy.
 
 ---
 
-## Contracts status
+## Remaining blockers
 
-Required shared contracts from SSOT:
+### 1. Canonical `SketchPackage v1`
 
-- `SketchPackage` — canonical repository schema not present;
-- `CADPackage` — canonical repository schema not present;
-- `CADVerificationReport` — canonical repository schema not present;
-- `ArtifactReference` — canonical repository schema not present, если потребуется Chat 4 artifact registration.
+Без schema/fixture нельзя честно реализовать upstream mapper.
 
-Expected fixtures named by SSOT:
+### 2. Canonical `CADVerificationReport v1`
 
-- `sketch_package_v1.json` — not present;
-- `cad_verification_v1.json` — not present.
+Без schema/fixture internal report нельзя объявлять downstream contract.
 
-Chat 4 не будет создавать canonical shared contracts самостоятельно.
+### 3. Tolerance policy
 
----
+Core поддерживает explicit tolerance, но источник tolerance должен определить Integrator/shared contract.
 
-## Current blockers
+### 4. SOLIDWORKS target environment
 
-### Blocker 1 — canonical SketchPackage v1
+До vendor adapter нужно подтвердить:
 
-Нельзя объявить integration-ready exporter/adapter, пока отсутствует утверждённый upstream schema/fixture.
-
-Можно независимо разработать generic abstractions и pure verification model, но окончательные DTO/contracts должны быть привязаны к Integrator-owned schema.
-
-### Blocker 2 — CADVerificationReport v1
-
-SSOT определяет обязательный выход, но canonical repository schema сейчас отсутствует.
-
-Chat 4 может определить внутреннюю verification model, но не должен выдавать её за shared contract до решения Integrator.
-
-### Blocker 3 — tolerance/units policy
-
-Для статуса `VERIFIED` требуется формальная политика сравнения expected и actual values.
-
-Если tolerance не хранится в upstream dimension/measurement contract и не определён отдельной политикой Integrator, потребуется Change Request до финальной contract implementation.
-
-### Blocker 4 — supported v1 geometry subset
-
-Для generic export и SOLIDWORKS adapter нужно подтвердить, какие `SketchPackage` entities/constraints/dimensions обязательны в v1.
-
-SSOT перечисляет более широкий набор возможных entities/constraints, но repository schema, ограничивающая первый release subset, пока отсутствует.
+- target SOLIDWORKS version;
+- target .NET runtime/framework;
+- interop strategy;
+- Windows test environment.
 
 ---
 
-## Planned implementation sequence
-
-### Phase 1 — Repository/contract reconnaissance
+## Next implementation sequence
 
 После публикации Integrator baseline:
 
-- прочитать actual repository architecture;
-- прочитать canonical `SketchPackage` schema;
-- прочитать fixtures;
-- проверить ownership paths;
-- проверить существующие language/build conventions;
-- не создавать параллельную архитектуру, если она уже определена.
+1. прочитать canonical `SketchPackage` schema/fixture;
+2. реализовать boundary mapper `SketchPackage → CadSketch`;
+3. добавить contract tests и negative unsupported-entity tests;
+4. прочитать `CADVerificationReport` schema;
+5. реализовать downstream report mapper;
+6. прогнать golden 80.20 / 42.10 / 5.10 / 60.00 case;
+7. только после этого начинать C# SOLIDWORKS adapter spike.
 
-### Phase 2 — Verification core
-
-Реализовать pure logic до vendor-specific integration:
-
-```text
-Expected verified dimensions
-→ normalized expected model
-
-CAD read-back
-→ normalized actual model
-
-expected + actual
-→ comparison
-→ VERIFIED / MISMATCH / MISSING / CONSTRAINT_CONFLICT
-→ verification report
-```
-
-Цель — максимальная тестируемость без SOLIDWORKS runtime.
-
-### Phase 3 — Generic SVG/DXF bridge
-
-- supported entity mapping;
-- unit/coordinate normalization;
-- deterministic export;
-- golden fixtures;
-- unsupported-input diagnostics.
-
-### Phase 4 — CAD adapter abstraction
-
-- adapter capability model;
-- create/import operation;
-- normalized errors;
-- read-back operation;
-- measurement mapping;
-- separation of vendor API and verification logic.
-
-### Phase 5 — SOLIDWORKS adapter
-
-- C#/.NET project aligned with repository conventions;
-- COM/API connection;
-- create sketch;
-- create supported entities;
-- create supported dimensions;
-- create supported constraints;
-- preserve `measurement_id` mapping;
-- read back actual sketch/dimension values.
-
-### Phase 6 — CAD verification integration
-
-Golden cases:
-
-```text
-80.20 → 80.200 VERIFIED
-42.10 → 42.100 VERIFIED
-5.10  → 5.100 VERIFIED
-60.00 → 60.000 VERIFIED
-```
-
-Negative cases:
-
-- actual value differs → `MISMATCH`;
-- dimension absent → `MISSING`;
-- constraint solver conflict → `CONSTRAINT_CONFLICT`.
-
-### Phase 7 — Documentation and integration handoff
-
-- implementation report;
-- dependencies;
-- verification evidence;
-- known limitations;
-- Change Requests;
-- integration readiness.
-
----
-
-## Build / Reuse checks required before implementation
-
-Отдельный Build / Reuse Check потребуется минимум для:
-
-1. DXF library;
-2. SVG generation library/approach;
-3. SOLIDWORKS interop strategy;
-4. COM wrapper/interop package strategy;
-5. numeric/tolerance handling if external units library рассматривается;
-6. test isolation strategy for SOLIDWORKS-dependent integration tests.
-
-Для каждой зависимости нужно проверить:
-
-- license;
-- maintenance state;
-- compatibility with target runtime;
-- Windows/SOLIDWORKS version support;
-- deterministic behavior where relevant;
-- lock-in risk;
-- fallback.
-
----
-
-## Verification performed
-
-Verified:
-
-- repository `AlexisMaxpower/MEASURED_REVERSE_ENGINEERING_ASSISTANT` доступен;
-- authenticated GitHub connection имеет push/admin permissions;
-- default branch — `main`;
-- до изменений в корне присутствовала область Chat 1;
-- область Chat 4 до этой итерации отсутствовала;
-- shared contract schemas/fixtures в видимой root structure не опубликованы;
-- Chat 4 README создан;
-- Chat 4 role documentation создана;
-- Chat 4 implementation-state documentation создана.
-
-Not verified yet:
-
-- actual project build/runtime, поскольку кода нет;
-- C#/.NET target version;
-- installed/target SOLIDWORKS version;
-- SOLIDWORKS API compatibility;
-- DXF/SVG dependencies;
-- exact tolerance policy;
-- actual `SketchPackage` validation;
-- CAD artifact generation;
-- CAD read-back;
-- unit tests;
-- integration tests;
-- end-to-end golden flow.
+До canonical contracts можно независимо расширять pure exporter/verification tests, но нельзя придумывать shared DTO.
 
 ---
 
 ## Integration readiness
 
-Ready for Integrator review:
+Готово для Integrator review:
 
-- Chat 4 ownership directory;
-- role documentation;
-- initial dependency/blocker analysis;
-- planned vertical-slice sequence.
+- internal CAD-neutral model;
+- exporter abstraction;
+- SVG baseline;
+- DXF R12 baseline;
+- pure verification core;
+- 9 unit tests;
+- Build / Reuse Check;
+- formal Change Request.
 
-Not ready for product integration:
+Не готово для product integration:
 
-- all runtime CAD functionality;
-- all contract-producing functionality;
-- all CAD verification execution.
-
----
-
-## Next required input
-
-Для безопасного перехода от документации к коду нужен актуальный Integrator baseline в repository:
-
-- repository architecture;
-- canonical `SketchPackage` schema + fixture;
-- canonical `CADVerificationReport` schema + fixture;
-- supported v1 CAD entity/constraint subset;
-- units/tolerance policy;
-- target SOLIDWORKS/.NET environment.
-
-Если часть этих данных не будет опубликована, Chat 4 должен оформить формальный Change Request вместо локального изобретения shared contract.
+- shared contract boundaries;
+- canonical fixtures;
+- SOLIDWORKS adapter;
+- CAD read-back;
+- end-to-end CAD verification.
