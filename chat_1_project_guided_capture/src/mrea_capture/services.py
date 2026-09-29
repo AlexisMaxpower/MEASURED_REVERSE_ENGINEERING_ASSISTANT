@@ -4,17 +4,27 @@ from collections.abc import Iterable
 from datetime import datetime
 from uuid import UUID
 
+from .artifacts import ArtifactStore
 from .models import (
+    CameraMetadata,
     CapturePlan,
     CapturePlanItem,
     CaptureSession,
     CaptureViewProgress,
+    CaptureViewStatus,
     CaptureViewType,
+    FrameKind,
+    FrameRecord,
     PartContext,
     Project,
+    ProjectStatus,
     utc_now,
 )
-from .repositories import ProjectRepository
+from .repositories import CaptureSessionRepository, ProjectRepository
+
+
+class CaptureWorkflowError(RuntimeError):
+    pass
 
 
 class ProjectService:
@@ -31,19 +41,14 @@ class ProjectService:
 
     def archive_project(self, project_id: UUID, *, now: datetime | None = None) -> Project:
         project = self._repository.get(project_id)
-        project.status = "ARCHIVED"
+        project.status = ProjectStatus.ARCHIVED
         project.updated_at = now or utc_now()
         self._repository.save(project)
         return project
 
 
 class CapturePlanService:
-    """Build deterministic local capture plans.
-
-    FRONT is the only implicit baseline view because SSOT explicitly requires the
-    FRONT view to be completable. Extra views must be requested explicitly until
-    Integrator/product policy defines a canonical recommendation strategy.
-    """
+    """Build deterministic local capture plans."""
 
     _RATIONALE = {
         CaptureViewType.FRONT: "Baseline orthographic reference required by Chat 1 acceptance criteria.",
@@ -85,9 +90,142 @@ class CapturePlanService:
         ]
         return CapturePlan(project_id=project.project_id, items=items)
 
-    def start_session(self, plan: CapturePlan) -> CaptureSession:
-        return CaptureSession(
+
+class CaptureSessionService:
+    def __init__(
+        self,
+        repository: CaptureSessionRepository,
+        artifact_store: ArtifactStore,
+    ) -> None:
+        self._repository = repository
+        self._artifact_store = artifact_store
+
+    def start(self, plan: CapturePlan) -> CaptureSession:
+        session = CaptureSession(
             project_id=plan.project_id,
             plan_id=plan.plan_id,
-            views=[CaptureViewProgress(view=item.view) for item in plan.items],
+            views=[
+                CaptureViewProgress(view=item.view, required=item.required)
+                for item in plan.items
+            ],
         )
+        self._repository.save(session)
+        return session
+
+    def get(self, session_id: UUID) -> CaptureSession:
+        return self._repository.get(session_id)
+
+    def capture_clean_reference(
+        self,
+        session_id: UUID,
+        *,
+        view: CaptureViewType,
+        image_bytes: bytes,
+        camera: CameraMetadata,
+        captured_at: datetime | None = None,
+        media_type: str = "image/jpeg",
+        extension: str = ".jpg",
+    ) -> FrameRecord:
+        session = self._repository.get(session_id)
+        progress = self._progress_for(session, view)
+        if any(frame.view is view and frame.kind is FrameKind.CLEAN_REFERENCE for frame in session.frames):
+            raise CaptureWorkflowError(f"clean reference already exists for view {view}")
+
+        artifact = self._artifact_store.put_bytes(
+            image_bytes,
+            media_type=media_type,
+            extension=extension,
+        )
+        timestamp = captured_at or utc_now()
+        frame = FrameRecord(
+            project_id=session.project_id,
+            session_id=session.session_id,
+            view=view,
+            kind=FrameKind.CLEAN_REFERENCE,
+            artifact=artifact,
+            captured_at=timestamp,
+            camera=camera,
+        )
+        session.frames.append(frame)
+        progress.status = CaptureViewStatus.CAPTURED
+        progress.started_at = progress.started_at or timestamp
+        progress.captured_at = timestamp
+        self._repository.save(session)
+        return frame
+
+    def capture_measurement_frame(
+        self,
+        session_id: UUID,
+        *,
+        view: CaptureViewType,
+        image_bytes: bytes,
+        camera: CameraMetadata,
+        captured_at: datetime | None = None,
+        media_type: str = "image/jpeg",
+        extension: str = ".jpg",
+    ) -> FrameRecord:
+        session = self._repository.get(session_id)
+        self._progress_for(session, view)
+        if not any(
+            frame.view is view and frame.kind is FrameKind.CLEAN_REFERENCE
+            for frame in session.frames
+        ):
+            raise CaptureWorkflowError(
+                f"measurement frame requires clean reference for view {view}"
+            )
+
+        artifact = self._artifact_store.put_bytes(
+            image_bytes,
+            media_type=media_type,
+            extension=extension,
+        )
+        frame = FrameRecord(
+            project_id=session.project_id,
+            session_id=session.session_id,
+            view=view,
+            kind=FrameKind.MEASUREMENT,
+            artifact=artifact,
+            captured_at=captured_at or utc_now(),
+            camera=camera,
+        )
+        session.frames.append(frame)
+        self._repository.save(session)
+        return frame
+
+    def accept_view(
+        self,
+        session_id: UUID,
+        *,
+        view: CaptureViewType,
+        accepted_at: datetime | None = None,
+    ) -> CaptureSession:
+        session = self._repository.get(session_id)
+        progress = self._progress_for(session, view)
+        if not any(
+            frame.view is view and frame.kind is FrameKind.CLEAN_REFERENCE
+            for frame in session.frames
+        ):
+            raise CaptureWorkflowError(f"cannot accept {view} without clean reference")
+
+        timestamp = accepted_at or utc_now()
+        progress.status = CaptureViewStatus.ACCEPTED
+        progress.accepted_at = timestamp
+
+        if all(
+            (not item.required) or item.status is CaptureViewStatus.ACCEPTED
+            for item in session.views
+        ):
+            session.completed_at = timestamp
+
+        self._repository.save(session)
+        return session
+
+    @staticmethod
+    def _progress_for(
+        session: CaptureSession,
+        view: CaptureViewType,
+    ) -> CaptureViewProgress:
+        for progress in session.views:
+            if progress.view is view:
+                return progress
+        raise CaptureWorkflowError(f"view {view} is not part of capture plan")
