@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 NonBlank = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+Sha256Hex = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
 
 
 def utc_now() -> datetime:
@@ -36,6 +37,11 @@ class CaptureViewStatus(StrEnum):
     IN_PROGRESS = "IN_PROGRESS"
     CAPTURED = "CAPTURED"
     ACCEPTED = "ACCEPTED"
+
+
+class FrameKind(StrEnum):
+    CLEAN_REFERENCE = "CLEAN_REFERENCE"
+    MEASUREMENT = "MEASUREMENT"
 
 
 class StrictModel(BaseModel):
@@ -100,8 +106,45 @@ class CapturePlan(StrictModel):
         return self
 
 
+class CameraMetadata(StrictModel):
+    width_px: int = Field(gt=0)
+    height_px: int = Field(gt=0)
+    device_model: NonBlank | None = None
+    rotation_degrees: int = Field(default=0, ge=0, lt=360)
+    focal_length_mm: float | None = Field(default=None, gt=0)
+    iso: int | None = Field(default=None, gt=0)
+    exposure_time_us: int | None = Field(default=None, gt=0)
+
+
+class ArtifactRecord(StrictModel):
+    artifact_id: UUID = Field(default_factory=uuid4)
+    relative_path: NonBlank
+    media_type: NonBlank
+    size_bytes: int = Field(ge=0)
+    sha256: Sha256Hex
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class FrameRecord(StrictModel):
+    frame_id: UUID = Field(default_factory=uuid4)
+    project_id: UUID
+    session_id: UUID
+    view: CaptureViewType
+    kind: FrameKind
+    artifact: ArtifactRecord
+    captured_at: datetime = Field(default_factory=utc_now)
+    camera: CameraMetadata
+
+    @model_validator(mode="after")
+    def validate_timestamp(self) -> "FrameRecord":
+        if self.captured_at.tzinfo is None:
+            raise ValueError("captured_at must be timezone-aware")
+        return self
+
+
 class CaptureViewProgress(StrictModel):
     view: CaptureViewType
+    required: bool = True
     status: CaptureViewStatus = CaptureViewStatus.PLANNED
     started_at: datetime | None = None
     captured_at: datetime | None = None
@@ -113,6 +156,7 @@ class CaptureSession(StrictModel):
     project_id: UUID
     plan_id: UUID
     views: list[CaptureViewProgress]
+    frames: list[FrameRecord] = Field(default_factory=list)
     started_at: datetime = Field(default_factory=utc_now)
     completed_at: datetime | None = None
 
@@ -123,4 +167,8 @@ class CaptureSession(StrictModel):
         values = [item.view for item in self.views]
         if len(values) != len(set(values)):
             raise ValueError("capture session cannot contain duplicate views")
+        if self.started_at.tzinfo is None:
+            raise ValueError("started_at must be timezone-aware")
+        if self.completed_at is not None and self.completed_at.tzinfo is None:
+            raise ValueError("completed_at must be timezone-aware")
         return self
