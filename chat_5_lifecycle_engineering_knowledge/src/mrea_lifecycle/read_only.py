@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import sqlite3
 
+from .engineering_knowledge import SQLiteEngineeringKnowledgeRepository
 from .persistence import SQLITE_SNAPSHOT_SCHEMA_VERSION
 from .relational import SQLiteLifecycleQueryRepository
 from .sqlite_schema import SQLITE_RELATIONAL_SCHEMA_VERSION
@@ -21,7 +22,7 @@ def _readonly_uri(database: Path) -> str:
 
 
 class SQLiteLifecycleReadOnlySession:
-    """Read-only SQL-native lifecycle query session.
+    """Read-only SQL-native lifecycle and engineering knowledge query session.
 
     The session never opens a writable SQLite handle. It also refuses to serve a
     relational projection that does not represent the current authoritative snapshot.
@@ -31,6 +32,7 @@ class SQLiteLifecycleReadOnlySession:
         self.database = Path(database)
         self._connection: sqlite3.Connection | None = None
         self._queries: SQLiteLifecycleQueryRepository | None = None
+        self._knowledge: SQLiteEngineeringKnowledgeRepository | None = None
         self._snapshot_version = 0
         self._read_model_version = 0
         self._relational_schema_version = 0
@@ -109,6 +111,7 @@ class SQLiteLifecycleReadOnlySession:
 
         self._connection = connection
         self._queries = SQLiteLifecycleQueryRepository(connection)
+        self._knowledge = SQLiteEngineeringKnowledgeRepository(connection)
         self._snapshot_version = snapshot_version
         self._read_model_version = read_model_version
         self._relational_schema_version = relational_schema_version
@@ -131,6 +134,12 @@ class SQLiteLifecycleReadOnlySession:
             raise LifecycleReadOnlyError("read-only lifecycle session is closed")
         return self._queries
 
+    @property
+    def knowledge(self) -> SQLiteEngineeringKnowledgeRepository:
+        if self._knowledge is None:
+            raise LifecycleReadOnlyError("read-only lifecycle session is closed")
+        return self._knowledge
+
     def refresh(self) -> int:
         self.close()
         self._open()
@@ -141,6 +150,7 @@ class SQLiteLifecycleReadOnlySession:
             self._connection.close()
         self._connection = None
         self._queries = None
+        self._knowledge = None
 
     def __enter__(self) -> "SQLiteLifecycleReadOnlySession":
         return self
