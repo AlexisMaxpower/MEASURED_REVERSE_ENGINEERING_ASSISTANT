@@ -1,6 +1,7 @@
 """Chat 1 domain/application baseline for MREA Project & Guided Capture."""
 
 from .artifacts import ArtifactNotFoundError, FileSystemArtifactStore
+from .contracts import CanonicalContractBuilder, CanonicalContractError
 from .models import (
     ArtifactRecord,
     CameraMetadata,
@@ -33,6 +34,8 @@ __all__ = [
     "ArtifactNotFoundError",
     "ArtifactRecord",
     "CameraMetadata",
+    "CanonicalContractBuilder",
+    "CanonicalContractError",
     "CapturePlan",
     "CapturePlanItem",
     "CapturePlanService",
