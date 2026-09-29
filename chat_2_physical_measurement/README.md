@@ -8,14 +8,29 @@ Chat 2 отвечает за вертикальный слайс `Physical Measu
 
 Chat 2 не владеет shared contracts и не изменяет их без Change Request для Integrator.
 
+## Координация
+
+Перед каждой следующей итерацией Chat 2 читает:
+
+1. актуальный `main`;
+2. `ORCHESTRATOR_DIRECTIVE.md`;
+3. `core/contracts/mrea_contracts_v1.schema.json`;
+4. `core/contracts/POLICIES_V1.md`;
+5. canonical fixtures в `tests/fixtures/contracts/`.
+
+При конфликте локальной документации с canonical contract приоритет имеет `core/contracts/`.
+
 ## Структура
 
-- `src/physical_measurement/` — внутренняя реализация Chat 2.
-- `tests/` — локальные unit tests вертикального слайса.
-- `pyproject.toml` — локальная Python/test configuration Chat 2.
-- `docs/CHAT_2_ROLE.md` — документация роли и границ ownership.
-- `docs/PHASE_A_MANUAL_MEASUREMENT.md` — реализованный Phase A baseline.
-- `docs/IMPLEMENTATION_REPORT_PHASE_A.md` — отчёт о реализации и проверке Phase A.
+- `src/physical_measurement/` — внутренняя реализация Chat 2;
+- `src/physical_measurement/boundary.py` — adapter internal Phase A → canonical shared contracts;
+- `tests/test_phase_a.py` — unit tests Phase A;
+- `tests/test_contract_boundary.py` — canonical contract/integration tests;
+- `pyproject.toml` — локальная Python/test configuration Chat 2;
+- `docs/CHAT_2_ROLE.md` — документация роли и границ ownership;
+- `docs/PHASE_A_MANUAL_MEASUREMENT.md` — реализованный Phase A baseline;
+- `docs/IMPLEMENTATION_REPORT_PHASE_A.md` — отчёт Phase A;
+- `docs/IMPLEMENTATION_REPORT_CANONICAL_BOUNDARY.md` — отчёт integration gate Chat 6.
 
 ## Текущее состояние
 
@@ -33,35 +48,48 @@ MeasurementSession
 → USER_CONFIRMED verified measurement
 ```
 
-Поддержаны все measurement types, перечисленные в SSOT. Значения измерений хранятся через `Decimal`. Candidate не может автоматически стать verified: confirmation выполнена отдельным явным state transition.
+Candidate не может автоматически стать verified: confirmation выполнена отдельным явным state transition.
 
-Добавлен in-memory repository boundary для unit-тестов и отделения application logic от будущего persistence implementation.
+### Canonical boundary — implemented
 
-Локальная проверка перед загрузкой:
+Выполнена директива Chat 6 `OD-2026-09-29-001`:
 
 ```text
-6 passed in 0.06s
+canonical CapturePackage
+→ Phase A MeasurementSession
+→ manual verified PhysicalMeasurement
+→ CanonicalMeasurementAdapter
+→ canonical MeasurementPackage
+→ JSON Schema validation
 ```
 
-### Shared integration — blocked by Integrator contracts
+Текущие внутренние manual anchors хранятся в пикселях, поэтому на shared boundary честно сериализуются как `IMAGE_PX`. Преобразование в `MAT_XY_MM` не выполняется без отдельного calibration-aware шага.
 
-Canonical shared contracts/fixtures v1 в repository пока не обнаружены. Поэтому Chat 2 намеренно не создавал собственные shared schemas для:
+Adapter проверяет:
 
-- `CapturePackage`;
-- `MeasurementCaptureFrame`;
-- `PhysicalMeasurement`;
-- `MeasurementPackage`;
-- `ArtifactReference`.
+- `CapturePackage.schema_version`;
+- совпадение `project_id`;
+- существование `view_id`;
+- соответствие `reference_frame_id` canonical clean reference frame;
+- существование `evidence_frame_id` в measurement frames, если evidence указан;
+- сохранение provenance и explicit confirmation;
+- формирование canonical `MeasurementPackage`.
 
-Внутренний `FeatureAnchor` также не объявляется canonical cross-slice representation.
+Локальная проверка этой итерации:
 
-## Ближайший рабочий порядок
+```text
+9 passed
+```
 
-1. Получить canonical contracts/fixtures v1 от Integrator.
-2. Добавить `CapturePackage -> MeasurementSession` adapter.
-3. Добавить mapper internal measurement -> canonical `PhysicalMeasurement`.
-4. Реализовать canonical `MeasurementPackageBuilder`.
-5. Добавить contract/integration tests.
-6. Добавить offline-safe persistence.
-7. После стабильной Phase A integration перейти к Phase B — snapping.
-8. Далее: OCR → voice value → caliper/jaw/contact CV.
+Contract test использует repository-owned:
+
+- `core/contracts/mrea_contracts_v1.schema.json`;
+- `tests/fixtures/contracts/capture_package_v1.json`.
+
+## Следующий рабочий порядок
+
+1. Перед новой итерацией перечитать `ORCHESTRATOR_DIRECTIVE.md`.
+2. Передать результат Chat 6 на integration acceptance.
+3. После принятия canonical boundary перейти к следующему gate, назначенному Orchestrator.
+4. Phase B snapping не начинать, если Chat 6 выдаст более приоритетную интеграционную задачу.
+5. Shared contracts не редактировать напрямую.
