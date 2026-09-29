@@ -1,31 +1,48 @@
 # Slice Status
 
-| Slice | Round 1 verdict | Pass 2 integration gate |
-|---|---|---|
-| Chat 1 | ACCEPTED | perspective-normalized derived reference + Chat 1 CI green |
-| Chat 2 | ACCEPTED AS SLICE | truthful IMAGE_PX/evidence boundary + Chat 2 CI green |
-| Chat 3 | FIX REQUIRED FOR INTEGRATION | real IMAGE_PX → MAT_XY_MM cross-slice CI gate green |
-| Chat 4 | ACCEPTED FOR GENERIC CAD GATE | generic CAD CI green + SOLIDWORKS adapter scaffold per ADR-001 |
-| Chat 5 | ACCEPTED WITH PROCESS FIX | CAD-verification eligibility policy + Chat 5 CI green + handoff |
+| Slice | Round 2 verdict | Accepted Pass 2 result | Pass 3 focus |
+|---|---|---|---|
+| Chat 1 — Project & Guided Capture | `ACCEPTED` | Perspective-normalized derived reference/rectification integrated; evidence frame remains immutable | guided capture quality/acceptance baseline |
+| Chat 2 — Physical Measurement | `ACCEPTED` | Truthful raw `IMAGE_PX` measurement/evidence boundary hardened | hands-free/voice candidate state machine without weakening manual truth |
+| Chat 3 — Geometry & Sketch | `ACCEPTED` | Real `IMAGE_PX -> MAT_XY_MM` normalization integrated; Round 1 blocker closed | primitive candidate extraction + measured-dimension binding |
+| Chat 4 — CAD Bridge & Verification | `ACCEPTED_WITH_RUNTIME_GATE` | Generic CAD + SOLIDWORKS-agent architecture integrated | real-host validation tooling + preserve fail-closed generic gate |
+| Chat 5 — Lifecycle & Engineering Knowledge | `ACCEPTED` | CAD verification now controls manufacturing eligibility | physical part instance/install/test/failure lifecycle |
 
-## Pass 2 branch policy
+## Round 2 integration status
 
-- `chat-1/pass-2`
-- `chat-2/pass-2`
-- `chat-3/pass-2`
-- `chat-4/pass-2`
-- `chat-5/pass-2`
+```text
+Chat 1 -> Chat 2    PASS / canonical-static
+Chat 2 -> Chat 3    PASS / automated
+Chat 3 -> Chat 4    PASS / canonical-generic
+Chat 4 -> Chat 5    PASS / automated
+```
 
-Worker implementation does not land directly in `main`.
+Final Round 2 assembled software baseline:
 
-## Required automation
+`d999af158310d3d872098a42691b2edc3ff5ebcb`
 
-Canonical CI: `.github/workflows/ci.yml`
+Final Round 2 MREA CI:
 
-Current required cross-slice gate:
+`36611690909` — `success`
 
-`tests/integration/test_chat2_to_chat3_boundary.py`
+## Current automated cross-slice gates
 
-The integration gate intentionally fails against the uncorrected Round 1 Chat 3 adapter and becomes green only after proper calibration-based normalization is implemented.
+- `tests/integration/test_chat2_to_chat3_boundary.py`
+- `tests/integration/test_chat4_to_chat5_boundary.py`
 
-This file is a snapshot; current repository/branch state and Chat 6 review remain authoritative.
+Pass 3 orchestration must add dedicated executable producer-consumer gates for:
+
+- Chat 1 -> Chat 2;
+- Chat 3 -> Chat 4.
+
+## Runtime exception
+
+Real Windows 11 + SOLIDWORKS 2026 COM execution is still `UNVERIFIED` and must not be presented as green merely because the generic/Python/C# protocol layers pass tests.
+
+## Pass 3 process rule
+
+All worker branches are created from one exact accepted `main` SHA after Chat 6 finishes all shared CI/directive/integration infrastructure.
+
+Publishing `ORCHESTRATOR_HANDOFF.md` freezes a worker branch until Chat 6 verdict.
+
+This file is a snapshot; current repository state and Chat 6 review remain authoritative.
