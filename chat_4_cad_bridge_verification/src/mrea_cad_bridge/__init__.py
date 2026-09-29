@@ -26,6 +26,14 @@ from .runtime_evidence import (
     parse_runtime_diagnostic,
     require_host_ready,
 )
+from .solidworks_runtime_inputs import (
+    SOLIDWORKS_RUNTIME_ADAPTER_NAME,
+    SOLIDWORKS_RUNTIME_INPUTS_PRODUCER,
+    SOLIDWORKS_RUNTIME_INPUTS_SCHEMA,
+    SolidWorksRuntimeInputs,
+    build_solidworks_runtime_evidence_from_inputs_v1,
+    parse_solidworks_runtime_inputs_v1,
+)
 from .test_double import TestDoubleCadAdapter
 from .solidworks_agent import (
     SOLIDWORKS_ADAPTER_NAME,
@@ -85,6 +93,10 @@ __all__ = [
     "ReadinessCheckStatus",
     "RuntimeDiagnostic",
     "RuntimeEvidenceStatus",
+    "SOLIDWORKS_RUNTIME_ADAPTER_NAME",
+    "SOLIDWORKS_RUNTIME_INPUTS_PRODUCER",
+    "SOLIDWORKS_RUNTIME_INPUTS_SCHEMA",
+    "SolidWorksRuntimeInputs",
     "SvgExporter",
     "SOLIDWORKS_ADAPTER_NAME",
     "SOLIDWORKS_AGENT_PROTOCOL",
@@ -99,10 +111,12 @@ __all__ = [
     "build_cad_verification_report_v1",
     "build_runtime_evidence",
     "build_solidworks_agent_request",
+    "build_solidworks_runtime_evidence_from_inputs_v1",
     "execute_cad_transfer_v1",
     "map_sketch_package_v1",
     "parse_host_readiness_report",
     "parse_runtime_diagnostic",
     "parse_solidworks_agent_response",
+    "parse_solidworks_runtime_inputs_v1",
     "require_host_ready",
 ]
