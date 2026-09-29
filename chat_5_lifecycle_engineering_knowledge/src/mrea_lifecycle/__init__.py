@@ -3,6 +3,17 @@ from .adapters import (
     CANONICAL_LIFECYCLE_EVENT_TYPES,
     CanonicalLifecycleEventAdapter,
 )
+from .backup import (
+    LIFECYCLE_BACKUP_FORMAT_VERSION,
+    LifecycleBackupConsistencyError,
+    LifecycleBackupError,
+    LifecycleBackupIntegrityError,
+    LifecycleBackupManager,
+    LifecycleBackupManifest,
+    LifecycleBackupVerification,
+    LifecycleDatabaseInspection,
+    inspect_lifecycle_database,
+)
 from .models import (
     CADArtifactReference,
     CADRevisionLink,
@@ -43,6 +54,11 @@ from .projections import (
     RevisionComparison,
     RevisionComparisonResult,
 )
+from .read_only import (
+    LifecycleReadOnlyError,
+    LifecycleReadOnlyStaleError,
+    SQLiteLifecycleReadOnlySession,
+)
 from .relational import (
     EquipmentOccupancyQueryResult,
     FailureQueryResult,
@@ -80,11 +96,21 @@ __all__ = [
     "Installation",
     "InstallationService",
     "KnowledgeQueryService",
+    "LIFECYCLE_BACKUP_FORMAT_VERSION",
+    "LifecycleBackupConsistencyError",
+    "LifecycleBackupError",
+    "LifecycleBackupIntegrityError",
+    "LifecycleBackupManager",
+    "LifecycleBackupManifest",
+    "LifecycleBackupVerification",
     "LifecycleConcurrencyError",
+    "LifecycleDatabaseInspection",
     "LifecycleEvent",
     "LifecycleEventType",
     "LifecycleInvariantError",
     "LifecyclePersistenceError",
+    "LifecycleReadOnlyError",
+    "LifecycleReadOnlyStaleError",
     "LifecycleRepository",
     "LifecycleState",
     "LifecycleStateProjection",
@@ -112,8 +138,10 @@ __all__ = [
     "SQLITE_RELATIONAL_SCHEMA_VERSION",
     "SQLITE_SNAPSHOT_SCHEMA_VERSION",
     "SQLiteLifecycleQueryRepository",
+    "SQLiteLifecycleReadOnlySession",
     "SQLiteLifecycleStore",
     "SQLiteSchemaMigration",
     "TestRecord",
     "TestService",
+    "inspect_lifecycle_database",
 ]
