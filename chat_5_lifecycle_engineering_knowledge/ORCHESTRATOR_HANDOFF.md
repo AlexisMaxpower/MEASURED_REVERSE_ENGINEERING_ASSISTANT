@@ -5,10 +5,11 @@
 **Branch:** `chat-5/pass-7`  
 **Base SHA:** `68791080a5440c6426ef28329302c99a323344b0` — frozen Chat 5 Pass 6  
 **Independently tested pre-handoff SHA:** `f61ec8a880624f40e1b4e6c7b5042fd9135f7195`  
+**Final state reconciliation SHA:** `f53b2051a73608bd5e7eb9c5fd3f14f41ab02f13`  
 **CI run:** `36645177818`  
 **Status at handoff:** required Chat 5 gates GREEN
 
-> This handoff is the final worker commit and freezes `chat-5/pass-7`. Chat 6 should use the current branch head as the final handoff commit; the pre-handoff SHA above is the exact implementation/documentation state exercised by the required gates.
+> This handoff is the final worker commit and freezes `chat-5/pass-7`. Chat 6 should use the current branch head as the final handoff commit; the pre-handoff SHA above is the exact implementation/documentation state exercised by the required gates. The reconciliation commit only corrected final state wording and recorded the completed gate results.
 
 ## Delivered functionality
 
