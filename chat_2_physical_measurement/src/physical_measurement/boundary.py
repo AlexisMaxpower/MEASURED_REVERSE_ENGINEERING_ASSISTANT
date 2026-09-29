@@ -29,7 +29,7 @@ def _utc_rfc3339(value: datetime) -> str:
 
 
 class CanonicalMeasurementAdapter:
-    """Maps Chat 2 internal Phase A models to Integrator-owned wire contracts."""
+    """Maps Chat 2 internal physical-measurement models to canonical wire contracts."""
 
     def __init__(self, *, id_factory: Callable[[str], str] | None = None) -> None:
         self._id_factory = id_factory or (lambda prefix: f"{prefix}_{uuid4().hex}")
@@ -148,8 +148,8 @@ class CanonicalMeasurementAdapter:
             "value": _as_number(measurement.value),
             "unit": measurement.unit,
             "uncertainty": (
-                _as_number(measurement.uncertainty_mm)
-                if measurement.uncertainty_mm is not None
+                _as_number(measurement.uncertainty)
+                if measurement.uncertainty is not None
                 else None
             ),
             "source": measurement.source.value,
