@@ -1,0 +1,44 @@
+{
+  "schema_version": "mrea.measurement-package.v1",
+  "measurement_package_id": "MP-CHAT2-IMAGEPX-001",
+  "project_id": "P-GOLDEN-001",
+  "part_id": "PART-GOLDEN-001",
+  "capture_package_id": "CP-GOLDEN-001",
+  "measurements": [
+    {
+      "measurement_id": "M-WIDTH-IMAGEPX",
+      "type": "LINEAR_EXTERNAL",
+      "value": 80.2,
+      "unit": "mm",
+      "uncertainty": 0.02,
+      "source": "MANUAL_MEASURED",
+      "view_id": "VIEW-FRONT-001",
+      "anchors": [
+        {
+          "anchor_id": "A-PX-LEFT",
+          "view_id": "VIEW-FRONT-001",
+          "reference_frame_id": "A-FRONT-CLEAN-001",
+          "coordinate_space": "IMAGE_PX",
+          "x": 0.0,
+          "y": 210.5,
+          "feature_id": null
+        },
+        {
+          "anchor_id": "A-PX-RIGHT",
+          "view_id": "VIEW-FRONT-001",
+          "reference_frame_id": "A-FRONT-CLEAN-001",
+          "coordinate_space": "IMAGE_PX",
+          "x": 802.0,
+          "y": 210.5,
+          "feature_id": null
+        }
+      ],
+      "evidence_frame_id": null,
+      "instrument": {"type": "DIGITAL_CALIPER"},
+      "confidence": null,
+      "verified": true,
+      "confirmation_source": "USER_CONFIRMED",
+      "created_at": "2026-09-29T12:00:00Z"
+    }
+  ]
+}
