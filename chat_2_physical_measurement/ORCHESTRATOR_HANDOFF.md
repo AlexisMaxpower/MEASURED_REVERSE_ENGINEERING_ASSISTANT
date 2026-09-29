@@ -1,111 +1,113 @@
 # ORCHESTRATOR HANDOFF — Chat 2
 
-**Pass:** 4  
-**Branch:** `chat-2/pass-4`  
-**Baseline:** tested Round-3 integration candidate `199cf5a15a22a6b6a01b54540f5f856a18ca7752`  
-**Executable implementation SHA:** `dc4968c2e60e515e95d8f2696a36c3121281b4ae`  
-**Implementation report SHA:** `ed78a67370dc1de294b7a2010a822dbdcd52da58`  
-**Implementation CI:** `MREA CI` run `36643379874` / run #271  
+**Pass:** 5  
+**Branch:** `chat-2/pass-5`  
+**Baseline:** frozen Pass-4 head `f1472c244d4f7bee990ff65f77b580b3952d964a`  
+**Executable implementation SHA:** `001959f1452fd8c3902f5af540cebe86e5e1afe0`  
+**Implementation CI:** `MREA CI` run `36644904693` / run #315  
 **Date:** 2026-09-30  
 **From:** Chat 2 — Physical Measurement  
 **To:** Chat 6 / integration review
 
-> This handoff is the final worker commit for this Pass-4 slice. The branch is frozen after this file update. No later worker commit should be added until integration review returns an explicit fix request.
-
-## Why this branch starts from the Round-3 candidate
-
-At Pass-4 start, repository `main` had post-merge orchestration/golden-path work but had not yet received the exact Round-3 worker directory trees. The authoritative tested Round-3 candidate was:
-
-`199cf5a15a22a6b6a01b54540f5f856a18ca7752`
-
-with complete green Round-3 integration evidence. `chat-2/pass-4` was therefore created directly from that exact SHA to avoid regressing Chat-2 Pass-3 content.
+> This handoff is the final worker commit for Pass 5. The branch is frozen after this file update. No post-handoff worker commit should be added unless integration review explicitly returns a fix request.
 
 ## Delivered functionality
 
-Pass 4 closes the measurement-unit truth defect in Chat 2.
+Pass 5 makes Chat 2 uncertainty semantics unit-neutral.
 
-Before this pass, `MeasurementSessionService.add_candidate()` hard-coded every candidate as:
+Before this pass, uncertainty was stored internally as `uncertainty_mm`. After Pass 4 introduced correct `ANGLE -> deg` semantics, that field name became semantically wrong for angular measurements.
 
-```text
-unit = mm
-```
+Pass 5 introduces primary field/API:
 
-including `MeasurementType.ANGLE`.
+`uncertainty`
 
-Pass 4 adds `MeasurementTypeRegistry` as the single Chat-2 source of measurement-type unit semantics:
+The uncertainty value is expressed in the same unit as `PhysicalMeasurement.unit`.
 
-- `ANGLE` -> `deg`;
-- every current length-like v1 measurement type -> `mm`.
+Examples:
 
-The service now asks the registry for the unit instead of hard-coding `mm`.
+- `42.18 mm ± 0.02 mm` -> `unit=mm`, `uncertainty=0.02`;
+- `45.5 deg ± 0.5 deg` -> `unit=deg`, `uncertainty=0.5`.
 
-## Fail-closed behavior
+## Backward compatibility
 
-`MeasurementTypeRegistry.validate_complete()` compares the registry keys with the complete `MeasurementType` enum. If a future enum member is added without registry semantics, service construction fails instead of silently assigning a wrong unit.
+Legacy `uncertainty_mm` remains temporarily supported as a compatibility bridge for old callers, with fail-closed rules:
+
+1. legacy `uncertainty_mm` is valid only for measurements whose resolved unit is `mm`;
+2. if both `uncertainty` and `uncertainty_mm` are supplied, they must be numerically equal;
+3. negative uncertainty values are rejected;
+4. `ANGLE` plus legacy `uncertainty_mm` is rejected instead of silently treating millimetres as degrees;
+5. old mm callers continue to observe mirrored `measurement.uncertainty_mm` while the new canonical internal value is `measurement.uncertainty`.
+
+## Application flow
+
+Updated `MeasurementSessionService`:
+
+- `add_candidate()` accepts preferred `uncertainty` plus legacy `uncertainty_mm`;
+- manual and reported candidate helpers propagate both consistently;
+- unit selection still comes from `MeasurementTypeRegistry`.
+
+Updated hands-free flow:
+
+- `MeasurementCandidateContext` now carries primary unit-neutral `uncertainty`;
+- the existing legacy mm field remains available for compatibility;
+- voice/OCR/device candidates preserve uncertainty without changing explicit-confirmation rules.
 
 ## Canonical boundary
 
-No canonical contract change was required.
+`CanonicalMeasurementAdapter` now serializes `measurement.uncertainty` directly.
 
-The existing `CanonicalMeasurementAdapter` already serializes the internal `measurement.unit`. After this pass, a confirmed angle reaches the canonical wire boundary as:
-
-```text
-type = ANGLE
-unit = deg
-verified = true
-confirmation_source = USER_CONFIRMED
-```
+No canonical contract change was required because canonical v1 already exposes the wire field as unit-neutral `uncertainty`.
 
 Existing invariants remain unchanged:
 
-- raw anchors stay `IMAGE_PX`;
-- evidence/reference/view linkage is preserved;
-- manual/voice/OCR/device values remain candidates until explicit confirmation;
-- no geometry normalization moved into Chat 2.
+- `ANGLE` uses `deg`;
+- length-like types use `mm`;
+- anchors remain raw `IMAGE_PX` in Chat 2;
+- provenance/evidence/view/reference linkage is preserved;
+- candidates remain unverified until explicit `USER_CONFIRMED`.
 
-## Files changed in Pass 4
-
-Added:
-
-- `src/physical_measurement/type_registry.py`
-- `tests/test_pass4_type_registry.py`
-- `docs/PASS_4_BUILD_REUSE_CHECK.md`
-- `docs/IMPLEMENTATION_REPORT_PASS_4.md`
+## Files changed in Pass 5
 
 Modified:
 
+- `src/physical_measurement/models.py`
 - `src/physical_measurement/service.py`
-- `src/physical_measurement/__init__.py`
+- `src/physical_measurement/hands_free.py`
+- `src/physical_measurement/boundary.py`
 - `ORCHESTRATOR_HANDOFF.md`
+
+Added:
+
+- `tests/test_pass5_unit_neutral_uncertainty.py`
+- `docs/PASS_5_BUILD_REUSE_CHECK.md`
+- `docs/IMPLEMENTATION_REPORT_PASS_5.md`
 
 No file outside `chat_2_physical_measurement/` was modified.
 
 ## Build / Reuse
 
-Recorded in:
+Recorded in `docs/PASS_5_BUILD_REUSE_CHECK.md`.
 
-`docs/PASS_4_BUILD_REUSE_CHECK.md`
-
-Decision: no third-party units framework. This is a closed MREA domain mapping, not a conversion problem. Python standard library plus the existing canonical `MeasurementType` enum is sufficient.
+Decision: no third-party units library. This pass is a small MREA-internal model migration aligned with the existing canonical `uncertainty` field, not a unit-conversion problem.
 
 ## Tests added
 
-`tests/test_pass4_type_registry.py` verifies:
+`tests/test_pass5_unit_neutral_uncertainty.py` verifies:
 
-1. registry covers every declared measurement type;
-2. `ANGLE` maps to `deg`;
-3. all current non-angle v1 measurement types map to `mm`;
-4. application service assigns the correct unit;
-5. a verified angle serializes through the real canonical adapter with `unit = deg`.
+1. angular uncertainty uses degrees and serializes canonically;
+2. legacy `uncertainty_mm` remains compatible for mm measurements;
+3. legacy mm uncertainty fails closed for angular measurements;
+4. conflicting old/new uncertainty values fail closed;
+5. hands-free context propagates unit-neutral angular uncertainty.
 
 ## GitHub Actions evidence
 
 Executable implementation state:
 
 ```text
-run_id = 36643379874
-run_number = 271
-head_sha = dc4968c2e60e515e95d8f2696a36c3121281b4ae
+run_id = 36644904693
+run_number = 315
+head_sha = 001959f1452fd8c3902f5af540cebe86e5e1afe0
 ```
 
 Required Chat-2 gates executed successfully:
@@ -115,24 +117,25 @@ Required Chat-2 gates executed successfully:
 - `Integration / Chat 1 -> Chat 2` — `success`;
 - `Integration / Chat 2 -> Chat 3` — `success`.
 
-Other cross-slice/golden jobs that are not selected for a Chat-2 worker push may remain skipped by repository CI conditions and are not used as Pass-4 acceptance evidence.
+Conditional downstream jobs not selected for a Chat-2 worker push may remain skipped by repository CI policy and are not used as this acceptance gate.
 
 ## Known limitations / next debt
 
-- internal uncertainty field is still named `uncertainty_mm`; unit-neutral uncertainty remains future work;
+- the legacy `uncertainty_mm` compatibility field remains until all callers are migrated and a breaking cleanup is accepted;
 - internal `PhysicalMeasurement` still owns exactly two anchors while canonical v1 permits one to three;
-- angle-specific geometric/anchor semantics are not implemented here; this pass fixes unit truth only;
-- snapping / feature detection remains future work.
+- angle-specific anchor geometry remains generic;
+- snapping / automatic feature detection remains future work.
 
 ## Requested integration review
 
 Verify:
 
-1. all 11 current `MeasurementType` values are registered;
-2. `ANGLE` produces `deg` and length-like values remain `mm`;
-3. no existing manual/hands-free provenance or confirmation rule regressed;
-4. canonical adapter emits the correct angle unit without contract changes;
-5. Chat-2 and both adjacent integration gates remain green;
-6. worker ownership is respected.
+1. unit-neutral uncertainty is the primary internal/API semantic;
+2. mm legacy callers remain compatible;
+3. angular legacy-mm input fails closed;
+4. canonical wire output uses `uncertainty` with the measurement's own unit;
+5. hands-free/manual/report candidate and explicit confirmation semantics did not regress;
+6. required Chat-2 and adjacent boundary CI gates are green on implementation SHA `001959f1452fd8c3902f5af540cebe86e5e1afe0`;
+7. worker ownership remains slice-local.
 
-If accepted, integrate this slice onto the post-Round-3 accepted baseline. This branch is frozen after the handoff commit.
+If accepted, integrate after Pass 4 according to orchestrator ordering. This branch is frozen after this handoff commit.
