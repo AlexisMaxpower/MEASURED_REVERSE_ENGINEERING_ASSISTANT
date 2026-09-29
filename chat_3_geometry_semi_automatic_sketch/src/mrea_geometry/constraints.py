@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+from .constraint_satisfaction import ConstraintSatisfactionAnalyzer
 from .models import Circle, ConstraintCandidate, DimensionBinding, GeometryDraft, Line
 
 ConstraintStatus = Literal["DETECTED", "INFERRED"]
@@ -66,6 +67,7 @@ class ConstraintResolver:
         *,
         minimum_confidence: float = 0.95,
         measurement_tolerance: float = 0.05,
+        satisfaction_analyzer: ConstraintSatisfactionAnalyzer | None = None,
     ) -> None:
         if not 0.0 <= minimum_confidence <= 1.0:
             raise ValueError("minimum_confidence must be between 0 and 1")
@@ -73,6 +75,7 @@ class ConstraintResolver:
             raise ValueError("measurement_tolerance must be non-negative")
         self.minimum_confidence = minimum_confidence
         self.measurement_tolerance = measurement_tolerance
+        self.satisfaction_analyzer = satisfaction_analyzer or ConstraintSatisfactionAnalyzer()
 
     def resolve(self, draft: GeometryDraft) -> ConstraintResolution:
         entities = {item.entity_id: item for item in draft.entities}
@@ -106,6 +109,22 @@ class ConstraintResolver:
                         message=(
                             f"Constraint confidence {effective_confidence:.3f} is below "
                             f"promotion threshold {self.minimum_confidence:.3f}."
+                        ),
+                        entity_ids=candidate.entity_ids,
+                    )
+                )
+                continue
+
+            satisfaction = self.satisfaction_analyzer.analyze(candidate, entities)
+            if not satisfaction.satisfied:
+                issues.append(
+                    ConstraintIssue(
+                        issue_id=f"U-{candidate.constraint_id}",
+                        code="UNSATISFIED_CONSTRAINT",
+                        message=(
+                            f"{candidate.kind} relation residual {satisfaction.residual:.6g} "
+                            f"{satisfaction.unit} exceeds tolerance {satisfaction.tolerance:.6g} "
+                            f"{satisfaction.unit}; relation was not published."
                         ),
                         entity_ids=candidate.entity_ids,
                     )
