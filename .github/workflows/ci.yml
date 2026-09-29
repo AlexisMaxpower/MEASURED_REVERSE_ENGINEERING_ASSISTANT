@@ -148,6 +148,7 @@ jobs:
 
   integration-chat2-chat3:
     name: Integration / Chat 2 -> Chat 3
+    if: github.event_name == 'pull_request' || startsWith(github.ref, 'refs/heads/chat-3/')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs:
