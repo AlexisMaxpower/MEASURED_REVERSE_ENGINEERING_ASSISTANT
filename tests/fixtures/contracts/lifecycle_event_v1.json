@@ -1,0 +1,12 @@
+{
+  "schema_version":"mrea.lifecycle-event.v1",
+  "event_id":"LE-GOLDEN-001",
+  "event_type":"REVISION_CREATED",
+  "occurred_at":"2026-09-29T15:10:00Z",
+  "sequence":1,
+  "revision_id":"REV-GOLDEN-01",
+  "manufacturing_id":null,
+  "installation_id":null,
+  "test_id":null,
+  "failure_id":null
+}
