@@ -226,6 +226,32 @@ def test_projective_homogeneous_divide_is_applied() -> None:
     assert context.measurements[0].anchors[0].point == Point2D(1.0, 2.0)
 
 
+def test_zero_homogeneous_divisor_is_rejected_explicitly() -> None:
+    package = _chat2_package()
+    anchor = package["measurements"][0]["anchors"][0]
+    package["measurements"][0]["anchors"] = [anchor]
+    anchor["x"] = 1.0
+    anchor["y"] = 0.0
+
+    with pytest.raises(ValueError, match="degenerate homogeneous divisor"):
+        CanonicalInputAdapter().from_packages(
+            _capture(
+                homography=[
+                    1.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    -1.0,
+                ]
+            ),
+            package,
+        )
+
+
 def test_wrong_image_reference_frame_is_rejected() -> None:
     package = _chat2_package()
     package["measurements"][0]["anchors"][0]["reference_frame_id"] = "WRONG-REF"
