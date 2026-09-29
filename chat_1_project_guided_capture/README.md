@@ -4,10 +4,11 @@ Chat 1 owns the MREA vertical slice from Project/Capture setup through canonical
 
 ## Current orchestration
 
-- Pass 1: **accepted** by Chat 6.
-- Current directive: `OD-2026-09-29-002`.
-- Pass 2 branch: `chat-1/pass-2`.
-- Pass 2 gate: perspective normalization / derived reference artifact.
+- Pass 1: **accepted** by Chat 6;
+- Pass 2: **accepted** and integrated into `main`;
+- current directive: `OD-2026-09-29-003`;
+- Pass 3 branch: `chat-1/pass-3`;
+- Pass 3 gate: Guided Capture Quality baseline.
 
 ## Current implementation
 
@@ -27,25 +28,31 @@ Chat 1 owns the MREA vertical slice from Project/Capture setup through canonical
 - schema-valid canonical FRONT flow;
 - canonical ChArUco calibration in `MAT_XY_MM`.
 
-### Calibration
+### Calibration and rectification
 
 - `MeasurementMatProfile`;
 - `CalibrationResult` with stable internal `calibration_id`;
 - OpenCV ChArUco detection;
 - RANSAC homography `IMAGE_PX -> MAT_XY_MM`;
-- calibration provenance tied to clean reference.
+- calibration provenance tied to clean reference;
+- deterministic perspective normalization;
+- immutable rectified artifact + source/calibration provenance;
+- canonical CapturePackage remains backward compatible.
 
-### Pass 2 — perspective normalization
+### Pass 3 — Guided Capture Quality
 
-- `PerspectiveNormalizer` abstraction;
-- `OpenCvPerspectiveNormalizer`;
-- deterministic MAT-space raster dimensions;
-- explicit invalid/singular-homography failures;
-- immutable rectified image artifact;
-- `RectifiedReferenceRecord`;
-- provenance: source clean frame + calibration + mat;
-- original clean reference remains unchanged/retrievable;
-- canonical CapturePackage remains backward-compatible and schema-valid.
+- `CaptureQualityPolicy` with versioned thresholds;
+- `OpenCvCaptureQualityAnalyzer`;
+- blur/focus proxy (Laplacian variance);
+- mean-luma + clipping exposure diagnostics;
+- glare/highlight proxy;
+- edge-density + border-edge framing diagnostics;
+- optional reuse of ChArUco corner visibility;
+- machine-readable `QualityReasonCode` findings;
+- explicit `ACCEPT` / `WARN` / `REJECT` verdict;
+- persisted source/calibration/mat provenance;
+- Russian actionable guidance adapter;
+- quality analysis remains internal and does not alter metric truth or canonical contracts.
 
 ## Structure
 
@@ -59,6 +66,7 @@ chat_1_project_guided_capture/
 │  ├─ calibration.py
 │  ├─ contracts.py
 │  ├─ models.py
+│  ├─ quality.py
 │  ├─ rectification.py
 │  ├─ repositories.py
 │  └─ services.py
@@ -68,32 +76,37 @@ chat_1_project_guided_capture/
 │  ├─ test_manual_capture.py
 │  ├─ test_canonical_contracts.py
 │  ├─ test_calibration.py
-│  └─ test_rectification.py
+│  ├─ test_rectification.py
+│  └─ test_quality.py
 └─ docs/
    ├─ IMPLEMENTATION_STATE.md
-   ├─ BUILD_REUSE_CHECK_PHASE3_RECTIFICATION.md
-   └─ IMPLEMENTATION_REPORT_PASS2_RECTIFICATION_2026-09-29.md
+   ├─ BUILD_REUSE_CHECK_PASS3_GUIDED_QUALITY.md
+   └─ IMPLEMENTATION_REPORT_PASS3_GUIDED_QUALITY_2026-09-29.md
 ```
 
-## Verification
-
-Latest local full regression for Pass 2:
+## Pass 3 local verification
 
 ```text
-16 passed in 1.17s
+pytest -q tests/test_quality.py
+........                                                                 [100%]
+8 passed in 0.21s
 ```
 
-The synthetic perspective regression uses known geometry and verifies deterministic encoded output, source preservation, provenance, derived artifact separation, explicit singular-homography failure and canonical schema compatibility.
+The generated fixtures cover good capture, strong blur, under/over exposure, localized glare, border-framing risk, low marker visibility, deterministic repeated analysis, persistence and explicit decode failure.
+
+Full repository CI is required for final Pass 3 acceptance because the local archive workspace does not contain repository-root shared-contract files.
 
 ## Contract policy
 
-`CapturePackage v1` currently has no field for a rectified artifact and disallows unknown view properties. Pass 2 therefore keeps the rectified artifact internal rather than silently extending the canonical wire contract.
+Guided quality is internal diagnostic state. `CapturePackage v1` is unchanged; no quality inference is emitted as physical measurement truth.
 
-## Remaining work
+## Remaining work after Pass 3
 
-- physical printed-mat validation;
+Subject to the next Chat 6 directive:
+
+- real-device threshold calibration;
+- printed Measurement Mat / physical accuracy validation;
 - camera lens/intrinsics strategy;
-- Guided Quality warnings;
+- richer framing/object guidance if a safe segmentation boundary is approved;
 - native/mobile camera integration;
-- voice-trigger capture (later roadmap gate);
-- CI.
+- voice-trigger capture in its later roadmap gate.
