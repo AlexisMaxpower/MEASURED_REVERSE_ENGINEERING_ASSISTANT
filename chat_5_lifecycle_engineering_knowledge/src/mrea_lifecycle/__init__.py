@@ -4,6 +4,9 @@ from .adapters import (
     CanonicalLifecycleEventAdapter,
 )
 from .models import (
+    CADArtifactReference,
+    CADRevisionLink,
+    CADVerificationStatus,
     FailureRecord,
     Installation,
     LifecycleEvent,
@@ -11,6 +14,7 @@ from .models import (
     LifecycleState,
     ManufacturingRecord,
     Revision,
+    RevisionOrigin,
     TestRecord,
 )
 from .projections import (
@@ -22,6 +26,7 @@ from .projections import (
     RevisionComparisonResult,
 )
 from .services import (
+    CADRevisionPreparationService,
     FailureService,
     InstallationService,
     ManufacturingService,
@@ -33,6 +38,10 @@ from .store import InMemoryLifecycleStore, LifecycleInvariantError
 __all__ = [
     "CANONICAL_LIFECYCLE_EVENT_SCHEMA_VERSION",
     "CANONICAL_LIFECYCLE_EVENT_TYPES",
+    "CADArtifactReference",
+    "CADRevisionLink",
+    "CADRevisionPreparationService",
+    "CADVerificationStatus",
     "CanonicalLifecycleEventAdapter",
     "EquipmentPartRegistry",
     "FailureRecord",
@@ -52,6 +61,7 @@ __all__ = [
     "Revision",
     "RevisionComparison",
     "RevisionComparisonResult",
+    "RevisionOrigin",
     "RevisionService",
     "TestRecord",
     "TestService",

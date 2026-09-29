@@ -1,14 +1,46 @@
 from __future__ import annotations
 
+from copy import deepcopy
+from datetime import datetime
+from typing import Mapping, Optional
+
 from .models import (
+    CADArtifactReference,
+    CADRevisionLink,
+    CADVerificationStatus,
     FailureRecord,
     Installation,
     LifecycleEventType,
     ManufacturingRecord,
     Revision,
+    RevisionOrigin,
     TestRecord,
 )
 from .store import InMemoryLifecycleStore, LifecycleInvariantError
+
+
+CAD_PACKAGE_SCHEMA_VERSION = "mrea.cad-package.v1"
+CAD_VERIFICATION_SCHEMA_VERSION = "mrea.cad-verification.v1"
+_ALLOWED_ARTIFACT_FIELDS = {
+    "artifact_id",
+    "kind",
+    "uri",
+    "media_type",
+    "sha256",
+    "metadata",
+}
+
+
+def _require_non_empty_string(value: object, *, field_name: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise LifecycleInvariantError(f"{field_name} must be a non-empty string")
+    return value
+
+
+def _require_mapping(value: object, *, field_name: str) -> Mapping[str, object]:
+    if not isinstance(value, Mapping):
+        raise LifecycleInvariantError(f"{field_name} must be an object")
+    return value
 
 
 class RevisionService:
@@ -37,6 +69,15 @@ class RevisionService:
             if parent.part_id != revision.part_id:
                 raise LifecycleInvariantError("parent revision belongs to another part")
 
+        if revision.origin is RevisionOrigin.CAD_TRANSFER and revision.cad_link is None:
+            raise LifecycleInvariantError(
+                "CAD_TRANSFER revision requires explicit CAD revision linkage"
+            )
+        if revision.origin is RevisionOrigin.MANUAL and revision.cad_link is not None:
+            raise LifecycleInvariantError(
+                "manual revision cannot silently carry CAD transfer linkage"
+            )
+
         self.store.revisions[revision.revision_id] = revision
         self.store.append_event(
             event_id=event_id,
@@ -47,17 +88,171 @@ class RevisionService:
         return revision
 
 
+class CADRevisionPreparationService:
+    """Consumes canonical CAD outputs and creates a traceable lifecycle Revision."""
+
+    def __init__(self, store: InMemoryLifecycleStore) -> None:
+        self.store = store
+        self.revisions = RevisionService(store)
+
+    def prepare(
+        self,
+        *,
+        revision_id: str,
+        part_id: str,
+        revision_code: str,
+        created_at: datetime,
+        cad_package: Mapping[str, object],
+        verification_report: Mapping[str, object],
+        event_id: str,
+        parent_revision_id: Optional[str] = None,
+        notes: Optional[str] = None,
+    ) -> Revision:
+        package = _require_mapping(cad_package, field_name="cad_package")
+        report = _require_mapping(
+            verification_report, field_name="verification_report"
+        )
+
+        if package.get("schema_version") != CAD_PACKAGE_SCHEMA_VERSION:
+            raise LifecycleInvariantError("unsupported CADPackage schema_version")
+        if report.get("schema_version") != CAD_VERIFICATION_SCHEMA_VERSION:
+            raise LifecycleInvariantError(
+                "unsupported CADVerificationReport schema_version"
+            )
+
+        cad_package_id = _require_non_empty_string(
+            package.get("cad_package_id"), field_name="cad_package_id"
+        )
+        sketch_package_id = _require_non_empty_string(
+            package.get("sketch_package_id"), field_name="sketch_package_id"
+        )
+        cad_adapter = _require_non_empty_string(
+            package.get("adapter"), field_name="adapter"
+        )
+        report_id = _require_non_empty_string(
+            report.get("report_id"), field_name="report_id"
+        )
+        report_cad_package_id = _require_non_empty_string(
+            report.get("cad_package_id"), field_name="report.cad_package_id"
+        )
+        report_sketch_package_id = _require_non_empty_string(
+            report.get("sketch_package_id"), field_name="report.sketch_package_id"
+        )
+
+        if report_cad_package_id != cad_package_id:
+            raise LifecycleInvariantError(
+                "CADVerificationReport cad_package_id does not match CADPackage"
+            )
+        if report_sketch_package_id != sketch_package_id:
+            raise LifecycleInvariantError(
+                "CADVerificationReport sketch_package_id does not match CADPackage"
+            )
+
+        raw_status = report.get("overall_status")
+        try:
+            verification_status = CADVerificationStatus(raw_status)
+        except (TypeError, ValueError) as exc:
+            raise LifecycleInvariantError(
+                "CADVerificationReport overall_status must be VERIFIED or FAILED"
+            ) from exc
+
+        raw_artifacts = package.get("artifacts")
+        if not isinstance(raw_artifacts, list):
+            raise LifecycleInvariantError("CADPackage artifacts must be an array")
+
+        artifacts: list[CADArtifactReference] = []
+        for index, raw_artifact in enumerate(raw_artifacts):
+            artifact = _require_mapping(
+                raw_artifact, field_name=f"artifacts[{index}]"
+            )
+            unexpected = set(artifact) - _ALLOWED_ARTIFACT_FIELDS
+            if unexpected:
+                raise LifecycleInvariantError(
+                    f"artifacts[{index}] contains unsupported fields: {sorted(unexpected)}"
+                )
+            metadata = artifact.get("metadata", {})
+            if not isinstance(metadata, Mapping):
+                raise LifecycleInvariantError(
+                    f"artifacts[{index}].metadata must be an object"
+                )
+            media_type = artifact.get("media_type")
+            if media_type is not None and not isinstance(media_type, str):
+                raise LifecycleInvariantError(
+                    f"artifacts[{index}].media_type must be string or null"
+                )
+            sha256 = artifact.get("sha256")
+            if sha256 is not None and not isinstance(sha256, str):
+                raise LifecycleInvariantError(
+                    f"artifacts[{index}].sha256 must be string or null"
+                )
+
+            artifacts.append(
+                CADArtifactReference(
+                    artifact_id=_require_non_empty_string(
+                        artifact.get("artifact_id"),
+                        field_name=f"artifacts[{index}].artifact_id",
+                    ),
+                    kind=_require_non_empty_string(
+                        artifact.get("kind"), field_name=f"artifacts[{index}].kind"
+                    ),
+                    uri=_require_non_empty_string(
+                        artifact.get("uri"), field_name=f"artifacts[{index}].uri"
+                    ),
+                    media_type=media_type,
+                    sha256=sha256,
+                    metadata=deepcopy(dict(metadata)),
+                )
+            )
+
+        revision = Revision(
+            revision_id=revision_id,
+            part_id=part_id,
+            revision_code=revision_code,
+            created_at=created_at,
+            parent_revision_id=parent_revision_id,
+            notes=notes,
+            origin=RevisionOrigin.CAD_TRANSFER,
+            cad_link=CADRevisionLink(
+                cad_package_id=cad_package_id,
+                sketch_package_id=sketch_package_id,
+                cad_verification_report_id=report_id,
+                cad_adapter=cad_adapter,
+                verification_status=verification_status,
+                artifacts=tuple(artifacts),
+            ),
+        )
+        return self.revisions.create(revision, event_id=event_id)
+
+
 class ManufacturingService:
     def __init__(self, store: InMemoryLifecycleStore) -> None:
         self.store = store
+
+    def is_revision_eligible(self, revision_id: str) -> bool:
+        revision = self.store.revisions.get(revision_id)
+        if revision is None:
+            raise LifecycleInvariantError(f"unknown revision_id: {revision_id}")
+
+        if revision.origin is not RevisionOrigin.CAD_TRANSFER:
+            return True
+
+        return (
+            revision.cad_link is not None
+            and revision.cad_link.verification_status is CADVerificationStatus.VERIFIED
+        )
 
     def record(self, record: ManufacturingRecord, *, event_id: str) -> ManufacturingRecord:
         if record.manufacturing_id in self.store.manufacturing_records:
             raise LifecycleInvariantError(
                 f"duplicate manufacturing_id: {record.manufacturing_id}"
             )
-        if record.revision_id not in self.store.revisions:
+        revision = self.store.revisions.get(record.revision_id)
+        if revision is None:
             raise LifecycleInvariantError(f"unknown revision_id: {record.revision_id}")
+        if not self.is_revision_eligible(record.revision_id):
+            raise LifecycleInvariantError(
+                "CAD transfer is not VERIFIED; manufacturing is blocked"
+            )
 
         self.store.manufacturing_records[record.manufacturing_id] = record
         self.store.append_event(
