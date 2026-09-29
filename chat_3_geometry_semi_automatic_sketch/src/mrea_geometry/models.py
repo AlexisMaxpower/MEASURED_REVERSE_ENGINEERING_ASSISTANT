@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal, Union
 
-PrimitiveKind = Literal["LINE", "CIRCLE", "ARC"]
+PrimitiveKind = Literal["POINT", "LINE", "CIRCLE", "ARC"]
 ConstraintKind = Literal[
     "HORIZONTAL",
     "VERTICAL",
@@ -24,10 +24,34 @@ class Point2D:
 
 
 @dataclass(frozen=True, slots=True)
+class PointEntity:
+    entity_id: str
+    point: Point2D
+    feature_id: str | None = None
+    source: str = "VISION_DETECTED"
+    confidence: float | None = None
+
+    @property
+    def kind(self) -> PrimitiveKind:
+        return "POINT"
+
+    def to_dict(self) -> dict:
+        return {
+            "entity_id": self.entity_id,
+            "kind": self.kind,
+            "point": self.point.to_dict(),
+            "feature_id": self.feature_id,
+            "source": self.source,
+            "confidence": self.confidence,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class Line:
     entity_id: str
     start: Point2D
     end: Point2D
+    feature_id: str | None = None
     source: str = "VISION_DETECTED"
     confidence: float | None = None
 
@@ -47,6 +71,7 @@ class Line:
             "kind": self.kind,
             "start": self.start.to_dict(),
             "end": self.end.to_dict(),
+            "feature_id": self.feature_id,
             "source": self.source,
             "confidence": self.confidence,
         }
@@ -57,6 +82,7 @@ class Circle:
     entity_id: str
     center: Point2D
     radius: float
+    feature_id: str | None = None
     source: str = "VISION_DETECTED"
     confidence: float | None = None
 
@@ -74,6 +100,7 @@ class Circle:
             "kind": self.kind,
             "center": self.center.to_dict(),
             "radius": float(self.radius),
+            "feature_id": self.feature_id,
             "source": self.source,
             "confidence": self.confidence,
         }
@@ -86,6 +113,7 @@ class Arc:
     radius: float
     start_angle_deg: float
     end_angle_deg: float
+    feature_id: str | None = None
     source: str = "VISION_DETECTED"
     confidence: float | None = None
 
@@ -105,24 +133,22 @@ class Arc:
             "radius": float(self.radius),
             "start_angle_deg": float(self.start_angle_deg),
             "end_angle_deg": float(self.end_angle_deg),
+            "feature_id": self.feature_id,
             "source": self.source,
             "confidence": self.confidence,
         }
 
 
-GeometryPrimitive = Union[Line, Circle, Arc]
+GeometryPrimitive = Union[PointEntity, Line, Circle, Arc]
 
 
 @dataclass(frozen=True, slots=True)
 class AnchorRef:
-    """Anchor already transformed into the geometry coordinate system.
-
-    Mapping raw Capture/Measurement coordinates into this normalized point is an
-    adapter concern until Integrator publishes canonical contracts.
-    """
+    """Anchor normalized into the Chat 3 geometry coordinate system."""
 
     anchor_id: str
     point: Point2D
+    feature_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,6 +192,7 @@ class ConstraintCandidate:
 class DimensionBinding:
     dimension_id: str
     measurement_id: str
+    measurement_type: str
     value: float
     unit: str
     verified: bool
@@ -177,6 +204,7 @@ class DimensionBinding:
         return {
             "dimension_id": self.dimension_id,
             "measurement_id": self.measurement_id,
+            "measurement_type": self.measurement_type,
             "value": float(self.value),
             "unit": self.unit,
             "verified": self.verified,
