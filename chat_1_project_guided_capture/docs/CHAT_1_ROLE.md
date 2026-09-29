@@ -3,21 +3,31 @@
 **Проект:** MREA — Measured Reverse Engineering Assistant  
 **Роль:** Chat 1  
 **Vertical slice:** Project & Guided Capture  
-**Источник истины:** `../MREA_SSOT_PRODUCT_CONCEPT_ARCHITECTURE_CHAT_ROLES_V0_1_2026-09-29.md`  
-**Статус документа:** актуализирован при подключении Chat 1 к репозиторию  
-**Дата:** 2026-09-29
-
----
+**Источник истины продукта:** `../MREA_SSOT_PRODUCT_CONCEPT_ARCHITECTURE_CHAT_ROLES_V0_1_2026-09-29.md`  
+**Canonical integration authority:** Chat 6 — Orchestrator / Repository Integrator  
+**Current directive:** `OD-2026-09-29-001`  
+**Contract baseline:** `mrea.contracts.v1`  
+**Дата актуализации:** 2026-09-29
 
 ## 1. Назначение роли
 
-Chat 1 реализует полный вертикальный слайс от создания проекта до формирования валидного `CapturePackage`, который может быть передан downstream-слайсам.
+Chat 1 реализует вертикальный слайс от создания Project и контекста детали до формирования canonical `CapturePackage`, который downstream-слайсы могут потреблять без знания внутренней реализации Capture.
 
-Основная задача: обеспечить воспроизводимый, проверяемый и удобный процесс получения исходных визуальных данных детали до того, как система начнёт интерпретировать физические измерения или строить геометрию.
+Основная задача — получить воспроизводимые, проверяемые visual evidence artifacts и calibration context до того, как система начинает интерпретировать физические измерения или строить геометрию.
 
----
+## 2. Source-of-truth hierarchy
 
-## 2. Ownership
+Для Chat 1 действует порядок:
+
+1. current repository state on `main`;
+2. canonical shared contracts in `core/contracts/`;
+3. canonical fixtures in `tests/fixtures/contracts/`;
+4. product SSOT + Chat 6 orchestration state/directives;
+5. Chat 1 local documentation.
+
+Если slice-local документ противоречит canonical contract, побеждает `core/contracts/`.
+
+## 3. Ownership Chat 1
 
 Chat 1 отвечает за:
 
@@ -33,30 +43,29 @@ Chat 1 отвечает за:
 - voice capture trigger;
 - image quality analysis;
 - background/object preparation;
-- формирование `CapturePackage`.
+- формирование canonical `CapturePackage` через adapter boundary.
 
-### Основные компоненты
+Основные компоненты/зоны ответственности:
 
-- `ProjectService`
-- `CapturePlanService`
-- `CameraSession`
-- `ImageQualityAnalyzer`
-- `CalibrationDetector`
-- `CaptureRegistration`
-- `ReferenceFrameBuilder`
-- `VoiceCaptureTrigger`
-- `CapturePackageBuilder`
+- `ProjectService`;
+- `CapturePlanService`;
+- CaptureSession state/workflow;
+- `ArtifactStore` abstraction;
+- `CalibrationDetector`;
+- `CalibrationService`;
+- future `CaptureRegistration` / perspective normalization;
+- future `ImageQualityAnalyzer`;
+- future `VoiceCaptureTrigger`;
+- `CanonicalContractBuilder` как outward adapter к Integrator-owned contracts.
 
----
+## 4. Что не входит в ownership
 
-## 3. Что не входит в ownership Chat 1
+Chat 1 не владеет:
 
-Chat 1 не отвечает за:
-
-- смысл measurement;
+- measurement meaning;
 - final measurement value;
 - final OCR semantics;
-- `PhysicalMeasurement` как метрологически подтверждённый результат;
+- `PhysicalMeasurement` semantics;
 - feature anchors как measurement semantics;
 - geometry/sketch;
 - CAD;
@@ -64,97 +73,116 @@ Chat 1 не отвечает за:
 
 Chat 1 не изменяет самостоятельно:
 
-- shared contracts;
-- `/core/contracts/`;
-- `/core/domain/shared/`;
-- `/tests/fixtures/contracts/`;
+- `core/contracts/`;
+- `core/domain/shared/`;
+- `tests/fixtures/contracts/`;
 - глобальную архитектуру;
 - cross-slice ownership.
 
-Эти области принадлежат Integrator.
+Любое backward-incompatible изменение shared contract требует Change Request к Chat 6.
 
----
+## 5. Canonical inputs and outputs
 
-## 4. Входы
+Текущие canonical источники:
 
-### Пользовательские/физические входы
+- `core/contracts/mrea_contracts_v1.schema.json`;
+- `core/contracts/POLICIES_V1.md`;
+- `tests/fixtures/contracts/project_v1.json`;
+- `tests/fixtures/contracts/capture_package_v1.json`.
 
-- project context;
-- описание детали и проблемы;
-- камера/фотографии;
-- Measurement Mat;
-- camera metadata;
-- команды захвата;
-- voice trigger на Hands-Free этапе.
+Chat 1 производит наружу:
 
-### Shared contracts, которые потребляет или производит Chat 1
+- `ProjectContract v1`;
+- `CapturePackage v1`;
+- вложенные canonical `ArtifactReference`;
+- вложенные canonical `MeasurementCaptureFrame`;
+- optional per-view calibration object.
 
-- `ProjectContract`;
-- `CapturePackage`;
-- `MeasurementCaptureFrame`;
-- `ArtifactReference`.
+Internal models (`Project`, `ArtifactRecord`, `FrameRecord`, `CaptureSession`, `CalibrationResult`) остаются slice-local и не выдаются за shared contracts.
 
-Их canonical schemas должны утверждаться Integrator и версионироваться.
+## 6. Canonical boundary policy
 
----
+Утверждённые правила:
 
-## 5. Выход
+- wire IDs — opaque non-empty strings;
+- UUID внутри Chat 1 допустим и сериализуется наружу как opaque string;
+- Project имеет стабильные `project_id` и `part_id`;
+- legacy Project без `part_id` получает deterministic stable backfill;
+- timestamps выходят в UTC/RFC3339;
+- `CapturePackage` содержит captured views;
+- каждый emitted view содержит ровно один clean reference artifact;
+- measurement frames остаются отдельными evidence artifacts;
+- calibration относится к clean reference того же view;
+- Chat 1 не меняет physical measurement semantics.
 
-Основной downstream output:
+## 7. Capture workflow
 
-`CapturePackage v1`
-
-Он должен содержать достаточно данных, чтобы Chat 2 мог начать Physical Measurement без зависимости от внутренней реализации Chat 1.
-
-Минимально ожидаемые категории данных:
-
-- project identity/reference;
-- captured views;
-- clean reference frame;
-- measurement frames;
-- calibration reference/metadata;
-- camera metadata;
-- timestamps;
-- image-quality results/warnings;
-- artifact references;
-- contract version.
-
-Точная schema не фиксируется этим документом, потому что shared contracts принадлежат Integrator.
-
----
-
-## 6. Capture workflow
-
-Базовый поток Chat 1:
+Целевой поток:
 
 ```text
 Project
 → CapturePlan
 → CaptureSession
-→ Guided Capture
-→ Image Quality Analysis
+→ Camera / Guided Capture
+→ Clean Reference
 → Measurement Mat Detection
 → Calibration
 → Perspective Normalization
-→ CleanReferenceFrame
-→ MeasurementCaptureFrame
-→ CapturePackage
+→ Measurement Frames
+→ Quality Analysis
+→ Canonical CapturePackage
 ```
 
-Ключевой принцип: clean reference frame должен храниться отдельно от measurement frames. Measurement frames остаются исходными evidence-артефактами и не должны механически накладываться друг на друга для построения финального clean view.
+Clean reference и measurement frames должны оставаться отдельными immutable evidence artifacts.
 
----
+## 8. CapturePlan
 
-## 7. Guided Capture checks
+Поддерживаемые canonical/SSOT виды:
 
-Планируемые проверки:
+- `FRONT`;
+- `LEFT`;
+- `RIGHT`;
+- `TOP`;
+- `BOTTOM`;
+- `REAR`;
+- `DETAIL_A`;
+- `DETAIL_B`;
+- `OPTIONAL_3Q`.
+
+Текущий safe implicit baseline — `FRONT`. `OPTIONAL_3Q` не блокирует completion required views.
+
+## 9. Measurement Mat и calibration
+
+Measurement Mat используется для:
+
+- fiducial detection;
+- определения рабочей плоскости;
+- calibration;
+- perspective correction;
+- регистрации в единой XY-системе;
+- перехода `IMAGE_PX -> MAT_XY_MM`.
+
+Текущая реализация использует OpenCV ChArUco и RANSAC homography. Measurement Mat не заменяет verified physical measurement instrument.
+
+Объективная calibration evidence включает:
+
+- detected marker count;
+- detected ChArUco corner count;
+- corner IDs;
+- 3x3 homography;
+- reprojection RMSE in mm;
+- clean-reference provenance.
+
+Canonical `calibration.quality` пока остаётся `null`, потому что утверждённой scalar quality formula нет.
+
+## 10. Guided Capture checks — planned
+
+Будущие проверки:
 
 - marker visibility;
-- focus;
-- blur;
+- focus/blur;
 - exposure;
-- shadow;
-- glare;
+- shadow/glare;
 - camera tilt;
 - object framing;
 - perspective distortion;
@@ -162,214 +190,122 @@ Project
 - feature occlusion;
 - completeness of views.
 
-Результат проверки должен быть объясним пользователю как actionable warning, а не только численный score.
+Результат должен быть actionable warning, а не скрытый AI/CV verdict.
 
----
-
-## 8. CapturePlan
-
-Поддерживаемые SSOT виды:
-
-- `FRONT`
-- `LEFT`
-- `RIGHT`
-- `TOP`
-- `BOTTOM`
-- `REAR`
-- `DETAIL_A`
-- `DETAIL_B`
-- `OPTIONAL_3Q`
-
-Система может рекомендовать дополнительные виды, но не должна утверждать, что скрытая геометрия полностью восстановлена при недостатке данных.
-
----
-
-## 9. Measurement Mat
-
-Measurement Mat используется для:
-
-- определения рабочей плоскости;
-- калибровки;
-- perspective correction;
-- масштаба изображения;
-- регистрации кадров;
-- обнаружения смещения камеры;
-- единой XY-системы.
-
-Measurement Mat не заменяет физический измерительный инструмент для verified metric dimensions.
-
----
-
-## 10. MVP Chat 1
-
-Согласно разделу Chat 1 SSOT:
-
-1. project;
-2. CapturePlan;
-3. camera;
-4. clean reference frame;
-5. marker detection;
-6. perspective normalization;
-7. manual measurement frame;
-8. voice-trigger measurement frame;
-9. quality warnings;
-10. CapturePackage v1.
-
-### Roadmap reconciliation
-
-Глобальный Roadmap SSOT относит `voice trigger` к R4 — Hands-Free, тогда как локальный MVP/Acceptance Chat 1 включает voice-trigger measurement frame.
-
-До решения Integrator применяется следующая рабочая трактовка:
-
-- R1: manual capture baseline без обязательной voice automation;
-- R4: voice-trigger extension;
-- итоговый Chat 1 slice должен выполнить acceptance по voice-trigger capture event.
-
-Это трактовка состояния разработки, а не изменение SSOT.
-
----
-
-## 11. Acceptance Criteria
-
-Slice Chat 1 должен подтвердить:
-
-- project создаётся и восстанавливается;
-- `FRONT` view может быть завершён;
-- clean frame отделён от measurement frames;
-- calibration сохраняется;
-- каждый frame имеет timestamp и camera metadata;
-- voice trigger создаёт capture event;
-- `CapturePackage` проходит schema validation.
-
----
-
-## 12. Offline-first требования
+## 11. Offline-first
 
 Capture workflow должен работать без cloud-only зависимости:
 
-- session хранится локально;
-- frames не теряются при отсутствии сети;
-- basic calibration доступна локально;
-- синхронизация может выполняться позже.
+- Project и CaptureSession сохраняются локально;
+- image artifacts хранятся локально через replaceable `ArtifactStore`;
+- basic calibration выполняется локально;
+- данные не теряются при отсутствии сети;
+- будущая синхронизация не должна менять domain semantics.
 
----
+Текущие adapters: atomic JSON repositories + content-addressed filesystem artifact store with SHA-256 verification.
 
-## 13. Build / Reuse baseline
+## 12. Build / Reuse policy
 
-Перед реализацией каждого нетривиального CV/camera компонента заполняется Build / Reuse Check.
+Не переизобретаем generic infrastructure:
 
-Предварительный baseline из SSOT:
+- Pydantic — validation/serialization;
+- OpenCV — ArUco/ChArUco detection, image decode, homography primitives;
+- NumPy — numerical arrays;
+- jsonschema — canonical contract tests.
 
-- OpenCV используется как строительный блок для CV;
-- marker detection/calibration не пишутся с нуля без необходимости;
-- generic segmentation model не разрабатывается с нуля;
-- platform speech recognition используется для первоначального voice-trigger spike;
-- собственными остаются orchestration, workflow, quality policy, capture state machine и формирование downstream package.
+MREA-own code: orchestration, capture state machine, provenance policy, mat identity/configuration, boundary mapping, acceptance rules и product-specific quality policy.
 
----
+## 13. Реализовано к концу Прохода 1
 
-## 14. Технические риски Chat 1
+### Phase 1
 
-### Medium
+- Project/Part context;
+- create/recovery/archive;
+- stable `project_id` / `part_id`;
+- deterministic CapturePlan;
+- offline repository abstraction.
 
-- marker calibration robustness;
-- perspective correction;
-- segmentation/background preparation;
-- voice trigger reliability.
+### Phase 2
 
-### Low
+- CaptureSession persistence;
+- CameraMetadata;
+- clean/measurement separation;
+- content-addressed artifacts + SHA-256;
+- required-view completion semantics.
 
-- project model;
-- REST/API слой после утверждения архитектуры;
-- сохранение базового capture state.
+### Canonical integration gate
 
-High-risk caliper/jaw/OCR research не должен блокировать R1 и относится преимущественно к Chat 2 / более поздним этапам.
+- canonical `ProjectContract v1` adapter;
+- canonical `CapturePackage v1` builder;
+- ArtifactReference/MeasurementCaptureFrame mapping;
+- deterministic opaque package/view IDs;
+- JSON Schema validation;
+- FRONT acceptance target `OD-2026-09-29-001` satisfied.
 
----
+### Phase 3 calibration baseline
 
-## 15. Ограничения на разработку
+- `MeasurementMatProfile`;
+- `CalibrationResult` persistence;
+- `CalibrationDetector` abstraction;
+- `OpenCvCharucoCalibrationDetector`;
+- ChArUco detection;
+- RANSAC homography to `MAT_XY_MM`;
+- canonical non-null calibration mapping;
+- synthetic integration test.
 
-1. Не выдумывать shared schemas.
-2. Не менять verified physical measurement — Chat 1 вообще не является владельцем final measurement semantics.
-3. Не выдавать image-derived масштаб/геометрию за physical measurement.
-4. Не использовать cloud-only camera/capture architecture.
-5. Не затрагивать директории других vertical slices.
-6. Не делать CV/AI результат скрытой истиной: результат должен оставаться candidate/diagnostic до соответствующего подтверждения downstream.
+## 14. Verification status
 
----
-
-## 16. Change Request к Integrator
+Latest full local regression:
 
 ```text
-CHANGE_REQUEST
-
-Requester:
-Chat 1 — Project & Guided Capture
-
-Contract:
-ProjectContract
-CapturePackage
-MeasurementCaptureFrame
-ArtifactReference
-
-Problem:
-SSOT определяет назначение и ownership contracts,
-но не задаёт полные versioned schemas.
-
-Current behavior:
-Есть концептуальные имена и требования, но нет canonical v1 schemas/fixtures.
-
-Requested change:
-Утвердить v1 schemas и canonical fixtures для:
-- ProjectContract
-- CapturePackage
-- MeasurementCaptureFrame
-- ArtifactReference
-
-Также зафиксировать:
-- CaptureViewType enum;
-- camera metadata schema;
-- calibration metadata schema;
-- quality-warning representation;
-- clean_reference_frame reference;
-- measurement frame list;
-- timestamps;
-- artifact identifiers;
-- contract version field.
-
-Reason:
-Без этого Chat 1 может реализовать внутренний domain,
-но не может честно выполнить contract validation
-и гарантировать совместимость с Chat 2.
-
-Affected chats:
-Integrator
-Chat 1
-Chat 2
-potentially Chat 3
-
-Backward compatible:
-YES — contracts ещё не реализованы.
-
-Migration:
-Not applicable.
+13 passed in 1.07s
 ```
 
----
+Synthetic calibration fixture:
 
-## 17. Текущий следующий шаг
+- 5x7 ChArUco board;
+- 24 ChArUco corners;
+- marker detection succeeds;
+- 9-value homography;
+- reprojection RMSE `< 0.001 mm`;
+- resulting canonical CapturePackage validates against Integrator-owned schema.
 
-До утверждения shared contracts можно безопасно проектировать и реализовывать внутренние компоненты Chat 1 только там, где их интерфейс не фиксирует глобальную schema.
+Не проверено:
 
-При появлении Integrator baseline порядок работы:
+- GitHub Actions CI;
+- printed physical mat;
+- phone lens distortion / intrinsics;
+- physical mm accuracy;
+- real-world blur/glare/oblique capture robustness;
+- mobile/native camera runtime.
 
-1. сверить repository structure;
-2. прочитать canonical contracts/fixtures;
-3. провести Build / Reuse Check по camera/CV зависимостям;
-4. реализовать Project/CapturePlan domain;
-5. реализовать manual capture path;
-6. добавить calibration и perspective normalization;
-7. добавить quality analysis;
-8. сформировать `CapturePackage` через утверждённую schema;
-9. добавить contract/integration tests;
-10. обновить эту документацию и Implementation Report.
+## 15. Acceptance criteria tracking
+
+- project создаётся и восстанавливается — DONE;
+- FRONT view может быть завершён — DONE;
+- clean frame отделён от measurement frames — DONE;
+- calibration сохраняется — DONE;
+- frame имеет timestamp/camera metadata — DONE;
+- CapturePackage schema validation — DONE;
+- marker detection — DONE baseline;
+- perspective normalization — NOT YET;
+- quality warnings — NOT YET;
+- voice trigger creates capture event — NOT YET, planned Hands-Free/R4 extension.
+
+## 16. Closed Change Request
+
+Первоначальный запрос на canonical `ProjectContract`, `CapturePackage`, `MeasurementCaptureFrame`, `ArtifactReference` **закрыт**: Chat 6 опубликовал `mrea.contracts.v1` и canonical fixtures.
+
+Новый Change Request сейчас не требуется. Любые будущие несовместимые contract changes должны идти через Chat 6.
+
+## 17. Immediate next technical target
+
+После интеграционной проверки Chat 6 следующий технический target Chat 1:
+
+1. perspective-normalized derived image artifact;
+2. deterministic `MAT_XY_MM` raster definition;
+3. source clean-reference → rectified artifact provenance;
+4. synthetic perspective-distortion warp test;
+5. затем Guided Quality baseline.
+
+До новой директивы Chat 6 shared contracts не меняются.
