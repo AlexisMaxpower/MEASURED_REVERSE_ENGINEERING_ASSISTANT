@@ -1,11 +1,11 @@
 # Chat 5 — Lifecycle & Engineering Knowledge
 
-Статус: **Pass 4 durable persistence foundation implemented**  
+Статус: **Pass 5 normalized relational persistence/query layer implemented**  
 Проект: **MREA — Measured Reverse Engineering Assistant**  
 Источник истины: **MREA SSOT v0.1 + orchestration addendum v0.2**  
-Запуск Pass 4: **direct user instruction; OD-004 отсутствовал в GitHub на момент старта**  
-Рабочая ветка: `chat-5/pass-4`  
-База ветки: `cdc5baceb281b657680d1e38cc49ea8094669ad8` (frozen Pass 3 handoff)
+Запуск Pass 5: **direct user instruction; newer Chat-5-specific directive was absent on `main`**  
+Рабочая ветка: `chat-5/pass-5`  
+База ветки: `81a3c1c63e03fbabbd0da1c8191c5ca7ea13cb01` (frozen Pass 4 handoff)
 
 ## Назначение области
 
@@ -48,42 +48,67 @@ Revision
 
 ### Pass 4
 
-Добавлен durable persistence/application boundary:
-
 - `LifecycleRepository` persistence port;
-- nested atomic transactions in `InMemoryLifecycleStore`;
-- `LifecycleUnitOfWork` across revision/manufacturing/installation/test/failure/physical services;
-- `SQLiteLifecycleStore` using stdlib `sqlite3`;
-- versioned durable snapshot `mrea.lifecycle-snapshot.v1`;
-- atomic canonical + physical commit/rollback;
-- optimistic stale-writer protection through `loaded_version`;
-- explicit `reload()` after concurrent writer advancement;
-- fail-closed rejection of SQLite mutations outside Unit of Work;
-- deterministic round-trip of CAD links, Decimal cost, canonical events and physical events.
+- `LifecycleUnitOfWork`;
+- nested rollback-capable transactions;
+- `SQLiteLifecycleStore`;
+- authoritative `mrea.lifecycle-snapshot.v1` durable snapshot;
+- stale-writer protection and explicit reload;
+- atomic canonical + physical persistence.
 
-## Transaction model
+### Pass 5
 
-Recommended durable write path:
+Добавлен нормализованный SQL query layer поверх того же authoritative snapshot:
 
-```python
-store = SQLiteLifecycleStore("lifecycle.db")
-uow = LifecycleUnitOfWork(store)
+- `SQLiteSchemaManager` и ordered migration journal;
+- relational schema version `2`;
+- automatic migration/backfill старых Pass-4 databases;
+- normalized lifecycle/CAD/manufacturing/installation/test/failure/physical-event tables;
+- deterministic relational indexes;
+- `lifecycle_read_model_meta.snapshot_version`;
+- automatic repair when relational projection lags behind snapshot;
+- snapshot + relational projection commit atomically in one SQLite transaction;
+- SQL-native `revision_history`;
+- SQL-native `failure_history`;
+- SQL-native `equipment_occupancy`;
+- SQL-native `physical_timeline`.
 
-with uow.transaction():
-    uow.revisions.create(...)
-    uow.manufacturing.record(...)
-    uow.physical.register_manufactured(...)
+## Persistence model
+
+Write path:
+
+```text
+LifecycleUnitOfWork
+→ authoritative aggregate
+→ lifecycle_store snapshot
+→ normalized SQL read model
+→ read-model snapshot_version
+→ COMMIT
 ```
 
-Any exception rolls the whole Unit of Work back, including both canonical and physical event streams.
+If projection generation fails, the whole transaction rolls back.
 
-A stale SQLite writer is rejected instead of overwriting a newer committed lifecycle state.
+Old Pass-4 databases remain readable. Their snapshot is not rewritten merely because Pass 5 adds relational schema; instead the normalized tables are backfilled from the existing snapshot and stamped with the same snapshot version.
+
+## Query surface
+
+```python
+store.queries.revision_history("PART-0042")
+store.queries.failure_history(instance_id="PI-001")
+store.queries.equipment_occupancy(
+    equipment_id="RACK-01",
+    position="SLOT-A",
+)
+store.queries.physical_timeline("PI-001")
+```
+
+Queries read committed normalized SQL state rather than scanning the complete in-memory aggregate.
 
 ## Shared-contract boundary
 
 No shared MREA contract was changed.
 
-Canonical `mrea.lifecycle-event.v1` still exports only:
+Canonical `mrea.lifecycle-event.v1` remains limited to:
 
 - `REVISION_CREATED`;
 - `MANUFACTURED`;
@@ -91,30 +116,32 @@ Canonical `mrea.lifecycle-event.v1` still exports only:
 - `TESTED`;
 - `FAILED`.
 
-Physical states and persistence metadata remain internal to Chat 5.
+Physical states, migration metadata and relational projection details remain internal to Chat 5.
 
 ## Verification
 
-Independent GitHub-hosted Chat 5 CI on Pass-4 implementation:
+Independent GitHub-hosted Chat 5 CI on Pass-5 implementation SHA `fc1402132092379c94e59332c2d14bfa1e7a367a`:
 
 ```text
-20 passed in 0.17s
+25 passed in 1.09s
 ```
 
-Canonical contract checks passed on the same run. Downstream `Integration / Chat 4 -> Chat 5` remains an acceptance gate for the final handoff.
+Canonical contract checks passed in the same workflow.
 
 ## Documentation
 
 - `docs/PASS_3_PHYSICAL_PART_INSTANCE_LIFECYCLE.md`
 - `docs/PASS_4_PERSISTENCE_UOW.md`
+- `docs/PASS_5_RELATIONAL_READ_MODEL.md`
 - `docs/IMPLEMENTATION_STATE.md`
 - `ORCHESTRATOR_HANDOFF.md`
 
 ## Still intentionally out of scope
 
-- normalized/query-optimized production database schema;
-- migration framework;
+- incremental SQL projection updates instead of deterministic full rebuild per write transaction;
+- richer engineering query catalogue;
+- backup/restore tooling;
 - REST/API;
 - field-device synchronization;
 - AI / semantic failure analysis;
-- shared contract expansion for physical events.
+- shared contract expansion for physical-only events.
