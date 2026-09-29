@@ -8,7 +8,7 @@ param(
     [Parameter(Mandatory=$true)]
     [string]$OutputJson,
     [string]$PartTemplate,
-    [bool]$AgentRequired = $true,
+    [switch]$AgentOptional,
     [switch]$RequireBuildTools,
     [switch]$AllowLaunchForVersionProbe
 )
@@ -16,6 +16,7 @@ param(
 $ErrorActionPreference = "Stop"
 $AdapterName = "SOLIDWORKS_2026"
 $ExpectedRevisionMajor = 34
+$agentIsRequired = -not $AgentOptional
 $checks = New-Object System.Collections.Generic.List[object]
 
 function Add-ReadinessCheck {
@@ -59,7 +60,6 @@ function Write-JsonUtf8NoBom {
     [IO.File]::WriteAllText([IO.Path]::GetFullPath($Path), $json, (New-Object Text.UTF8Encoding($false)))
 }
 
-# 1. Windows 11 x64.
 try {
     $os = Get-CimInstance Win32_OperatingSystem -ErrorAction Stop
     $isWin11 = [string]$os.Caption -match "Windows 11"
@@ -83,7 +83,6 @@ try {
     }
 }
 
-# 2. x64 process.
 if ([Environment]::Is64BitProcess) {
     Add-ReadinessCheck "PROCESS_X64" "PASS" "Host preflight is running in a 64-bit process." $true @{
         process_architecture = "x64"
@@ -94,7 +93,6 @@ if ([Environment]::Is64BitProcess) {
     }
 }
 
-# 3. .NET Framework 4.8.
 try {
     $net = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full" -Name Release -ErrorAction Stop
     $release = [int]$net.Release
@@ -114,7 +112,6 @@ try {
     }
 }
 
-# 4. Optional build-tool gate. It is required only when the one-command runner must build the agent.
 if ($RequireBuildTools) {
     $msbuild = Get-Command msbuild.exe -ErrorAction SilentlyContinue
     if ($null -ne $msbuild) {
@@ -126,20 +123,18 @@ if ($RequireBuildTools) {
     }
 }
 
-# 5. Agent executable.
 $agentFullPath = [IO.Path]::GetFullPath($AgentPath)
 if (Test-Path -LiteralPath $agentFullPath -PathType Leaf) {
-    Add-ReadinessCheck "AGENT_EXECUTABLE_AVAILABLE" "PASS" "CAD Agent executable is available." $AgentRequired @{
+    Add-ReadinessCheck "AGENT_EXECUTABLE_AVAILABLE" "PASS" "CAD Agent executable is available." $agentIsRequired @{
         path = $agentFullPath
     }
 } else {
-    $agentStatus = if ($AgentRequired) { "FAIL" } else { "UNVERIFIED" }
-    Add-ReadinessCheck "AGENT_EXECUTABLE_AVAILABLE" $agentStatus "CAD Agent executable is not available yet." $AgentRequired @{
+    $agentStatus = if ($agentIsRequired) { "FAIL" } else { "UNVERIFIED" }
+    Add-ReadinessCheck "AGENT_EXECUTABLE_AVAILABLE" $agentStatus "CAD Agent executable is not available yet." $agentIsRequired @{
         path = $agentFullPath
     }
 }
 
-# 6. Official SOLIDWORKS interop assemblies.
 $interopDir = Join-Path ([IO.Path]::GetFullPath($SolidWorksInstallDir)) "api\redist"
 $sldworksInterop = Join-Path $interopDir "SolidWorks.Interop.sldworks.dll"
 $swconstInterop = Join-Path $interopDir "SolidWorks.Interop.swconst.dll"
@@ -158,7 +153,6 @@ if ($interopPresent) {
     }
 }
 
-# 7. COM registration.
 $comType = $null
 try {
     $comType = [Type]::GetTypeFromProgID("SldWorks.Application", $false)
@@ -175,7 +169,6 @@ try {
     }
 }
 
-# 8. Output path must be actually writable.
 try {
     $outputFullPath = [IO.Path]::GetFullPath($OutputDir)
     [IO.Directory]::CreateDirectory($outputFullPath) | Out-Null
@@ -192,11 +185,8 @@ try {
     }
 }
 
-# 9. Attach to an active SOLIDWORKS session, or launch only when explicitly allowed,
-# to obtain the actual RevisionNumber and (if needed) the configured default part template.
 $swApp = $null
 $launchedForProbe = $false
-$revision = $null
 try {
     try {
         $swApp = [Runtime.InteropServices.Marshal]::GetActiveObject("SldWorks.Application")
