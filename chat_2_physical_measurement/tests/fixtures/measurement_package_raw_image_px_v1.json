@@ -1,0 +1,83 @@
+{
+  "schema_version": "mrea.measurement-package.v1",
+  "measurement_package_id": "MP-CHAT2-P2-001",
+  "project_id": "P-CHAT2-PASS2-001",
+  "part_id": "PART-CHAT2-PASS2-001",
+  "capture_package_id": "CP-CHAT2-PASS2-001",
+  "measurements": [
+    {
+      "measurement_id": "M-CHAT2-P2-001",
+      "type": "LINEAR_EXTERNAL",
+      "value": 80.2,
+      "unit": "mm",
+      "uncertainty": 0.02,
+      "source": "MANUAL_MEASURED",
+      "view_id": "VIEW-FRONT-RAW-001",
+      "anchors": [
+        {
+          "anchor_id": "A-CHAT2-P2-001",
+          "view_id": "VIEW-FRONT-RAW-001",
+          "reference_frame_id": "A-FRONT-CLEAN-RAW-001",
+          "coordinate_space": "IMAGE_PX",
+          "x": 100.0,
+          "y": 200.0,
+          "feature_id": null
+        },
+        {
+          "anchor_id": "A-CHAT2-P2-002",
+          "view_id": "VIEW-FRONT-RAW-001",
+          "reference_frame_id": "A-FRONT-CLEAN-RAW-001",
+          "coordinate_space": "IMAGE_PX",
+          "x": 902.0,
+          "y": 200.0,
+          "feature_id": null
+        }
+      ],
+      "evidence_frame_id": "FRAME-FRONT-MEAS-001",
+      "instrument": {
+        "type": "DIGITAL_CALIPER"
+      },
+      "confidence": null,
+      "verified": true,
+      "confirmation_source": "USER_CONFIRMED",
+      "created_at": "2026-09-29T12:00:00.000000Z"
+    },
+    {
+      "measurement_id": "M-CHAT2-P2-002",
+      "type": "DIAMETER_INTERNAL",
+      "value": 5.1,
+      "unit": "mm",
+      "uncertainty": 0.02,
+      "source": "MANUAL_MEASURED",
+      "view_id": "VIEW-FRONT-RAW-001",
+      "anchors": [
+        {
+          "anchor_id": "A-CHAT2-P2-003",
+          "view_id": "VIEW-FRONT-RAW-001",
+          "reference_frame_id": "A-FRONT-CLEAN-RAW-001",
+          "coordinate_space": "IMAGE_PX",
+          "x": 500.0,
+          "y": 300.0,
+          "feature_id": null
+        },
+        {
+          "anchor_id": "A-CHAT2-P2-004",
+          "view_id": "VIEW-FRONT-RAW-001",
+          "reference_frame_id": "A-FRONT-CLEAN-RAW-001",
+          "coordinate_space": "IMAGE_PX",
+          "x": 551.0,
+          "y": 300.0,
+          "feature_id": null
+        }
+      ],
+      "evidence_frame_id": "FRAME-FRONT-MEAS-001",
+      "instrument": {
+        "type": "DIGITAL_CALIPER"
+      },
+      "confidence": null,
+      "verified": true,
+      "confirmation_source": "USER_CONFIRMED",
+      "created_at": "2026-09-29T12:00:00.000000Z"
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import uuid4
 
@@ -15,6 +16,10 @@ from .models import (
 from .repository import InMemoryMeasurementSessionRepository
 
 
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
 class MeasurementSessionService:
     """Application service for Phase A: manual anchors + manual value + confirmation."""
 
@@ -23,14 +28,23 @@ class MeasurementSessionService:
         repository: InMemoryMeasurementSessionRepository,
         *,
         id_factory: Callable[[str], str] | None = None,
+        clock: Callable[[], datetime] | None = None,
     ) -> None:
         self._repository = repository
         self._id_factory = id_factory or (lambda prefix: f"{prefix}_{uuid4().hex}")
+        self._clock = clock or _utc_now
+
+    def _now(self) -> datetime:
+        value = self._clock()
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("clock must return a timezone-aware datetime")
+        return value
 
     def create_session(self, project_id: str) -> MeasurementSession:
         session = MeasurementSession(
             session_id=self._id_factory("MS"),
             project_id=project_id,
+            created_at=self._now(),
         )
         self._repository.save(session)
         return session
@@ -82,6 +96,7 @@ class MeasurementSessionService:
             evidence_frame_id=evidence_frame_id,
             instrument_type=instrument_type,
             confirmed=False,
+            created_at=self._now(),
         )
         self._repository.save(session.append(measurement))
         return measurement
@@ -98,7 +113,7 @@ class MeasurementSessionService:
 
         session = self._repository.get(session_id)
         measurement = session.get(measurement_id)
-        confirmed = measurement.confirm_by_user()
+        confirmed = measurement.confirm_by_user(at=self._now())
         self._repository.save(session.replace_measurement(confirmed))
         return confirmed
 
