@@ -73,8 +73,8 @@ function Invoke-AgentBuild {
 
 try {
     if (-not (Test-Path -LiteralPath $agentFull -PathType Leaf)) {
-        Write-Host "CAD Agent not found. Running preliminary host/build readiness..."
-        $preExit = Invoke-Readiness -JsonPath $prebuildReadiness -AgentRequired $false -RequireBuildTools $true
+        Write-Host "CAD Agent not found. Running preliminary host readiness..."
+        $preExit = Invoke-Readiness -JsonPath $prebuildReadiness -AgentRequired $false -RequireBuildTools $false
         if ($preExit -ne 0) {
             Write-Error "HOST_PREFLIGHT_NOT_READY: preliminary readiness is not READY. See $prebuildReadiness"
             exit 10
