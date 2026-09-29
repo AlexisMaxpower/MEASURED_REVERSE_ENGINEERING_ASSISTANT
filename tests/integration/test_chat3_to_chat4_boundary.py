@@ -110,11 +110,11 @@ def test_real_chat3_sketch_package_is_consumed_and_verified_by_chat4() -> None:
     }
     verified_measurement_ids = {
         item["measurement_id"]
-        for item in transfer.cad_verification_report["dimensions"]
+        for item in transfer.cad_verification_report["items"]
         if item.get("measurement_id") is not None
     }
     assert verified_measurement_ids == sketch_measurement_ids
     assert all(
         item["status"] == "VERIFIED"
-        for item in transfer.cad_verification_report["dimensions"]
+        for item in transfer.cad_verification_report["items"]
     )
