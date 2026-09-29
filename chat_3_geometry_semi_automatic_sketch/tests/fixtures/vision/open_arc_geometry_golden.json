@@ -1,0 +1,16 @@
+{
+  "primitives": [
+    {
+      "entity_id": "A-DETECTED-001",
+      "kind": "ARC",
+      "center": {"x": 0.0, "y": 0.0},
+      "radius": 10.198,
+      "start_angle_deg": 69.775,
+      "end_angle_deg": 339.775,
+      "feature_id": null,
+      "source": "VISION_DETECTED",
+      "confidence": 0.96
+    }
+  ],
+  "issues": []
+}
