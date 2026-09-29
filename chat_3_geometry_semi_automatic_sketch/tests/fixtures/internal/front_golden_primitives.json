@@ -1,0 +1,10 @@
+{
+  "primitives": [
+    {"kind":"LINE","entity_id":"L-BOTTOM","feature_id":"EDGE_BOTTOM","start":[0.0,0.0],"end":[80.2,0.0],"source":"GEOMETRY_DERIVED","confidence":1.0},
+    {"kind":"LINE","entity_id":"L-RIGHT","feature_id":"EDGE_RIGHT","start":[80.2,0.0],"end":[80.2,42.1],"source":"GEOMETRY_DERIVED","confidence":1.0},
+    {"kind":"LINE","entity_id":"L-TOP","feature_id":"EDGE_TOP","start":[80.2,42.1],"end":[0.0,42.1],"source":"GEOMETRY_DERIVED","confidence":1.0},
+    {"kind":"LINE","entity_id":"L-LEFT","feature_id":"EDGE_LEFT","start":[0.0,42.1],"end":[0.0,0.0],"source":"GEOMETRY_DERIVED","confidence":1.0},
+    {"kind":"CIRCLE","entity_id":"C-HOLE-1","feature_id":"HOLE_1","center":[10.1,21.05],"radius":2.55,"source":"GEOMETRY_DERIVED","confidence":1.0},
+    {"kind":"CIRCLE","entity_id":"C-HOLE-2","feature_id":"HOLE_2","center":[70.1,21.05],"radius":2.55,"source":"GEOMETRY_DERIVED","confidence":1.0}
+  ]
+}
