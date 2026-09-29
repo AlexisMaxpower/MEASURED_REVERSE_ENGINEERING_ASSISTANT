@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from enum import StrEnum
-from typing import Annotated
-from uuid import UUID, uuid4
+from typing import Annotated, Any
+from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
@@ -64,11 +64,22 @@ class PartContext(StrictModel):
 
 class Project(StrictModel):
     project_id: UUID = Field(default_factory=uuid4)
+    part_id: UUID = Field(default_factory=uuid4)
     name: NonBlank
     part: PartContext
     status: ProjectStatus = ProjectStatus.ACTIVE
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
+
+    @model_validator(mode="before")
+    @classmethod
+    def backfill_stable_part_id(cls, data: Any) -> Any:
+        if isinstance(data, dict) and not data.get("part_id") and data.get("project_id"):
+            migrated = dict(data)
+            project_id = UUID(str(data["project_id"]))
+            migrated["part_id"] = uuid5(NAMESPACE_URL, f"mrea:part:v1:{project_id}")
+            return migrated
+        return data
 
     @model_validator(mode="after")
     def validate_timestamps(self) -> "Project":
