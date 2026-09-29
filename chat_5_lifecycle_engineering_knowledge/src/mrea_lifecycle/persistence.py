@@ -26,6 +26,11 @@ from .models import (
     RevisionOrigin,
     TestRecord,
 )
+from .relational import (
+    SQLiteLifecycleQueryRepository,
+    SQLiteLifecycleReadModelWriter,
+)
+from .sqlite_schema import SQLiteSchemaManager
 from .store import InMemoryLifecycleStore
 
 
@@ -191,11 +196,12 @@ def _physical_event(raw: dict[str, object]) -> PhysicalLifecycleEvent:
 
 
 class SQLiteLifecycleStore(InMemoryLifecycleStore):
-    """Durable Chat 5 repository with atomic snapshot commits and stale-writer guard.
+    """Durable lifecycle aggregate plus normalized relational read model.
 
-    This is deliberately a persistence foundation rather than a query-optimized final
-    schema. The complete lifecycle aggregate is serialized into one versioned SQLite
-    snapshot so canonical and physical event streams commit atomically.
+    The versioned JSON snapshot remains the authoritative atomic write image. Pass 5
+    adds a normalized SQL projection in the same database and updates both inside the
+    same SQLite transaction. The read model therefore cannot commit ahead of or behind
+    a successful snapshot write.
     """
 
     def __init__(self, database: str | Path, *, timeout: float = 5.0) -> None:
@@ -206,15 +212,43 @@ class SQLiteLifecycleStore(InMemoryLifecycleStore):
             timeout=timeout,
             isolation_level=None,
         )
+        self._connection.execute("PRAGMA foreign_keys = ON")
         self._loaded_version = 0
-        self._ensure_schema()
+        self._ensure_snapshot_schema()
+        self._schema_manager = SQLiteSchemaManager(self._connection)
+        self._schema_manager.migrate()
+        self._queries = SQLiteLifecycleQueryRepository(self._connection)
         self.reload()
+        self._synchronize_read_model_if_needed()
 
     @property
     def loaded_version(self) -> int:
         return self._loaded_version
 
-    def _ensure_schema(self) -> None:
+    @property
+    def relational_schema_version(self) -> int:
+        return self._schema_manager.current_version
+
+    @property
+    def read_model_version(self) -> int:
+        row = self._connection.execute(
+            """
+            SELECT snapshot_version
+            FROM lifecycle_read_model_meta
+            WHERE singleton = 1
+            """
+        ).fetchone()
+        if row is None:
+            raise LifecyclePersistenceError("read model metadata row is missing")
+        return int(row[0])
+
+    @property
+    def queries(self) -> SQLiteLifecycleQueryRepository:
+        """SQL-native committed-state query surface."""
+
+        return self._queries
+
+    def _ensure_snapshot_schema(self) -> None:
         self._connection.execute(
             """
             CREATE TABLE IF NOT EXISTS lifecycle_store (
@@ -323,6 +357,47 @@ class SQLiteLifecycleStore(InMemoryLifecycleStore):
         self._hydrate(payload)
         self._loaded_version = int(version)
 
+    def _synchronize_read_model_if_needed(self) -> None:
+        if self.read_model_version == self._loaded_version:
+            return
+
+        self._connection.execute("BEGIN IMMEDIATE")
+        try:
+            durable_row = self._connection.execute(
+                "SELECT version FROM lifecycle_store WHERE singleton = 1"
+            ).fetchone()
+            meta_row = self._connection.execute(
+                """
+                SELECT snapshot_version
+                FROM lifecycle_read_model_meta
+                WHERE singleton = 1
+                """
+            ).fetchone()
+            if durable_row is None or meta_row is None:
+                raise LifecyclePersistenceError(
+                    "cannot synchronize incomplete lifecycle persistence metadata"
+                )
+            durable_version = int(durable_row[0])
+            read_model_version = int(meta_row[0])
+            if durable_version != self._loaded_version:
+                raise LifecycleConcurrencyError(
+                    "snapshot advanced while read model synchronization was starting"
+                )
+            if read_model_version != durable_version:
+                SQLiteLifecycleReadModelWriter.replace(self._connection, self)
+                self._connection.execute(
+                    """
+                    UPDATE lifecycle_read_model_meta
+                    SET snapshot_version = ?
+                    WHERE singleton = 1
+                    """,
+                    (durable_version,),
+                )
+            self._connection.commit()
+        except Exception:
+            self._connection.rollback()
+            raise
+
     def _begin_outer_transaction(self) -> None:
         self._connection.execute("BEGIN IMMEDIATE")
         row = self._connection.execute(
@@ -364,6 +439,21 @@ class SQLiteLifecycleStore(InMemoryLifecycleStore):
             raise LifecycleConcurrencyError(
                 "lifecycle snapshot changed during commit"
             )
+
+        SQLiteLifecycleReadModelWriter.replace(self._connection, self)
+        meta_cursor = self._connection.execute(
+            """
+            UPDATE lifecycle_read_model_meta
+            SET snapshot_version = ?
+            WHERE singleton = 1
+            """,
+            (next_version,),
+        )
+        if meta_cursor.rowcount != 1:
+            raise LifecyclePersistenceError(
+                "read model metadata row is missing during commit"
+            )
+
         self._connection.commit()
         self._loaded_version = next_version
 
