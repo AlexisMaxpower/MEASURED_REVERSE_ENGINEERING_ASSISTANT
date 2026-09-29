@@ -9,15 +9,7 @@
 
 ## Current repository state
 
-Repository теперь содержит пять изолированных chat workspaces:
-
-- `chat_1_project_guided_capture/`;
-- `chat_2_physical_measurement/`;
-- `chat_3_geometry_semi_automatic_sketch/`;
-- `chat_4_cad_bridge_verification/`;
-- `chat_5_lifecycle_engineering_knowledge/`.
-
-На текущий момент Integrator не опубликовал root-level R0 architecture/shared-contract structure, canonical contract schemas или fixtures.
+Repository содержит пять изолированных chat workspaces. Root-level R0 architecture/shared-contract structure от Integrator пока отсутствует.
 
 Chat 1 изменяет только `chat_1_project_guided_capture/`.
 
@@ -25,208 +17,210 @@ Chat 1 изменяет только `chat_1_project_guided_capture/`.
 
 ## Implemented
 
-### Repository/documentation
-
-- repository access verified;
-- Chat 1 ownership isolated in its own directory;
-- role boundaries documented;
-- expected inputs/outputs documented;
-- Chat 1 MVP and acceptance criteria documented;
-- R1/R4 voice-trigger ambiguity recorded;
-- initial Change Request for missing v1 shared schemas prepared;
-- SSOT copied into Chat 1 area as local reference baseline;
-- Phase 1 Build/Reuse Check recorded;
-- Phase 1 implementation report recorded.
-
 ### R1 Phase 1 — Project/Capture domain
 
 - `PartContext`;
-- `Project`;
-- `ProjectStatus`;
-- `CaptureViewType`;
-- `CaptureViewStatus`;
-- `CapturePlanItem`;
-- `CapturePlan`;
-- `CaptureViewProgress`;
-- `CaptureSession`;
-- strict Pydantic validation;
-- timezone-aware timestamps;
-- duplicate-view rejection at model level;
+- `Project` / `ProjectStatus`;
+- `CaptureViewType` / `CaptureViewStatus`;
+- `CapturePlanItem` / `CapturePlan`;
 - deterministic CapturePlan construction;
-- default `FRONT` baseline only;
-- CaptureSession initialization from CapturePlan.
-
-### Project application/persistence
-
+- default `FRONT` baseline;
 - `ProjectRepository` protocol;
 - `JsonProjectRepository`;
-- atomic JSON write via temp file + `os.replace`;
 - `ProjectService.create_project()`;
 - `ProjectService.get_project()`;
 - `ProjectService.archive_project()`;
-- explicit `ProjectNotFoundError`.
+- explicit `ProjectNotFoundError`;
+- strict Pydantic validation;
+- timezone-aware Project timestamps.
+
+### R1 Phase 2 — Manual Capture Baseline
+
+- `CameraMetadata`;
+- internal `ArtifactRecord`;
+- `FrameKind.CLEAN_REFERENCE`;
+- `FrameKind.MEASUREMENT`;
+- `FrameRecord`;
+- `CaptureViewProgress.required`;
+- persisted `CaptureSession.frames`;
+- `CaptureSessionRepository` protocol;
+- `JsonCaptureSessionRepository`;
+- `ArtifactStore` protocol;
+- content-addressed `FileSystemArtifactStore`;
+- SHA-256 integrity check при чтении artifact;
+- `CaptureSessionService.start()`;
+- `capture_clean_reference()`;
+- `capture_measurement_frame()`;
+- `accept_view()`;
+- completion, когда все required views имеют `ACCEPTED`;
+- optional `OPTIONAL_3Q` не блокирует completion;
+- measurement frame запрещён до clean reference того же view;
+- view запрещено принимать без clean reference;
+- clean reference и measurement frames остаются отдельными evidence artifacts.
 
 ---
 
 ## Verification
 
-Added unit tests:
-
-- project create + restore from disk;
-- unknown project explicit error;
-- blank project name validation;
-- default FRONT CapturePlan;
-- explicit plan ordering + duplicate removal;
-- CaptureSession initialization without capture side effects.
-
-Local verification result:
+Последний полный локальный Chat 1 run:
 
 ```text
-6 passed in 0.07s
+10 passed in 0.06s
 ```
 
-Environment used for verification:
+Проверено тестами:
+
+1. project create + restore from disk;
+2. unknown project explicit error;
+3. blank project name validation;
+4. default FRONT CapturePlan;
+5. explicit plan ordering + duplicate removal;
+6. CaptureSession persistence after start;
+7. artifact bytes round-trip + SHA-256 metadata;
+8. measurement frame rejected before clean reference;
+9. clean reference and measurement frame remain distinct after persistence;
+10. required FRONT acceptance completes session while optional 3Q remains unaccepted.
+
+Verification environment:
 
 - Pydantic `2.13.4`;
 - pytest `9.0.2`.
 
-This was a local runtime test run, not GitHub Actions CI.
+Это локальный runtime verification, не GitHub Actions CI.
+
+---
+
+## Contracts status
+
+Canonical shared contracts Integrator пока отсутствуют:
+
+- `ProjectContract`;
+- `CapturePackage`;
+- `MeasurementCaptureFrame`;
+- `ArtifactReference`.
+
+Canonical fixtures под root `/tests/fixtures/contracts/` также отсутствуют.
+
+Internal `ArtifactRecord` и `FrameRecord` намеренно не выдаются за shared contracts и находятся только в ownership Chat 1.
+
+---
+
+## Architecture decisions local to Chat 1
+
+### Validation
+
+Pydantic v2 используется как generic validation/serialization building block. MREA-specific semantics реализуются в собственных моделях/services.
+
+### Offline persistence
+
+Project и CaptureSession сохраняются через replaceable repository protocols. Текущий JSON adapter использует atomic `os.replace` и является локальной offline реализацией, а не глобальным database decision.
+
+### Artifact storage
+
+Image bytes сохраняются content-addressed по SHA-256 через `ArtifactStore` abstraction. Это обеспечивает integrity baseline и не создаёт cloud dependency.
+
+### Capture ordering
+
+`CLEAN_REFERENCE` обязателен до `MEASUREMENT` для каждого view. Measurement semantics/value не входят в ownership Chat 1.
 
 ---
 
 ## Not implemented yet
 
-### R1 Phase 2 — Manual capture baseline
+### R1 Phase 3 — Calibration Baseline
 
-- frame ingestion abstraction;
-- camera metadata;
-- local image/artifact persistence;
-- clean reference frame;
-- manual measurement frame;
-- real CaptureSession state transitions;
-- frame timestamps + camera metadata acceptance path.
-
-### R1 Phase 3 — Calibration baseline
-
-- Measurement Mat detector;
-- marker visibility;
-- calibration metadata;
+- Measurement Mat model/version metadata;
+- ChArUco/Aruco detector adapter;
+- marker visibility result;
+- calibration result;
 - perspective normalization;
-- registration baseline.
+- image registration baseline;
+- normalized/rectified artifact relation;
+- calibration fixtures.
 
-### R1 Phase 4 — Guided quality
+### R1 Phase 4 — Guided Quality
 
 - blur/focus;
 - exposure;
 - glare/shadow;
-- tilt;
+- camera tilt;
 - framing;
+- perspective warning;
 - background quality;
-- actionable warnings.
+- feature occlusion;
+- completeness of views;
+- actionable guidance.
 
 ### Contract/integration
 
-- CapturePackage builder;
+- canonical CapturePackage builder;
 - ProjectContract adapter;
 - MeasurementCaptureFrame adapter;
 - ArtifactReference adapter;
 - canonical fixture validation;
 - API;
 - mobile UI;
+- native camera adapter;
 - voice-trigger capture.
 
 ---
 
-## Contracts status
+## Known limitations
 
-Required shared contracts named by SSOT:
-
-- `ProjectContract` — canonical schema not present in repository;
-- `CapturePackage` — canonical schema not present in repository;
-- `MeasurementCaptureFrame` — canonical schema not present in repository;
-- `ArtifactReference` — canonical schema not present in repository.
-
-Canonical fixtures under root `/tests/fixtures/contracts/` are also absent.
-
-Chat 1 has not created or modified these shared contracts.
-
----
-
-## Architecture decisions local to Chat 1
-
-### Pydantic
-
-Used for strict internal validation and serialization. This follows SSOT backend baseline and avoids implementing a validation framework.
-
-### JSON project persistence
-
-`JsonProjectRepository` is a replaceable offline-first adapter behind `ProjectRepository`, not a repository-wide database decision.
-
-It exists to satisfy real project recovery while Integrator has not yet defined persistence architecture. A later SQLite/SQLAlchemy/PostgreSQL adapter can replace it without changing `ProjectService` semantics.
-
-### CapturePlan default
-
-Only `FRONT` is implicit because Chat 1 acceptance explicitly requires a completable FRONT view. Other views are explicit until a canonical capture-recommendation policy exists.
+- camera image bytes сейчас приходят в service уже готовыми; native camera ownership boundary ещё не реализован;
+- artifact store не декодирует изображение и не проверяет фактическое соответствие MIME/extension;
+- concurrent writers одного JSON record не поддержаны;
+- clean reference replacement/recapture пока не реализован;
+- mobile filesystem permissions/atomicity не проверены;
+- нет CI;
+- нет CV/calibration;
+- нет shared-contract compatibility verification.
 
 ---
 
 ## Current blocker
 
-Internal R1 work can continue.
+Внутренние R1 Phase 3/4 могут продолжаться независимо.
 
-A fully integration-ready `CapturePackage v1` cannot be declared complete until Integrator publishes canonical schemas and fixtures for the shared contracts.
-
-This does not block Phase 2 camera/frame architecture because it can remain behind internal Chat 1 models/adapters.
+Cross-slice integration блокируется отсутствием canonical shared schemas/fixtures Integrator. `CapturePackage v1` нельзя объявлять готовым до их появления.
 
 ---
 
-## Next implementation sequence
+## Immediate next step
 
-### Immediate next: Phase 2 — Manual Capture Baseline
+### R1 Phase 3 — Calibration Baseline
 
-1. define internal immutable frame/artifact metadata;
-2. define `CameraMetadata`;
-3. add replaceable `ArtifactStore` interface;
-4. implement filesystem artifact adapter with atomic writes;
-5. implement `ReferenceFrameBuilder` baseline;
-6. implement manual measurement-frame recording;
-7. bind frame records to CaptureSession transitions;
-8. add tests proving clean reference and measurement frames remain distinct.
-
-### After Phase 2
-
-Phase 3 Calibration → Phase 4 Guided Quality → canonical contract adapters when Integrator schemas appear → Hands-Free extension.
-
----
-
-## What remains unverified
-
-- GitHub Actions/CI;
-- Android/iOS runtime;
-- camera/device behavior;
-- mobile filesystem semantics;
-- concurrent writers to same JSON project;
-- CV quality;
-- calibration accuracy;
-- schema compatibility with future Integrator contracts.
+1. BUILD/REUSE check OpenCV/ArUco/ChArUco;
+2. internal Measurement Mat identity/version model;
+3. `CalibrationDetector` interface;
+4. OpenCV adapter boundary;
+5. marker visibility/detection result;
+6. homography/calibration result representation;
+7. `PerspectiveNormalizer` interface;
+8. preserve original frame + create derived rectified artifact;
+9. explicit provenance relation original → rectified;
+10. tests on generated/synthetic marker fixtures before real camera dataset.
 
 ---
 
 ## Integration readiness
 
-Ready for Integrator review:
+Ready inside Chat 1:
 
-- Chat 1 ownership directory;
-- Phase 1 code baseline;
-- Project repository abstraction;
-- Project create/recovery behavior;
-- deterministic CapturePlan;
-- CaptureSession state initialization;
-- Phase 1 tests and report.
+- Project create/recovery;
+- CapturePlan;
+- CaptureSession persistence;
+- local camera metadata/frame record;
+- clean reference/manual measurement frame semantics;
+- local evidence artifacts with checksum;
+- required-view completion;
+- 10 passing tests;
+- Phase 1/2 implementation reports and Build/Reuse checks.
 
-Not yet ready for cross-slice product integration:
+Not ready cross-slice:
 
-- shared contract output;
-- CapturePackage v1;
-- camera/calibration artifacts;
-- mobile runtime.
+- canonical contracts;
+- CapturePackage;
+- calibration/rectification;
+- image quality guidance;
+- mobile/native camera integration.
