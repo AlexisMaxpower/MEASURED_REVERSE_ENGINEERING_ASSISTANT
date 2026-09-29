@@ -22,6 +22,13 @@ from .models import (
     RevisionOrigin,
     TestRecord,
 )
+from .persistence import (
+    SQLITE_SNAPSHOT_SCHEMA_VERSION,
+    LifecycleConcurrencyError,
+    LifecyclePersistenceError,
+    LifecycleTransactionRequiredError,
+    SQLiteLifecycleStore,
+)
 from .physical import (
     PhysicalEquipmentRegistry,
     PhysicalPartLifecycleService,
@@ -36,6 +43,7 @@ from .projections import (
     RevisionComparison,
     RevisionComparisonResult,
 )
+from .repository import LifecycleRepository
 from .services import (
     CADRevisionPreparationService,
     FailureService,
@@ -45,6 +53,7 @@ from .services import (
     TestService,
 )
 from .store import InMemoryLifecycleStore, LifecycleInvariantError
+from .unit_of_work import LifecycleUnitOfWork
 
 __all__ = [
     "CANONICAL_LIFECYCLE_EVENT_SCHEMA_VERSION",
@@ -61,12 +70,17 @@ __all__ = [
     "Installation",
     "InstallationService",
     "KnowledgeQueryService",
+    "LifecycleConcurrencyError",
     "LifecycleEvent",
     "LifecycleEventType",
     "LifecycleInvariantError",
+    "LifecyclePersistenceError",
+    "LifecycleRepository",
     "LifecycleState",
     "LifecycleStateProjection",
     "LifecycleTimeline",
+    "LifecycleTransactionRequiredError",
+    "LifecycleUnitOfWork",
     "ManufacturingRecord",
     "ManufacturingService",
     "PhysicalEquipmentRegistry",
@@ -83,6 +97,8 @@ __all__ = [
     "RevisionComparisonResult",
     "RevisionOrigin",
     "RevisionService",
+    "SQLITE_SNAPSHOT_SCHEMA_VERSION",
+    "SQLiteLifecycleStore",
     "TestRecord",
     "TestService",
 ]
