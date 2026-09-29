@@ -2,12 +2,13 @@
 
 **From:** Chat 4 — CAD Bridge & Verification  
 **To:** Chat 6 — Orchestrator / Repository Integrator  
-**Status:** OPEN  
-**Date:** 2026-09-29
+**Status:** RESOLVED  
+**Date:** 2026-09-29  
+**Resolved by:** `chat_6_orchestrator/ADR_001_SOLIDWORKS_2026_CAD_AGENT.md`
 
 ## Problem
 
-The generic CAD gate is now independent of vendor runtime:
+The generic CAD gate is independent of vendor runtime:
 
 ```text
 SketchPackage v1
@@ -17,40 +18,34 @@ SketchPackage v1
 → CADVerificationReport v1
 ```
 
-A deterministic `TEST_DOUBLE` covers the canonical golden flow without SOLIDWORKS.
+The next stage requires a concrete SOLIDWORKS environment baseline.
 
-The next stage is the real SOLIDWORKS adapter. Repository-wide target environment is not currently published, so Chat 4 must not silently choose an interop/runtime baseline that later conflicts with integration or release requirements.
+## Decision
 
-## Decision requested
+Chat 6 approved the following v1 baseline:
 
-Please publish or approve the canonical v1 SOLIDWORKS adapter environment:
+- Windows 11 x64;
+- SOLIDWORKS 2026 x64;
+- C#;
+- .NET Framework 4.8 for the first adapter implementation;
+- x64 process;
+- out-of-process user-session CAD Agent/worker behind existing `CadAdapter` semantics;
+- dedicated STA COM execution context;
+- official/local SOLIDWORKS 2026 API/interop references;
+- do not commit proprietary SOLIDWORKS binaries;
+- generic/unit/contract tests stay independent of SOLIDWORKS;
+- real adapter verification requires an explicit Windows 11 + SOLIDWORKS 2026 host;
+- if the host is unavailable, the real-host gate is `UNVERIFIED/SKIPPED`, never PASS;
+- native CAD output is registered through the existing CADPackage/artifact boundary rather than a new storage subsystem.
 
-1. target SOLIDWORKS major version or supported version range;
-2. Windows target/version range;
-3. process architecture (`x64` expected unless explicitly decided otherwise);
-4. .NET target (`net8.0-windows`, .NET Framework, or another explicit target);
-5. SOLIDWORKS interop reference strategy;
-6. COM apartment/threading policy;
-7. whether adapter runs in-process, separate worker process, or separate Windows service;
-8. test host strategy for integration tests requiring installed SOLIDWORKS;
-9. CI/release-gate behavior when a SOLIDWORKS host is unavailable;
-10. artifact location/registration boundary for generated native CAD files.
+The full rationale, acceptance slice and consequences are canonicalized in:
 
-## Chat 4 recommendation for decision criteria
-
-The selected baseline should:
-
-- keep SOLIDWORKS-specific code behind the existing `CadAdapter` semantics;
-- normalize read-back to canonical `mm` / `deg` before verification;
-- preserve `dimension_id`, nullable `measurement_id`, and vendor dimension reference;
-- allow pure unit/contract tests without launching SOLIDWORKS;
-- isolate COM lifecycle failures from canonical domain logic;
-- support a dedicated Windows integration-test path for real API verification.
-
-## Impact if unresolved
-
-Chat 4 can continue pure adapter-boundary tests and documentation, but should not create a production C# project or pin interop packages/framework targets without this decision.
+`chat_6_orchestrator/ADR_001_SOLIDWORKS_2026_CAD_AGENT.md`
 
 ## Shared contract impact
 
-None requested. `mrea.contracts.v1` remains unchanged.
+None. `mrea.contracts.v1` remains unchanged.
+
+## Follow-up
+
+Chat 4 must follow `ORCHESTRATOR_DIRECTIVE.md` revision `OD-2026-09-29-002` on branch `chat-4/pass-2`.
