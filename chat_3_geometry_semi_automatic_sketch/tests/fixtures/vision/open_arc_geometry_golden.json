@@ -1,1 +1,1 @@
-{"primitives":[{"entity_id":"A-DETECTED-001","kind":"ARC","center":{"x":0.0,"y":0.0},"radius":10.44,"start_angle_deg":71.565,"end_angle_deg":341.565,"feature_id":null,"source":"VISION_DETECTED","confidence":0.93}],"issues":[]}
+{"primitives":[{"entity_id":"A-DETECTED-001","kind":"ARC","center":{"x":0.0,"y":0.0},"radius":4.472,"start_angle_deg":14.036,"end_angle_deg":284.036,"feature_id":null,"source":"VISION_DETECTED","confidence":0.879}],"issues":[]}
