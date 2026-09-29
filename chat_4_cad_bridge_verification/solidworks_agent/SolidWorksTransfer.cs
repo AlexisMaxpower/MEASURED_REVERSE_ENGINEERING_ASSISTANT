@@ -129,8 +129,32 @@ namespace Mrea.SolidWorksCadAgent
                     throw new InvalidDataException("Every entity requires entity_id.");
                 if (!ids.Add(entity.entity_id))
                     throw new InvalidDataException("Duplicate entity_id: " + entity.entity_id);
-                if (entity.type != "LINE" && entity.type != "CIRCLE")
-                    throw new NotSupportedException("Pass 2 agent supports LINE/CIRCLE only: " + entity.type);
+                if (entity.type != "POINT" && entity.type != "LINE" && entity.type != "CIRCLE" && entity.type != "ARC")
+                    throw new NotSupportedException("Vendor agent supports POINT/LINE/CIRCLE/ARC only: " + entity.type);
+
+                if (entity.type == "POINT")
+                    RequirePoint(entity.point, entity.entity_id + ".point");
+                else if (entity.type == "LINE")
+                {
+                    RequirePoint(entity.start, entity.entity_id + ".start");
+                    RequirePoint(entity.end, entity.entity_id + ".end");
+                }
+                else if (entity.type == "CIRCLE")
+                {
+                    RequirePoint(entity.center, entity.entity_id + ".center");
+                    RequirePositiveFinite(entity.radius, entity.entity_id + ".radius");
+                }
+                else if (entity.type == "ARC")
+                {
+                    RequirePoint(entity.center, entity.entity_id + ".center");
+                    RequirePositiveFinite(entity.radius, entity.entity_id + ".radius");
+                    RequireFinite(entity.start_angle_deg, entity.entity_id + ".start_angle_deg");
+                    RequireFinite(entity.end_angle_deg, entity.entity_id + ".end_angle_deg");
+                    var span = PositiveModulo(entity.end_angle_deg - entity.start_angle_deg, 360.0);
+                    if (span < 1e-12)
+                        throw new InvalidDataException(
+                            "ARC start/end angles resolve to a full/zero circle; use CIRCLE instead: " + entity.entity_id);
+                }
             }
 
             var dimensionIds = new HashSet<string>(StringComparer.Ordinal);
@@ -141,9 +165,9 @@ namespace Mrea.SolidWorksCadAgent
                 if (!dimensionIds.Add(dimension.dimension_id))
                     throw new InvalidDataException("Duplicate dimension_id: " + dimension.dimension_id);
                 if (dimension.unit != "mm")
-                    throw new NotSupportedException("Pass 2 real-host slice currently supports mm dimensions only: " + dimension.unit);
+                    throw new NotSupportedException("Real-host slice currently supports mm dimensions only: " + dimension.unit);
                 if (dimension.type != "DISTANCE" && dimension.type != "DIAMETER" && dimension.type != "RADIUS")
-                    throw new NotSupportedException("Unsupported Pass 2 dimension type: " + dimension.type);
+                    throw new NotSupportedException("Unsupported dimension type: " + dimension.type);
                 if (dimension.entity_ids == null || dimension.entity_ids.Count == 0)
                     throw new InvalidDataException("Dimension has no entity_ids: " + dimension.dimension_id);
                 foreach (var entityId in dimension.entity_ids)
@@ -154,6 +178,16 @@ namespace Mrea.SolidWorksCadAgent
 
         private static dynamic CreateEntity(dynamic sketchManager, EntitySpec entity)
         {
+            if (entity.type == "POINT")
+            {
+                RequirePoint(entity.point, entity.entity_id + ".point");
+                dynamic point = sketchManager.CreatePoint(
+                    MmToM(entity.point.x), MmToM(entity.point.y), 0.0);
+                if (point == null)
+                    throw new InvalidOperationException("CreatePoint failed for " + entity.entity_id);
+                return point;
+            }
+
             if (entity.type == "LINE")
             {
                 RequirePoint(entity.start, entity.entity_id + ".start");
@@ -169,12 +203,35 @@ namespace Mrea.SolidWorksCadAgent
             if (entity.type == "CIRCLE")
             {
                 RequirePoint(entity.center, entity.entity_id + ".center");
-                if (!(entity.radius > 0.0))
-                    throw new InvalidDataException("Circle radius must be > 0 for " + entity.entity_id);
+                RequirePositiveFinite(entity.radius, entity.entity_id + ".radius");
                 dynamic segment = sketchManager.CreateCircleByRadius(
                     MmToM(entity.center.x), MmToM(entity.center.y), 0.0, MmToM(entity.radius));
                 if (segment == null)
                     throw new InvalidOperationException("CreateCircleByRadius failed for " + entity.entity_id);
+                return segment;
+            }
+
+            if (entity.type == "ARC")
+            {
+                RequirePoint(entity.center, entity.entity_id + ".center");
+                RequirePositiveFinite(entity.radius, entity.entity_id + ".radius");
+                RequireFinite(entity.start_angle_deg, entity.entity_id + ".start_angle_deg");
+                RequireFinite(entity.end_angle_deg, entity.entity_id + ".end_angle_deg");
+
+                var startRadians = entity.start_angle_deg * Math.PI / 180.0;
+                var endRadians = entity.end_angle_deg * Math.PI / 180.0;
+                var startX = entity.center.x + entity.radius * Math.Cos(startRadians);
+                var startY = entity.center.y + entity.radius * Math.Sin(startRadians);
+                var endX = entity.center.x + entity.radius * Math.Cos(endRadians);
+                var endY = entity.center.y + entity.radius * Math.Sin(endRadians);
+
+                dynamic segment = sketchManager.CreateArc(
+                    MmToM(entity.center.x), MmToM(entity.center.y), 0.0,
+                    MmToM(startX), MmToM(startY), 0.0,
+                    MmToM(endX), MmToM(endY), 0.0,
+                    (short)1);
+                if (segment == null)
+                    throw new InvalidOperationException("CreateArc failed for " + entity.entity_id);
                 return segment;
             }
 
@@ -272,8 +329,27 @@ namespace Mrea.SolidWorksCadAgent
         {
             if (point == null)
                 throw new InvalidDataException(name + " is required.");
-            if (double.IsNaN(point.x) || double.IsInfinity(point.x) || double.IsNaN(point.y) || double.IsInfinity(point.y))
-                throw new InvalidDataException(name + " must contain finite coordinates.");
+            RequireFinite(point.x, name + ".x");
+            RequireFinite(point.y, name + ".y");
+        }
+
+        private static void RequireFinite(double value, string name)
+        {
+            if (double.IsNaN(value) || double.IsInfinity(value))
+                throw new InvalidDataException(name + " must be finite.");
+        }
+
+        private static void RequirePositiveFinite(double value, string name)
+        {
+            RequireFinite(value, name);
+            if (!(value > 0.0))
+                throw new InvalidDataException(name + " must be > 0.");
+        }
+
+        private static double PositiveModulo(double value, double modulo)
+        {
+            var result = value % modulo;
+            return result < 0.0 ? result + modulo : result;
         }
 
         private static double ToSystemValue(double value, string unit)
