@@ -3,23 +3,24 @@
 **Проект:** MREA — Measured Reverse Engineering Assistant  
 **Роль:** Chat 3  
 **Vertical slice:** Geometry & Semi-Automatic Sketch  
-**Источник истины:** пользовательский SSOT `MREA_SSOT_PRODUCT_CONCEPT_ARCHITECTURE_CHAT_ROLES_V0_1_2026-09-29.md`  
-**Статус документа:** актуализирован при подключении Chat 3 к repository  
-**Дата:** 2026-09-29
+**Источник истины:** repository `main` → `core/contracts/` → canonical fixtures → product SSOT  
+**Active directive:** `OD-2026-09-29-001`  
+**Ring:** 1  
+**Дата актуализации:** 2026-09-29
 
 ---
 
 ## 1. Назначение роли
 
-Chat 3 преобразует подтверждённые downstream-данные Capture/Measurement в трассируемое геометрическое представление и deterministic `SketchPackage`, пригодный для последующего CAD Bridge.
+Chat 3 преобразует canonical Capture/Measurement data и geometry candidates в трассируемое 2D geometric representation и deterministic `SketchPackage v1`, пригодный для downstream CAD Bridge.
 
-Основная задача слайса — не «угадать CAD», а построить проверяемую 2D-геометрию, где:
+Основная задача — не «угадать CAD», а построить проверяемую геометрию, где:
 
-- image-derived geometry остаётся candidate/inferred до подтверждения;
-- verified physical measurements имеют приоритет над vision estimates;
-- каждый dimension сохраняет связь с исходным `measurement_id`;
-- конфликт не скрывается и не исправляется молча;
-- одинаковый входной fixture даёт одинаковый результат.
+- verified physical measurements имеют приоритет над vision/geometry estimates;
+- каждый published dimension сохраняет `measurement_id`;
+- ambiguous/conflicting geometry не скрывается;
+- одинаковый canonical input даёт одинаковый canonical output;
+- Chat 3 не переопределяет shared contracts.
 
 ---
 
@@ -27,28 +28,35 @@ Chat 3 преобразует подтверждённые downstream-данны
 
 Chat 3 отвечает за:
 
-- `GeometryFeature` model;
-- contour extraction;
-- line/circle/arc primitives;
+- internal geometry domain model;
+- `POINT`, `LINE`, `CIRCLE`, `ARC` v1 support;
+- contour/primitive extraction boundary;
 - `GeometryGraph`;
-- constraint candidates;
-- constraint resolution внутри своего слайса;
-- binding measurements к geometry entities/features;
-- geometry/measurement conflict detection;
+- constraint candidates и последующий constraint resolution внутри slice;
+- anchor/feature → geometry association;
+- measurement binding;
+- geometry-vs-measurement conflict detection;
 - dimensioned view;
-- формирование `SketchPackage`.
+- deterministic `SketchPackageBuilder`;
+- golden/determinism tests своего slice.
 
-### Основные компоненты
+Текущие компоненты:
 
-- `GeometryFeatureExtractor`
-- `PrimitiveDetector`
-- `GeometryGraph`
-- `ConstraintCandidateEngine`
-- `ConstraintResolver`
-- `DimensionBinder`
-- `GeometryConflictDetector`
-- `DimensionedViewRenderer`
-- `SketchPackageBuilder`
+- `CanonicalInputAdapter`;
+- `GeometryGraph`;
+- `AnchorEntityMatcher`;
+- `ConstraintCandidateEngine`;
+- `DimensionBinder`;
+- `GeometryConflictDetector`;
+- `GeometryPipeline`;
+- `SketchPackageBuilder`.
+
+Будущие компоненты внутри ownership:
+
+- `GeometryFeatureExtractor`;
+- `PrimitiveDetector`;
+- `ConstraintResolver`;
+- `DimensionedViewRenderer`.
 
 ---
 
@@ -56,15 +64,12 @@ Chat 3 отвечает за:
 
 Chat 3 не отвечает за:
 
-- camera core;
-- Guided Capture;
+- camera core и Guided Capture;
 - Measurement Mat capture/calibration ownership;
-- OCR;
-- voice measurement semantics;
+- OCR/voice measurement semantics;
 - final physical measurement confirmation;
 - caliper/jaw/contact detection;
-- CAD-native API;
-- SOLIDWORKS adapter;
+- CAD-native API / SOLIDWORKS adapter;
 - CAD read-back verification;
 - lifecycle/revisions/manufacturing/failures.
 
@@ -73,286 +78,324 @@ Chat 3 не изменяет самостоятельно:
 - `/core/contracts/`;
 - `/core/domain/shared/`;
 - `/tests/fixtures/contracts/`;
-- shared contract schemas;
 - global architecture;
 - ownership других chats.
 
-Эти области принадлежат Integrator.
+Эти области принадлежат Chat 6 / Integrator либо соответствующему slice owner.
 
 ---
 
-## 4. Входы
+## 4. Canonical входы
 
-Основные upstream contracts по SSOT:
+После публикации baseline Chat 6 canonical inputs определены:
 
-- `CapturePackage`;
-- `MeasurementPackage`;
-- `PhysicalMeasurement` как элемент/связанная сущность measurement data;
-- artifact/view references, если они включены в утверждённые contracts.
+- `core/contracts/mrea_contracts_v1.schema.json`;
+- `core/contracts/POLICIES_V1.md`;
+- `tests/fixtures/contracts/capture_package_v1.json`;
+- `tests/fixtures/contracts/measurement_package_v1.json`.
 
-Рабочая формула:
+Рабочий поток:
 
 ```text
-CapturePackage
+CapturePackage v1
       +
-MeasurementPackage
+MeasurementPackage v1
       ↓
-Geometry & Sketch pipeline
+CanonicalInputAdapter
+      ↓
+Chat 3 internal geometry domain
 ```
 
-Chat 3 должен работать от canonical fixtures и не обязан ждать runtime-реализацию Chat 1/Chat 2.
+Для текущего FRONT acceptance target:
+
+```text
+coordinate_system = MAT_XY_MM
+```
+
+Canonical measurement anchors могут содержать `feature_id`; Chat 3 использует его как primary semantic binding hint, а coordinate-distance matching — как fallback.
 
 ---
 
-## 5. Выход
+## 5. Canonical выход
 
-Основной downstream output:
+Основной output:
 
-`SketchPackage`
+`SketchPackage v1`
 
-Минимально ожидаемые категории данных, определённые SSOT:
+Golden output fixture:
 
-- `sketch_package_version`;
-- project/part identity;
-- view;
-- coordinate system;
+`tests/fixtures/contracts/sketch_package_v1.json`
+
+Published package содержит:
+
+- `schema_version`;
+- `sketch_package_id`;
+- project/part/view identity;
+- `MAT_XY_MM` coordinate system;
 - geometry entities;
 - constraints;
 - dimensions;
-- unresolved/conflicts;
-- source views.
+- unresolved items;
+- source view ids.
 
-Dimension должен сохранять:
+Dimension сохраняет:
 
 - `dimension_id`;
 - `measurement_id`;
+- type;
 - value/unit;
-- source/provenance;
-- verified state.
+- entity ids;
+- verified state;
+- provenance.
 
-Точная canonical schema не определяется Chat 3 самостоятельно.
+Chat 3 не определяет форму этого wire contract самостоятельно — builder обязан соответствовать Integrator-owned schema.
 
 ---
 
 ## 6. Главный метрологический инвариант
 
 ```text
-verified physical measurement > image-derived estimate
+verified physical measurement > image-derived / geometry-derived estimate
 ```
 
 Следствия:
 
-1. Vision/geometry estimate не может молча заменить verified measurement.
-2. Если geometry невозможно согласовать с verified dimension, создаётся явный conflict.
-3. Solver не имеет права «подправить» физический размер ради замыкания эскиза.
-4. Inferred geometry должна быть отличима от measured/confirmed geometry.
-5. Evidence/provenance chain не должна теряться при переходе к `SketchPackage`.
+1. Geometry estimate не может молча заменить verified value.
+2. Conflict становится explicit diagnostic/unresolved state.
+3. Solver не имеет права «подправить» verified physical dimension ради красивого sketch.
+4. Vision/derived geometry остаётся отличимой по provenance.
+5. Evidence/measurement traceability сохраняется через `measurement_id`.
 
 ---
 
-## 7. Geometry pipeline
-
-Базовый поток Chat 3:
+## 7. Текущий Ring 1 pipeline
 
 ```text
-Clean Reference / normalized view
-            +
-Physical Measurements
-            ↓
-Contour Extraction
-            ↓
-Primitive Detection
-            ↓
-Geometry Features
-            ↓
+CapturePackage v1
+        +
+MeasurementPackage v1
+        ↓
+CanonicalInputAdapter
+        ↓
+normalized MeasurementRef + feature hints
+        +
+primitive candidates
+        ↓
 GeometryGraph
-            ↓
-Constraint Candidates
-            ↓
-Measurement Binding
-            ↓
-Conflict Detection
-            ↓
-Constraint Resolution
-            ↓
-Dimensioned View
-            ↓
-SketchPackage
+        ↓
+AnchorEntityMatcher
+        ↓
+DimensionBinder
+        ↓
+geometry estimate
+        ↓
+GeometryConflictDetector
+        +
+ConstraintCandidateEngine
+        ↓
+GeometryDraft (internal)
+        ↓
+SketchPackageBuilder
+        ↓
+SketchPackage v1
+        ↓
+JSON Schema validation + exact golden comparison
 ```
 
-Порядок может уточняться внутренне, но observable contract и метрологические правила должны сохраняться.
+`GeometryDraft` остаётся internal representation и не является shared contract.
 
 ---
 
 ## 8. Primitive baseline
 
-Первая обязательная поддержка:
+Canonical v1 mandatory vocabulary:
 
-- `Point` при необходимости внутренней topology;
-- `Line`;
-- `Circle`;
-- `Arc`;
-- `Polyline`/`ConstructionLine` только когда потребуются утверждённым кейсом.
+- `POINT`;
+- `LINE`;
+- `CIRCLE`;
+- `ARC`.
 
-Acceptance SSOT явно требует минимум:
+Все четыре типа поддерживаются internal model и canonical serializer.
 
-- line;
-- circle;
-- arc.
+Расширение vocabulary (`POLYLINE`, `CONSTRUCTION_LINE` и т. п.) — только после Change Request/новой директивы Integrator.
 
-Первый golden FRONT fixture должен быть достаточно простым, чтобы проверить topology, measurement binding и deterministic output независимо от advanced CV.
+Raw image primitive detection пока не реализован; текущий FRONT acceptance использует deterministic internal detector-output fixture.
 
 ---
 
-## 9. Constraint baseline
+## 9. GeometryGraph
 
-SSOT перечисляет целевые constraints:
+`GeometryGraph` — internal deterministic topology representation.
 
-- Coincident;
-- Horizontal;
-- Vertical;
-- Parallel;
-- Perpendicular;
-- Tangent;
-- Concentric;
-- Equal;
-- Symmetric;
-- Distance;
-- Angle;
-- Radius;
-- Diameter.
+Ring 1 поддерживает:
 
-Не все constraints обязаны появиться в первой внутренней итерации одновременно.
+- stable entity ids;
+- duplicate-id rejection;
+- point incidence;
+- line endpoint incidence;
+- arc endpoint incidence;
+- deterministic adjacency ordering.
 
-Приоритет первой реализации:
-
-1. topology-preserving constraints;
-2. очевидные deterministic geometric relations;
-3. dimension constraints, связанные с verified measurements;
-4. явное unresolved/conflict состояние вместо агрессивного inference.
+Circle не имеет endpoint incidence и участвует в других geometry/measurement relations.
 
 ---
 
-## 10. GeometryGraph
+## 10. Measurement binding
 
-`GeometryGraph` — внутренняя модель связей между entities/features и measurement anchors.
+`DimensionBinder` связывает canonical measurements с geometry entities.
 
-Он должен позволять минимум:
+Binding policy Ring 1:
 
-- хранить стабильные entity/feature identifiers;
-- связывать primitives между собой;
-- связывать measurement anchors с geometry;
-- представлять candidate constraints;
-- отличать detected/derived/inferred/confirmed происхождение;
-- находить конфликтующие связи;
-- строить deterministic downstream representation.
+1. exact unique `feature_id` match, если canonical anchor его содержит;
+2. coordinate-distance fallback;
+3. ambiguous/out-of-range association → explicit unresolved;
+4. никакой fabricated verified dimension при отсутствии достаточной связи.
 
-Точная внутренняя структура графа принадлежит Chat 3 до тех пор, пока она не становится shared contract.
+Поддерживаемые geometry estimates Ring 1:
+
+- diameter для circle;
+- radius для circle/arc;
+- center distance для двух circles;
+- linear/thickness/slot width для параллельных lines.
 
 ---
 
-## 11. Measurement binding
+## 11. Constraint baseline
 
-`DimensionBinder` обязан связывать sketch dimension с исходным `measurement_id`.
+Internal candidate engine поддерживает:
 
-Запрещено создавать verified dimension, если отсутствует достаточная upstream информация о verified physical measurement.
+- `HORIZONTAL`;
+- `VERTICAL`;
+- `PARALLEL`;
+- `PERPENDICULAR`;
+- `CONCENTRIC`;
+- `EQUAL`.
 
-Если геометрический feature найден vision-алгоритмом, а physical measurement указывает иной метрический размер:
+Canonical schema также допускает другие constraints, но Ring 1 их не генерирует.
 
-```text
-physical verified value wins
-```
+Текущий canonical FRONT golden fixture содержит пустой `constraints`, поэтому purely inferred candidates остаются internal и не публикуются в `SketchPackage v1` без отдельной promotion policy.
 
-Vision estimate сохраняется только как diagnostic/candidate information, если такая информация предусмотрена внутренней моделью или утверждённым contract.
+General `ConstraintResolver` ещё не реализован.
 
 ---
 
 ## 12. Conflict policy
 
-Минимальные конфликтные состояния:
+Ring 1 явно различает:
 
-- geometry estimate vs verified measurement;
+- unresolved/ambiguous anchor binding;
+- verified measurement vs derived geometry mismatch.
+
+Verified value сохраняется неизменным.
+
+Internal geometry conflict преобразуется builder-ом в canonical `unresolved` item, а не исправляется молча.
+
+Будущие обязательные состояния:
+
 - incompatible verified dimensions;
 - unsatisfied constraint set;
-- missing geometry anchor для verified dimension;
-- ambiguous primitive/feature binding.
-
-SSOT задаёт `CONSTRAINT_CONFLICT` как обязательный явный результат при невозможности solver выполнить verified dimensions.
-
-Никакой silent correction не допускается.
+- `CONSTRAINT_CONFLICT` при невозможности удовлетворить verified dimensions.
 
 ---
 
-## 13. Dimensioned View
+## 13. Determinism
 
-Dimensioned view строится как производное представление:
+Одинаковый canonical input должен давать одинаковый `SketchPackage`.
 
-```text
-Clean Reference Image
-+
-Geometry Overlay
-+
-Dimension Lines
-+
-Physical Measurements
-+
-Confidence / Provenance
-```
-
-Он не заменяет исходные evidence frames и не становится новым метрологическим источником истины.
-
----
-
-## 14. Determinism
-
-Одинаковый canonical fixture должен приводить к одинаковому `SketchPackage`.
-
-Для этого реализация должна исключать необоснованную недетерминированность в:
+Ring 1 стабилизирует:
 
 - entity ordering;
-- generated identifiers;
-- candidate ordering;
-- constraint ordering;
-- floating-point normalization/serialization;
-- tie-breaking при одинаковых candidates.
+- dimension ordering;
+- graph adjacency;
+- constraint candidate ordering;
+- association tie-breaking;
+- generated canonical dimension ids.
 
-Если алгоритм использует вероятностный CV/ML-компонент, golden layer должен получать стабилизированный/зафиксированный вход либо явно нормализовать его до deterministic contract output.
-
----
-
-## 15. Golden case
-
-Глобальный SSOT определяет первый end-to-end кейс как плоскую деталь с:
-
-- внешним контуром;
-- двумя отверстиями;
-- одним radius;
-- одной thickness.
-
-Для FRONT geometry baseline релевантны размеры:
-
-- width = 80.20 mm;
-- height = 42.10 mm;
-- hole_diam = 5.10 mm;
-- center_dist = 60.00 mm.
-
-Thickness относится к другому view/physical property и не должна искусственно встраиваться в FRONT sketch без утверждённой cross-view модели.
-
-Первый Chat 3 golden test должен доказать:
-
-- построение простого FRONT sketch;
-- line/circle/arc support;
-- measurement binding;
-- deterministic serialization;
-- явное различие measured и inferred geometry.
+Acceptance test дополнительно меняет primitive input order и требует идентичный canonical output.
 
 ---
 
-## 16. Roadmap position
+## 14. Golden FRONT case
 
-Глобальный roadmap связывает основной Chat 3 slice с:
+Текущий canonical baseline:
 
-### R3 — Semi-Automatic Geometry
+- width = `80.20 mm`;
+- height = `42.10 mm`;
+- hole diameter = `5.10 mm`;
+- center distance = `60.00 mm`;
+- два circle holes;
+- rectangular outer contour.
+
+Thickness относится к другому view/physical property и не встраивается искусственно в FRONT sketch.
+
+Canonical measurement ids:
+
+- `M-WIDTH`;
+- `M-HEIGHT`;
+- `M-HOLE`;
+- `M-CENTER`.
+
+Все они должны сохраняться в canonical dimensions.
+
+---
+
+## 15. Ring 1 acceptance
+
+Добавлены проверки:
+
+- exact equality с `sketch_package_v1.json`;
+- Draft 2020-12 JSON Schema validation;
+- deterministic result при reversed primitive order;
+- сохранение canonical `measurement_id` links;
+- schema-valid `POINT` support.
+
+Phase 1 historical runtime verification:
+
+```text
+6 passed in 0.06s
+```
+
+Phase 2 runtime gate в текущем ChatGPT sandbox не выполнен из-за отсутствия checkout/network path к GitHub. Это ограничение честно зафиксировано; Phase 2 не помечается как passed без запуска.
+
+Current handoff status:
+
+```text
+READY_FOR_INTEGRATOR_RUNTIME_GATE
+```
+
+---
+
+## 16. Build / Reuse
+
+Phase 1 runtime core использует Python standard library; test dependency — pytest.
+
+Phase 2 canonical validation использует test-only:
+
+- `pytest>=8,<9`;
+- `jsonschema>=4.23,<5`.
+
+Перед добавлением OpenCV/geometry solver обязателен отдельный Build / Reuse Check.
+
+---
+
+## 17. Не реализовано после Ring 1
+
+- raw image contour extraction;
+- OpenCV primitive detection;
+- real `front_clean.png` image fixture;
+- IMAGE_PX → MAT_XY_MM transformer для raw anchors;
+- general `ConstraintResolver`;
+- inferred-constraint promotion policy;
+- Dimensioned View renderer;
+- persistence/API;
+- multi-view geometry;
+- CAD-native integration/read-back.
+
+---
+
+## 18. Roadmap position
+
+Основной slice относится к R3 — Semi-Automatic Geometry:
 
 - contours;
 - primitives;
@@ -360,177 +403,57 @@ Thickness относится к другому view/physical property и не д
 - `SketchPackage`;
 - downstream DXF/SVG через Chat 4.
 
-### R7 — Multi-View Geometry
-
-Позднее расширение:
+Позднее R7 — Multi-View Geometry:
 
 - view relationships;
 - advanced alignment;
 - cross-view feature matching.
 
-R7 не должен блокировать первый FRONT-only R3 baseline.
+R7 не блокирует FRONT-only R3 baseline.
 
 ---
 
-## 17. Acceptance Criteria
+## 19. Change control
 
-Согласно SSOT, Chat 3 считается прошедшим локальные критерии, когда:
+Первоначальный Change Request на canonical contracts **закрыт Chat 6** публикацией `mrea.contracts.v1`, policies и canonical fixtures.
 
-- простой FRONT fixture превращается в `SketchPackage`;
-- line/circle/arc поддерживаются;
-- dimensions имеют `measurement_id`;
-- одинаковый fixture даёт deterministic output;
-- golden tests проходят;
-- inferred geometry отличается от measured.
+Новый Change Request потребуется только для backward-incompatible shared change, например:
 
-Общий Definition of Done дополнительно требует:
+- расширение canonical geometry vocabulary;
+- изменение SketchPackage fields/semantics;
+- shared constraint promotion policy;
+- multi-view contract;
+- новый calibration/coordinate contract, если текущего v1 недостаточно.
 
-- upstream contract читается;
-- downstream contract создаётся;
-- contract tests проходят;
-- fixtures валидны;
-- ошибки не скрываются;
-- documentation обновлена;
-- чужие ownership-модули не затронуты;
-- нет незадокументированных временных workaround.
+Chat 3 не меняет shared schema напрямую.
 
 ---
 
-## 18. Build / Reuse baseline
+## 20. Следующий этап после Integrator gate
 
-Перед нетривиальной реализацией заполняется `BUILD / REUSE CHECK`.
+После подтверждения Ring 1 runtime gate:
 
-Исходный SSOT разрешает/ожидает использование готовых строительных блоков:
-
-- OpenCV для CV/contour/geometry-related primitives, где применимо;
-- готовых geometry libraries;
-- существующего geometry/constraint solver, если он удовлетворяет требованиям.
-
-Chat 3 пишет самостоятельно:
-
-- MREA-specific geometry orchestration;
-- `GeometryGraph` semantics;
-- provenance-aware measurement binding;
-- conflict policy;
-- deterministic SketchPackage assembly;
-- golden normalization/verification rules.
-
-Конкретная сторонняя geometry/solver dependency пока не выбрана. Она должна быть подтверждена отдельным Build / Reuse Check до добавления в код.
+1. primitive extraction interface;
+2. Build / Reuse Check для OpenCV;
+3. real image fixture;
+4. contour extraction baseline;
+5. line/circle/arc candidate detector;
+6. conversion detector output → internal primitives;
+7. robustness tests и explicit unresolved behavior;
+8. затем constraint-resolution/promotion work.
 
 ---
 
-## 19. Технические риски
+## 21. Текущий статус
 
-### High
+Ring 1 geometry/canonical bridge реализован в `main` и передан Chat 6 через `ORCHESTRATOR_HANDOFF.md`.
 
-- constraint-consistent sketch generation.
+Shared contracts не изменялись.
 
-### Medium
+Фактическое состояние разработки см. в:
 
-- primitive detection robustness;
-- contour simplification;
-- geometry candidate ambiguity.
+- `docs/IMPLEMENTATION_STATE.md`;
+- `docs/IMPLEMENTATION_REPORT_PHASE2_CANONICAL_FRONT_2026-09-29.md`;
+- `ORCHESTRATOR_HANDOFF.md`.
 
-### Later / cross-slice
-
-- cross-view correspondence;
-- advanced multi-view alignment.
-
-Рискованный advanced solver/CV не должен блокировать deterministic fixture-driven baseline.
-
----
-
-## 20. Ограничения разработки
-
-1. Не выдумывать shared schemas.
-2. Не менять verified physical measurements.
-3. Не превращать vision estimate в verified metric truth.
-4. Не реализовывать CAD-native semantics вместо Chat 4.
-5. Не затрагивать чужие ownership directories.
-6. Не начинать с multi-view/photogrammetry, пока не закрыт простой FRONT vertical slice.
-7. Не скрывать ambiguous/unresolved/conflict состояния.
-8. Не связывать correctness только с визуально «похожим» sketch — важны topology, dimensions, provenance и deterministic contract output.
-
----
-
-## 21. Change Request к Integrator
-
-```text
-CHANGE_REQUEST
-
-Requester:
-Chat 3 — Geometry & Semi-Automatic Sketch
-
-Contract:
-CapturePackage
-PhysicalMeasurement
-MeasurementPackage
-SketchPackage
-ArtifactReference (если используется для dimensioned view/source views)
-
-Problem:
-SSOT определяет назначение, пример полей и ownership contracts,
-но repository пока не содержит canonical versioned schemas/fixtures.
-
-Current behavior:
-Есть концептуальные contract names и SketchPackage example,
-но нет утверждённых machine-validatable v1 schemas.
-
-Requested change:
-Утвердить canonical v1 schemas и fixtures, необходимые Chat 3, включая:
-- CapturePackage view/reference representation;
-- MeasurementPackage structure;
-- PhysicalMeasurement anchors/provenance/verified semantics;
-- SketchPackage entity model;
-- SketchPackage constraint model;
-- dimension representation с measurement_id;
-- unresolved/conflict representation;
-- coordinate-system representation;
-- stable ID policy;
-- ArtifactReference, если нужен для rendered dimensioned view.
-
-Также предоставить canonical FRONT golden upstream fixture,
-который может быть использован независимо от runtime Chat 1/Chat 2.
-
-Reason:
-Без canonical v1 contracts Chat 3 может реализовать внутренний geometry core,
-но не может честно гарантировать совместимость upstream/downstream
-или выполнить contract Definition of Done.
-
-Affected chats:
-Integrator
-Chat 2
-Chat 3
-Chat 4
-
-Backward compatible:
-YES — canonical contracts отсутствуют в текущем repository.
-
-Migration:
-Not applicable at current repository state.
-```
-
----
-
-## 22. План реализации после Integrator baseline
-
-1. Повторно проверить актуальное дерево repository и ownership.
-2. Прочитать canonical `CapturePackage`/`MeasurementPackage` fixtures.
-3. Проверить `PhysicalMeasurement` semantics и anchor representation.
-4. Провести Build / Reuse Check для contour/primitive/constraint dependencies.
-5. Реализовать внутреннюю geometry domain model.
-6. Реализовать deterministic primitive baseline для line/circle/arc.
-7. Реализовать `GeometryGraph`.
-8. Реализовать measurement binding.
-9. Реализовать conflict detection.
-10. Реализовать минимальный constraint resolution baseline.
-11. Сформировать canonical `SketchPackage`.
-12. Добавить FRONT golden tests и determinism tests.
-13. Добавить dimensioned view renderer после стабилизации geometry data.
-14. Обновить `IMPLEMENTATION_STATE.md` и Implementation Report.
-
----
-
-## 23. Текущий статус
-
-На момент создания документа product code и canonical shared contracts в repository отсутствуют. Поэтому выполнена только безопасная организационная и архитектурная инициализация Chat 3. Никаких shared schemas, чужих modules или глобальной структуры Chat 3 не изменял.
+При конфликте этого документа с `core/contracts/`, canonical contracts имеют приоритет.
