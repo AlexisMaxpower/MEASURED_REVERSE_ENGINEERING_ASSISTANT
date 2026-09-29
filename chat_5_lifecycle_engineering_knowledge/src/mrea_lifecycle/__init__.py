@@ -43,6 +43,13 @@ from .projections import (
     RevisionComparison,
     RevisionComparisonResult,
 )
+from .relational import (
+    EquipmentOccupancyQueryResult,
+    FailureQueryResult,
+    PhysicalEventQueryResult,
+    RevisionQueryResult,
+    SQLiteLifecycleQueryRepository,
+)
 from .repository import LifecycleRepository
 from .services import (
     CADRevisionPreparationService,
@@ -52,6 +59,7 @@ from .services import (
     RevisionService,
     TestService,
 )
+from .sqlite_schema import SQLITE_RELATIONAL_SCHEMA_VERSION, SQLiteSchemaMigration
 from .store import InMemoryLifecycleStore, LifecycleInvariantError
 from .unit_of_work import LifecycleUnitOfWork
 
@@ -63,7 +71,9 @@ __all__ = [
     "CADRevisionPreparationService",
     "CADVerificationStatus",
     "CanonicalLifecycleEventAdapter",
+    "EquipmentOccupancyQueryResult",
     "EquipmentPartRegistry",
+    "FailureQueryResult",
     "FailureRecord",
     "FailureService",
     "InMemoryLifecycleStore",
@@ -84,6 +94,7 @@ __all__ = [
     "ManufacturingRecord",
     "ManufacturingService",
     "PhysicalEquipmentRegistry",
+    "PhysicalEventQueryResult",
     "PhysicalLifecycleEvent",
     "PhysicalLifecycleEventType",
     "PhysicalPartInstance",
@@ -96,9 +107,13 @@ __all__ = [
     "RevisionComparison",
     "RevisionComparisonResult",
     "RevisionOrigin",
+    "RevisionQueryResult",
     "RevisionService",
+    "SQLITE_RELATIONAL_SCHEMA_VERSION",
     "SQLITE_SNAPSHOT_SCHEMA_VERSION",
+    "SQLiteLifecycleQueryRepository",
     "SQLiteLifecycleStore",
+    "SQLiteSchemaMigration",
     "TestRecord",
     "TestService",
 ]
