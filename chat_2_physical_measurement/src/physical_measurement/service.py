@@ -93,6 +93,7 @@ class MeasurementSessionService:
         anchor_a: FeatureAnchor,
         anchor_b: FeatureAnchor,
         evidence_frame_id: str | None = None,
+        uncertainty: Decimal | int | float | str | None = None,
         uncertainty_mm: Decimal | int | float | str | None = None,
         instrument_type: str | None = None,
     ) -> PhysicalMeasurement:
@@ -105,6 +106,11 @@ class MeasurementSessionService:
             measurement_type=measurement_type,
             value=decimal_value(value),
             unit=self._type_registry.unit_for(measurement_type),
+            uncertainty=(
+                decimal_value(uncertainty, "uncertainty")
+                if uncertainty is not None
+                else None
+            ),
             uncertainty_mm=(
                 decimal_value(uncertainty_mm, "uncertainty_mm")
                 if uncertainty_mm is not None
@@ -132,6 +138,7 @@ class MeasurementSessionService:
         anchor_a: FeatureAnchor,
         anchor_b: FeatureAnchor,
         evidence_frame_id: str | None = None,
+        uncertainty: Decimal | int | float | str | None = None,
         uncertainty_mm: Decimal | int | float | str | None = None,
         instrument_type: str | None = None,
     ) -> PhysicalMeasurement:
@@ -144,6 +151,7 @@ class MeasurementSessionService:
             anchor_a=anchor_a,
             anchor_b=anchor_b,
             evidence_frame_id=evidence_frame_id,
+            uncertainty=uncertainty,
             uncertainty_mm=uncertainty_mm,
             instrument_type=instrument_type,
         )
@@ -159,6 +167,7 @@ class MeasurementSessionService:
         anchor_a: FeatureAnchor,
         anchor_b: FeatureAnchor,
         evidence_frame_id: str | None = None,
+        uncertainty: Decimal | int | float | str | None = None,
         uncertainty_mm: Decimal | int | float | str | None = None,
         instrument_type: str | None = None,
     ) -> PhysicalMeasurement:
@@ -177,6 +186,7 @@ class MeasurementSessionService:
             anchor_a=anchor_a,
             anchor_b=anchor_b,
             evidence_frame_id=evidence_frame_id,
+            uncertainty=uncertainty,
             uncertainty_mm=uncertainty_mm,
             instrument_type=instrument_type,
         )
