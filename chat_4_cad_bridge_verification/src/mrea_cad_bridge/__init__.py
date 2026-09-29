@@ -26,6 +26,13 @@ from .runtime_evidence import (
     parse_runtime_diagnostic,
     require_host_ready,
 )
+from .runtime_validation import (
+    SOLIDWORKS_2026_REVISION_MAJOR,
+    CadRuntimeValidationExecution,
+    SolidWorksRuntimeValidationExecution,
+    evaluate_solidworks_runtime_inputs_v1,
+    execute_cad_runtime_validation_v1,
+)
 from .solidworks_runtime_inputs import (
     SOLIDWORKS_RUNTIME_ADAPTER_NAME,
     SOLIDWORKS_RUNTIME_INPUTS_PRODUCER,
@@ -71,6 +78,7 @@ __all__ = [
     "CadReadBack",
     "CadReadBackDimension",
     "CadRuntimeEvidenceError",
+    "CadRuntimeValidationExecution",
     "CadSketch",
     "CadTransferExecution",
     "CircleEntity",
@@ -93,10 +101,12 @@ __all__ = [
     "ReadinessCheckStatus",
     "RuntimeDiagnostic",
     "RuntimeEvidenceStatus",
+    "SOLIDWORKS_2026_REVISION_MAJOR",
     "SOLIDWORKS_RUNTIME_ADAPTER_NAME",
     "SOLIDWORKS_RUNTIME_INPUTS_PRODUCER",
     "SOLIDWORKS_RUNTIME_INPUTS_SCHEMA",
     "SolidWorksRuntimeInputs",
+    "SolidWorksRuntimeValidationExecution",
     "SvgExporter",
     "SOLIDWORKS_ADAPTER_NAME",
     "SOLIDWORKS_AGENT_PROTOCOL",
@@ -112,6 +122,8 @@ __all__ = [
     "build_runtime_evidence",
     "build_solidworks_agent_request",
     "build_solidworks_runtime_evidence_from_inputs_v1",
+    "evaluate_solidworks_runtime_inputs_v1",
+    "execute_cad_runtime_validation_v1",
     "execute_cad_transfer_v1",
     "map_sketch_package_v1",
     "parse_host_readiness_report",
