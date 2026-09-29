@@ -1,145 +1,121 @@
-# ORCHESTRATOR HANDOFF — Chat 5 / Pass 3
+# ORCHESTRATOR HANDOFF — Chat 5 / Pass 4
 
-**Directive:** `OD-2026-09-29-003`  
-**Branch:** `chat-5/pass-3`  
-**Accepted base SHA:** `c3452d7fa68c9c5c3716db5fef71172e9c3b9532`  
-**Independently tested implementation SHA:** `f92bc1aeea7df601c43080ed6eb78bb18b608571`  
-**CI run:** `36619302842`  
+**Authorization:** direct user instruction to start Pass 4  
+**Orchestrator status at branch start:** no `OD-004` present in GitHub; `main` still pointed to the Pass-3 directive baseline  
+**Branch:** `chat-5/pass-4`  
+**Base SHA:** `cdc5baceb281b657680d1e38cc49ea8094669ad8` — frozen Chat 5 Pass 3 handoff  
+**Independently tested pre-handoff SHA:** `8ab4e6c5d409325c31fd71710d2abdb5cdea688e`  
+**CI run:** `36624776138`  
 **Status at handoff:** required Chat 5 gates GREEN
 
-> This handoff is the final worker commit and freezes `chat-5/pass-3`. A Git commit cannot contain its own SHA. Chat 6 must use the current `chat-5/pass-3` branch head as the final handoff commit and the SHA above as the exact implementation state independently exercised by CI immediately before the handoff.
+> This handoff is the final worker commit and freezes `chat-5/pass-4`. A Git commit cannot contain its own final SHA. Chat 6 should use the current branch head as the final handoff commit and the tested SHA above as the exact pre-handoff state independently exercised by CI.
 
 ## 1. Delivered functionality
 
-Pass 3 extends Chat 5 from revision/manufacturing history to the real-world lifecycle of one concrete manufactured item.
+Pass 4 closes the persistence and atomicity gap explicitly left by Pass 3.
 
-Implemented:
+Implemented application path:
 
 ```text
-Revision
-→ ManufacturingRecord
-→ PhysicalPartInstance
-→ Installed
-→ Tested
-→ Active / In service
-→ Failed
-→ Removed
-→ Superseded by replacement
+existing lifecycle services
+→ LifecycleUnitOfWork
+→ LifecycleRepository transaction boundary
+→ atomic canonical + physical mutation
+→ SQLite durable snapshot commit
 ```
 
-### Physical manufactured identity
+### Repository boundary
 
-Added `PhysicalPartInstance` tied to exactly one existing `ManufacturingRecord` and therefore to exactly one Revision.
+Added internal `LifecycleRepository` protocol as the Chat 5 persistence port.
 
-The identity retains:
+### Unit of Work
 
-- `instance_id`;
-- `part_id`;
-- `revision_id`;
-- `manufacturing_id`;
-- material;
-- manufacturing method;
-- manufacturing timestamp;
-- batch/machine/print-profile snapshot when available.
+Added `LifecycleUnitOfWork`, which groups the existing services:
 
-A physical instance cannot be registered without a previously accepted manufacturing record.
+- RevisionService;
+- CADRevisionPreparationService;
+- ManufacturingService;
+- InstallationService;
+- TestService;
+- FailureService;
+- PhysicalPartLifecycleService.
 
-### Deterministic physical state machine
+The outer Unit of Work owns transaction commit/rollback so canonical revision-level state and physical-instance state can no longer be partially committed through the supported durable path.
 
-Internal states:
+### Transaction semantics
+
+`InMemoryLifecycleStore` now supports:
+
+- nested transaction depth;
+- outer state snapshot;
+- rollback of all domain collections;
+- rollback of canonical and physical event sequence counters;
+- rollback-only behavior after nested failure;
+- begin/commit/rollback hooks for durable implementations.
+
+Existing in-memory callers remain backward compatible.
+
+### SQLite durable repository
+
+Added `SQLiteLifecycleStore` using Python stdlib `sqlite3`; no third-party persistence dependency was added.
+
+Durable snapshot schema:
 
 ```text
-MANUFACTURED
-INSTALLED
-TESTED
-ACTIVE
-FAILED
-REMOVED
-SUPERSEDED
+mrea.lifecycle-snapshot.v1
 ```
 
-Normal path:
+SQLite representation:
 
 ```text
-MANUFACTURED → INSTALLED → TESTED → ACTIVE
+lifecycle_store(
+    singleton,
+    schema_version,
+    version,
+    payload
+)
 ```
 
-Failure/replacement path:
+The complete current Chat 5 aggregate is serialized into one deterministic JSON snapshot and committed atomically.
+
+Persisted state includes:
+
+- Revision and CAD linkage;
+- CAD artifact metadata;
+- ManufacturingRecord including Decimal cost;
+- Installation/Test/Failure records;
+- canonical LifecycleEvent sequence;
+- PhysicalPartInstance identities;
+- physical lifecycle events and explicit test outcomes;
+- replacement/supersession references.
+
+### Stale-writer protection
+
+Each SQLite repository instance tracks `loaded_version`.
+
+Writer begin path:
 
 ```text
-INSTALLED / TESTED / ACTIVE
-→ FAILED
-→ REMOVED
-→ SUPERSEDED
+BEGIN IMMEDIATE
+→ read durable version
+→ require durable version == loaded_version
 ```
 
-Preventive replacement is also allowed from installed/tested/active through explicit removal before supersession.
+A stale writer fails with `LifecycleConcurrencyError` instead of overwriting newer state. It must explicitly `reload()` before continuing.
 
-Invalid transitions fail closed.
+### Fail-closed durable mutation
 
-### Explicit test gate
+SQLite mutation outside `LifecycleUnitOfWork.transaction()` fails with `LifecycleTransactionRequiredError`.
 
-A physical test carries internal `PhysicalTestOutcome`:
+If a legacy service staged an in-memory mapping mutation before reaching the event append, the SQLite store reloads the last committed snapshot before raising, so the unsafe mutation is discarded rather than left visible.
 
-- `PASSED`;
-- `FAILED`.
+## 2. Canonical contract compatibility
 
-Activation is allowed only when the latest physical event is a test with outcome `PASSED`. Free-text `TestRecord.result` is not parsed as lifecycle truth.
+No shared contract or canonical fixture was modified.
 
-### Equipment / position occupancy
-
-`PhysicalEquipmentRegistry` derives the current physical occupant for `equipment_id + position`.
-
-The following states continue to occupy the location:
-
-- `INSTALLED`;
-- `TESTED`;
-- `ACTIVE`;
-- `FAILED`.
-
-A failed item still occupies the location until an explicit `REMOVED` transition.
-
-A second instance cannot be installed into an occupied equipment/position.
-
-### Failure evidence and exact item linkage
-
-`Installation`, `TestRecord`, and `FailureRecord` now support optional `instance_id` for backward compatibility.
-
-The Pass 3 physical path requires the identity and validates that:
-
-- revision matches the instance;
-- manufacturing record matches the instance;
-- test/failure installation matches the instance's current installation;
-- failure evidence remains on the exact `FailureRecord` and is traceable to the exact `instance_id` and revision.
-
-### Removal and replacement
-
-`REMOVED` releases equipment/position occupancy.
-
-`SUPERSEDED` requires:
-
-- old instance already `REMOVED`;
-- replacement is a different instance;
-- replacement belongs to the same part;
-- replacement is installed/tested/active;
-- replacement occupies the same equipment/position;
-- chronology remains monotonic.
-
-The superseded event retains `replacement_instance_id`.
-
-## 2. Canonical inputs / outputs used
-
-Consumed without modification:
-
-- `core/contracts/mrea_contracts_v1.schema.json`;
-- `core/contracts/POLICIES_V1.md`;
-- canonical CAD fixtures already used by the accepted Pass 2 boundary;
-- canonical `LifecycleEvent v1` contract.
-
-Shared output remains unchanged:
+Shared lifecycle output remains exactly `mrea.lifecycle-event.v1` with:
 
 ```text
-mrea.lifecycle-event.v1
 REVISION_CREATED
 MANUFACTURED
 INSTALLED
@@ -147,186 +123,147 @@ TESTED
 FAILED
 ```
 
-Physical-only facts such as:
+Persistence metadata, SQLite versioning, Unit-of-Work state and physical-only lifecycle states remain internal to Chat 5.
 
-- `instance_id`;
-- `ACTIVATED`;
-- `REMOVED`;
-- `SUPERSEDED`;
-- `replacement_instance_id`;
-- explicit physical test outcome;
-
-remain Chat-5-internal and are not emitted as new shared lifecycle event types.
-
-No Change Request was needed for Pass 3.
-
-## 3. CAD manufacturing eligibility invariant
-
-Pass 2 eligibility is preserved.
-
-The physical service never creates or bypasses a `ManufacturingRecord`. It can register an instance only from an already existing manufacturing record.
-
-Therefore:
+Existing CAD rule remains intact:
 
 ```text
-CAD_TRANSFER + VERIFIED → ManufacturingRecord may exist → physical instance may exist
-CAD_TRANSFER + FAILED   → manufacturing blocked → physical instance cannot enter normal lifecycle
+CAD_TRANSFER + VERIFIED → manufacturing eligible
+CAD_TRANSFER + FAILED   → manufacturing blocked
 ```
 
-No override mechanism was added.
+The persistence layer cannot manufacture or register a physical instance unless the existing domain services allow it.
 
-## 4. Files changed in Pass 3
+## 3. Files changed in Pass 4
 
-Modified:
+Modified before this handoff:
 
 - `README.md`
 - `docs/IMPLEMENTATION_STATE.md`
 - `src/mrea_lifecycle/__init__.py`
-- `src/mrea_lifecycle/models.py`
 - `src/mrea_lifecycle/store.py`
-- `ORCHESTRATOR_HANDOFF.md` — this final freeze commit
 
 Added:
 
-- `docs/PASS_3_PHYSICAL_PART_INSTANCE_LIFECYCLE.md`
-- `src/mrea_lifecycle/physical.py`
-- `tests/test_physical_instance_lifecycle.py`
+- `docs/PASS_4_PERSISTENCE_UOW.md`
+- `src/mrea_lifecycle/persistence.py`
+- `src/mrea_lifecycle/repository.py`
+- `src/mrea_lifecycle/unit_of_work.py`
+- `tests/test_persistence_uow.py`
 
-No files outside `chat_5_lifecycle_engineering_knowledge/` were modified by Chat 5.
+Final freeze commit modifies only:
 
-## 5. Test inventory added
+- `ORCHESTRATOR_HANDOFF.md`
 
-`tests/test_physical_instance_lifecycle.py` covers:
+No file outside `chat_5_lifecycle_engineering_knowledge/` was changed by Chat 5 in Pass 4.
 
-1. manufacturing record → concrete physical instance;
-2. revision/manufacturing/material/method identity retention;
-3. installation with equipment/position;
-4. explicit physical test outcome;
-5. successful test → activation;
-6. exact failure instance/revision/evidence traceability;
-7. failure → removal;
-8. old instance removal releases location;
-9. replacement instance installation at same location;
-10. replacement activation;
-11. removed old instance → superseded by exact replacement;
-12. deterministic physical timeline;
-13. canonical lifecycle export remains thin and contains no `instance_id`;
-14. activation before test rejected;
-15. failed test cannot activate;
-16. backward-time transition rejected;
-17. installation into occupied equipment/position rejected without canonical installation mutation;
-18. supersession before removal rejected.
+## 4. New test inventory
 
-Existing Pass 1/2 tests remain in the same suite.
+`tests/test_persistence_uow.py` covers:
 
-## 6. Tests actually executed
+1. VERIFIED CAD revision durable round-trip;
+2. CAD artifact metadata retention;
+3. Decimal manufacturing cost retention;
+4. physical instance/install/test/ACTIVE durable round-trip;
+5. unchanged canonical LifecycleEvent v1 after reopen;
+6. forced failure after canonical installation mutation but before physical event append;
+7. atomic rollback of canonical + physical state;
+8. failed transaction does not advance durable version;
+9. stale concurrent writer rejection;
+10. explicit reload followed by successful continuation;
+11. SQLite mutation outside Unit of Work rejected and discarded;
+12. in-memory transaction rollback.
 
-### Independent GitHub-hosted Chat 5 suite
+All Pass 1-3 tests remain in the same Chat 5 suite.
 
-Workflow run:
+## 5. Independent CI evidence
+
+Workflow:
 
 ```text
-MREA CI / 36619302842
-head: f92bc1aeea7df601c43080ed6eb78bb18b608571
-job: Chat 5 / Lifecycle
+MREA CI / 36624776138
+head: 8ab4e6c5d409325c31fd71710d2abdb5cdea688e
 ```
+
+### Chat 5 / Lifecycle
 
 Exact result:
 
 ```text
-15 passed in 0.07s
-```
-
-Result: **SUCCESS**, with no pytest collection warning from Chat 5 after the final test-import cleanup.
-
-### Canonical contract / fixture gate
-
-Same workflow run:
-
-```text
-Contracts / canonical fixtures
+20 passed in 0.16s
 ```
 
 Result: **SUCCESS**.
 
-### Real Chat 4 → Chat 5 integration gate
+### Contracts / canonical fixtures
 
-Same workflow run:
+Result: **SUCCESS**.
 
-```text
-Integration / Chat 4 -> Chat 5
-```
+### Chat 4 generic prerequisite
+
+Result: **SUCCESS**.
+
+### Integration / Chat 4 -> Chat 5
 
 Exact result:
 
 ```text
-2 passed, 1 warning in 0.46s
+2 passed, 1 warning in 0.47s
 ```
 
 Result: **SUCCESS**.
 
-The single warning originates in Chat 4's existing `TestDoubleCadAdapter` pytest collection naming and is outside Chat 5 ownership. It does not indicate a failed boundary test and was not modified by Chat 5.
-
-## 7. CI status known at handoff time
-
-Required Pass 3 gates for Chat 5 on tested implementation SHA:
-
-- `Chat 5 / Lifecycle` — **SUCCESS**;
-- `Contracts / canonical fixtures` — **SUCCESS**;
-- `Integration / Chat 4 -> Chat 5` — **SUCCESS**;
-- Chat 4 generic prerequisite in the same run — **SUCCESS**.
+The single warning is the existing Chat 4 `TestDoubleCadAdapter` pytest collection warning and is outside Chat 5 ownership.
 
 No required Chat 5 CI job is red at handoff time.
 
-Per Pass 3 workflow, this handoff commit now freezes the branch. Any CI generated by the handoff commit itself is post-handoff evidence for Chat 6 to record centrally; Chat 5 will not move the branch merely to update that result.
+## 6. Build / Reuse decision
 
-## 8. Tests not executed / external gates
+Reused:
 
-No physical database, REST API, concurrent writer, field-device, or migration tests were executed because those capabilities are not implemented in Pass 3.
+- Python stdlib `sqlite3`;
+- existing Chat 5 domain models;
+- existing CAD eligibility rule;
+- existing lifecycle services;
+- existing physical state machine;
+- existing canonical lifecycle adapter.
 
-No real SOLIDWORKS runtime test is owned by Chat 5. The Chat 4 → Chat 5 software boundary was executed through the repository integration gate and passed.
+Not introduced:
 
-## 9. Build / Reuse decision
+- ORM;
+- external database driver;
+- migration framework;
+- duplicated service layer;
+- shared contract amendment.
 
-No new external dependency was introduced.
+## 7. Known limitations
 
-Pass 3 reuses:
+Pass 4 is a correctness-first persistence foundation, not the final production database design.
 
-- `InMemoryLifecycleStore`;
-- `ManufacturingService` and its CAD eligibility rule;
-- `InstallationService`;
-- `TestService`;
-- `FailureService`;
-- `CanonicalLifecycleEventAdapter`.
+Still open:
 
-The new physical event stream exists only for semantics absent from shared `LifecycleEvent v1`; canonical serialization was not duplicated or redefined.
-
-## 10. Known limitations
-
-Still intentionally not implemented:
-
-- production persistence;
-- repository abstraction / transaction boundary across canonical + physical events;
-- concurrent installation conflict control beyond deterministic in-memory checks;
+- normalized/query-optimized relational schema;
+- schema migration framework;
+- repository-native query API;
+- automatic refresh policy for long-lived readers;
 - REST/API;
-- database migrations;
-- field-device integration;
-- AI / semantic failure analysis;
-- shared physical-instance event contract.
+- backup/restore tooling;
+- field-device synchronization;
+- AI / semantic failure analysis.
 
-The in-memory application path validates event IDs before canonical/physical paired writes where applicable, but a real atomic transaction boundary belongs to future persistence work.
+`LifecycleUnitOfWork` currently adapts the pre-existing services structurally; those service constructor annotations still name `InMemoryLifecycleStore`. Runtime behavior is repository-compatible and independently tested. A later cleanup can migrate annotations to the protocol without changing behavior.
 
-## 11. Open Change Requests
+## 8. Open Change Requests
 
-None from Chat 5 for Pass 3.
+None.
 
-The shared v1 lifecycle contract is sufficient because physical-instance-only states remain internal in this pass.
+The existing shared contracts were sufficient because persistence semantics remain entirely internal to Chat 5.
 
-## 12. Ownership verification
+## 9. Ownership verification
 
-Pre-handoff diff against accepted base `c3452d7fa68c9c5c3716db5fef71172e9c3b9532` contained exactly eight implementation/documentation files, all under Chat 5 ownership.
+Pre-handoff diff against base `cdc5baceb281b657680d1e38cc49ea8094669ad8` contained exactly nine files, all under Chat 5 ownership.
 
-This handoff adds only the ninth changed file, `ORCHESTRATOR_HANDOFF.md`.
+This final handoff makes `ORCHESTRATOR_HANDOFF.md` the tenth changed file.
 
 No changes were made to:
 
@@ -334,22 +271,21 @@ No changes were made to:
 - canonical fixtures;
 - `.github/workflows/`;
 - `tests/integration/`;
-- Chat 1–4;
-- Chat 6 documentation.
+- Chat 1-4;
+- Chat 6 files.
 
-## 13. Requested acceptance gate
+## 10. Requested acceptance gate
 
 Please verify:
 
-1. concrete physical identity is tied to exact revision + manufacturing record;
-2. lifecycle transitions are deterministic and invalid transitions fail closed;
-3. equipment/position occupancy cannot silently contain two physical instances;
-4. test pass is explicit before activation;
-5. failure evidence is linked to exact physical instance and revision;
-6. removal/replacement/supersession remain auditable;
-7. failed/unverified CAD still cannot bypass manufacturing;
-8. canonical `LifecycleEvent v1` remains unchanged;
-9. required CI gates are green;
-10. ownership boundaries are preserved.
+1. SQLite state survives close/reopen without losing CAD or physical traceability;
+2. canonical and physical mutations roll back together on failure;
+3. stale writers cannot silently overwrite newer state;
+4. SQLite writes require explicit Unit of Work;
+5. canonical LifecycleEvent v1 remains unchanged;
+6. CAD FAILED/unverified manufacturing gate remains intact;
+7. required CI gates are green;
+8. ownership boundaries are preserved;
+9. the direct-user Pass-4 base exception is reconciled by Chat 6 during integration because `main` had not yet incorporated Pass 3 when this pass started.
 
-Requested verdict: **Pass 3 ACCEPTED or explicit FIX_REQUIRED directive.**
+Requested verdict: **Pass 4 ACCEPTED, ACCEPTED_WITH_REBASE/INTEGRATION FOLLOWUP, or explicit FIX_REQUIRED.**
