@@ -1,0 +1,18 @@
+{
+  "primitives": [
+    {"kind":"LINE","entity_id":"L4","start":[0.0,42.1],"end":[0.0,0.0]},
+    {"kind":"CIRCLE","entity_id":"C2","center":[70.1,21.05],"radius":2.55},
+    {"kind":"LINE","entity_id":"L2","start":[80.2,0.0],"end":[80.2,42.1]},
+    {"kind":"ARC","entity_id":"A1","center":[75.2,37.1],"radius":5.0,"start_angle_deg":0.0,"end_angle_deg":90.0},
+    {"kind":"LINE","entity_id":"L1","start":[0.0,0.0],"end":[80.2,0.0]},
+    {"kind":"CIRCLE","entity_id":"C1","center":[10.1,21.05],"radius":2.55},
+    {"kind":"LINE","entity_id":"L3","start":[80.2,42.1],"end":[0.0,42.1]}
+  ],
+  "measurements": [
+    {"measurement_id":"M001","measurement_type":"LINEAR_EXTERNAL","value":80.2,"unit":"mm","verified":true,"source":"MANUAL_MEASURED","anchors":[{"anchor_id":"A11","point":[0.0,20.0]},{"anchor_id":"A12","point":[80.2,20.0]}]},
+    {"measurement_id":"M002","measurement_type":"LINEAR_EXTERNAL","value":42.1,"unit":"mm","verified":true,"source":"MANUAL_MEASURED","anchors":[{"anchor_id":"A21","point":[40.0,0.0]},{"anchor_id":"A22","point":[40.0,42.1]}]},
+    {"measurement_id":"M003","measurement_type":"DIAMETER_EXTERNAL","value":5.1,"unit":"mm","verified":true,"source":"MANUAL_MEASURED","anchors":[{"anchor_id":"A31","point":[7.55,21.05]},{"anchor_id":"A32","point":[12.65,21.05]}]},
+    {"measurement_id":"M004","measurement_type":"CENTER_DISTANCE","value":60.0,"unit":"mm","verified":true,"source":"MANUAL_MEASURED","anchors":[{"anchor_id":"A41","point":[10.1,23.6]},{"anchor_id":"A42","point":[70.1,23.6]}]},
+    {"measurement_id":"M005","measurement_type":"RADIUS","value":5.0,"unit":"mm","verified":false,"source":"GEOMETRY_DERIVED","anchors":[{"anchor_id":"A51","point":[80.2,37.1]}]}
+  ]
+}
