@@ -8,6 +8,7 @@ on:
     branches:
       - main
       - "chat-*/pass-*"
+      - "integration/pass-*-candidate"
   workflow_dispatch:
 
 permissions:
@@ -149,7 +150,7 @@ jobs:
 
   integration-chat1-chat2:
     name: Integration / Chat 1 -> Chat 2
-    if: github.ref == 'refs/heads/main' || (github.event_name == 'pull_request' && (startsWith(github.head_ref, 'chat-1/') || startsWith(github.head_ref, 'chat-2/'))) || startsWith(github.ref, 'refs/heads/chat-1/') || startsWith(github.ref, 'refs/heads/chat-2/')
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'pull_request' && (startsWith(github.head_ref, 'chat-1/') || startsWith(github.head_ref, 'chat-2/') || startsWith(github.head_ref, 'integration/pass-'))) || startsWith(github.ref, 'refs/heads/chat-1/') || startsWith(github.ref, 'refs/heads/chat-2/') || startsWith(github.ref, 'refs/heads/integration/pass-')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs:
@@ -176,7 +177,7 @@ jobs:
 
   integration-chat2-chat3:
     name: Integration / Chat 2 -> Chat 3
-    if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request' || startsWith(github.ref, 'refs/heads/chat-2/') || startsWith(github.ref, 'refs/heads/chat-3/')
+    if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request' || startsWith(github.ref, 'refs/heads/chat-2/') || startsWith(github.ref, 'refs/heads/chat-3/') || startsWith(github.ref, 'refs/heads/integration/pass-')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs:
@@ -203,7 +204,7 @@ jobs:
 
   integration-chat3-chat4:
     name: Integration / Chat 3 -> Chat 4
-    if: github.ref == 'refs/heads/main' || (github.event_name == 'pull_request' && (startsWith(github.head_ref, 'chat-3/') || startsWith(github.head_ref, 'chat-4/'))) || startsWith(github.ref, 'refs/heads/chat-3/') || startsWith(github.ref, 'refs/heads/chat-4/')
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'pull_request' && (startsWith(github.head_ref, 'chat-3/') || startsWith(github.head_ref, 'chat-4/') || startsWith(github.head_ref, 'integration/pass-'))) || startsWith(github.ref, 'refs/heads/chat-3/') || startsWith(github.ref, 'refs/heads/chat-4/') || startsWith(github.ref, 'refs/heads/integration/pass-')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs:
@@ -233,7 +234,7 @@ jobs:
 
   integration-chat4-chat5:
     name: Integration / Chat 4 -> Chat 5
-    if: github.ref == 'refs/heads/main' || (github.event_name == 'pull_request' && (startsWith(github.head_ref, 'chat-4/') || startsWith(github.head_ref, 'chat-5/'))) || startsWith(github.ref, 'refs/heads/chat-4/') || startsWith(github.ref, 'refs/heads/chat-5/')
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'pull_request' && (startsWith(github.head_ref, 'chat-4/') || startsWith(github.head_ref, 'chat-5/') || startsWith(github.head_ref, 'integration/pass-'))) || startsWith(github.ref, 'refs/heads/chat-4/') || startsWith(github.ref, 'refs/heads/chat-5/') || startsWith(github.ref, 'refs/heads/integration/pass-')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs:
