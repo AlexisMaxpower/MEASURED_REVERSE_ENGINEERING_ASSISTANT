@@ -14,6 +14,19 @@ from urllib.request import url2pathname
 HOST_READINESS_SCHEMA = "mrea.cad-host-readiness.v1"
 RUNTIME_INPUTS_SCHEMA = "mrea.solidworks-runtime-inputs.v1"
 ADAPTER_NAME = "SOLIDWORKS_2026"
+REQUIRED_READINESS_CODES = frozenset(
+    {
+        "OS_WINDOWS_11_X64",
+        "PROCESS_X64",
+        "DOTNET_FRAMEWORK_48",
+        "AGENT_EXECUTABLE_AVAILABLE",
+        "SOLIDWORKS_COM_REGISTERED",
+        "SOLIDWORKS_VERSION_2026",
+        "SOLIDWORKS_INTEROP_AVAILABLE",
+        "OUTPUT_PATH_WRITABLE",
+        "PART_TEMPLATE_AVAILABLE",
+    }
+)
 
 EXIT_OK = 0
 EXIT_HOST_NOT_READY = 10
@@ -74,14 +87,25 @@ def recompute_host_readiness(payload: Mapping[str, Any]) -> str:
         raise ValueError("host-readiness checks must be an array")
 
     required_statuses: list[str] = []
+    seen_codes: set[str] = set()
     for item in checks:
         if not isinstance(item, Mapping):
             raise ValueError("host-readiness check must be an object")
+        code = item.get("code")
+        if not isinstance(code, str) or not code:
+            raise ValueError("host-readiness check code must be a non-empty string")
+        if code in seen_codes:
+            raise ValueError(f"duplicate host-readiness check code: {code}")
+        seen_codes.add(code)
         if item.get("required", True):
             status = item.get("status")
             if status not in {"PASS", "FAIL", "UNVERIFIED"}:
                 raise ValueError("host-readiness check has invalid status")
             required_statuses.append(str(status))
+
+    missing = sorted(REQUIRED_READINESS_CODES - seen_codes)
+    if missing:
+        raise ValueError(f"host-readiness report is missing required checks: {missing!r}")
 
     if "FAIL" in required_statuses:
         computed = "FAILED"
@@ -247,8 +271,6 @@ def build_runtime_inputs(
     diagnostics = [dict(item) for item in response.get("diagnostics", ()) if isinstance(item, Mapping)]
     diagnostics.extend(dict(item) for item in (extra_diagnostics or ()))
 
-    # This is deliberately an input bundle, not mrea.cad-runtime-evidence.v1.
-    # Primary Chat 4 owns the final VERIFIED/FAILED/UNVERIFIED decision.
     return {
         "schema_version": RUNTIME_INPUTS_SCHEMA,
         "producer": "SIDE_CHAT_4B",
@@ -281,6 +303,28 @@ class _RecordedAdapter:
 
     def transfer(self, package: Any) -> Any:
         return self._result
+
+
+def _write_failure_bundle(
+    *,
+    path: Path,
+    readiness: Mapping[str, Any],
+    request: Mapping[str, Any],
+    process_exit: int,
+    response: Mapping[str, Any] | None,
+    diagnostics: list[Mapping[str, Any]],
+) -> None:
+    _write_json(
+        path,
+        build_runtime_inputs(
+            host_readiness=readiness,
+            request=request,
+            agent_exit_code=process_exit,
+            agent_response=response,
+            canonical_verification_report=None,
+            extra_diagnostics=diagnostics,
+        ),
+    )
 
 
 def main() -> int:
@@ -352,19 +396,18 @@ def main() -> int:
                 details={"stdout": stdout.strip(), "stderr": stderr.strip(), "exit_code": process_exit},
             )
         )
-        bundle = build_runtime_inputs(
-            host_readiness=readiness,
+        _write_failure_bundle(
+            path=inputs_path,
+            readiness=readiness,
             request=request,
-            agent_exit_code=process_exit,
-            agent_response=None,
-            canonical_verification_report=None,
-            extra_diagnostics=process_diagnostics,
+            process_exit=process_exit,
+            response=None,
+            diagnostics=process_diagnostics,
         )
-        _write_json(inputs_path, bundle)
         return process_exit if process_exit in KNOWN_AGENT_EXITS and process_exit != 0 else EXIT_UNEXPECTED
 
     response_exit = response.get("exit_code")
-    if isinstance(response_exit, int) and response_exit != process_exit:
+    if not isinstance(response_exit, int) or response_exit != process_exit:
         process_diagnostics.append(
             _diagnostic(
                 "AGENT_EXIT_CODE_MISMATCH",
@@ -373,18 +416,53 @@ def main() -> int:
                 details={"process_exit": process_exit, "response_exit": response_exit},
             )
         )
+        _write_failure_bundle(
+            path=inputs_path,
+            readiness=readiness,
+            request=request,
+            process_exit=process_exit,
+            response=response,
+            diagnostics=process_diagnostics,
+        )
+        return EXIT_UNEXPECTED
 
     if process_exit != EXIT_OK or response.get("status") != "OK":
-        bundle = build_runtime_inputs(
-            host_readiness=readiness,
+        _write_failure_bundle(
+            path=inputs_path,
+            readiness=readiness,
             request=request,
-            agent_exit_code=process_exit,
-            agent_response=response,
-            canonical_verification_report=None,
-            extra_diagnostics=process_diagnostics,
+            process_exit=process_exit,
+            response=response,
+            diagnostics=process_diagnostics,
         )
-        _write_json(inputs_path, bundle)
         return process_exit if process_exit in KNOWN_AGENT_EXITS and process_exit != 0 else EXIT_UNEXPECTED
+
+    if response.get("real_host_executed") is not True:
+        process_diagnostics.append(
+            _diagnostic(
+                "REAL_HOST_EXECUTION_FLAG_MISSING",
+                "SOLIDWORKS_COM",
+                "successful CAD Agent response did not assert real_host_executed=true",
+            )
+        )
+    if not isinstance(response.get("solidworks_version"), str) or not response.get("solidworks_version"):
+        process_diagnostics.append(
+            _diagnostic(
+                "SOLIDWORKS_VERSION_MISSING",
+                "SOLIDWORKS_COM",
+                "successful CAD Agent response did not record the actual SOLIDWORKS version",
+            )
+        )
+    if process_diagnostics:
+        _write_failure_bundle(
+            path=inputs_path,
+            readiness=readiness,
+            request=request,
+            process_exit=process_exit,
+            response=response,
+            diagnostics=process_diagnostics,
+        )
+        return EXIT_ARTIFACT
 
     try:
         adapter_result = parse_solidworks_agent_response(response)
@@ -402,15 +480,14 @@ def main() -> int:
                 str(exc),
             )
         )
-        bundle = build_runtime_inputs(
-            host_readiness=readiness,
+        _write_failure_bundle(
+            path=inputs_path,
+            readiness=readiness,
             request=request,
-            agent_exit_code=process_exit,
-            agent_response=response,
-            canonical_verification_report=None,
-            extra_diagnostics=process_diagnostics,
+            process_exit=process_exit,
+            response=response,
+            diagnostics=process_diagnostics,
         )
-        _write_json(inputs_path, bundle)
         return EXIT_CAD_TRANSFER
 
     cad_package_path = args.output_dir / "cad_package.json"
