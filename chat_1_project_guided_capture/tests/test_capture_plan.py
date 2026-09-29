@@ -1,5 +1,9 @@
-from mrea_capture.models import CaptureViewStatus, CaptureViewType, PartContext, Project
-from mrea_capture.services import CapturePlanService
+from pathlib import Path
+
+from mrea_capture.artifacts import FileSystemArtifactStore
+from mrea_capture.models import CaptureViewType, PartContext, Project
+from mrea_capture.repositories import JsonCaptureSessionRepository
+from mrea_capture.services import CapturePlanService, CaptureSessionService
 
 
 def build_project() -> Project:
@@ -35,16 +39,16 @@ def test_explicit_plan_preserves_order_and_removes_duplicates() -> None:
     assert plan.items[-1].required is False
 
 
-def test_session_is_initialized_from_plan_without_capture_side_effects() -> None:
+def test_session_is_initialized_and_persisted_from_plan(tmp_path: Path) -> None:
     project = build_project()
-    service = CapturePlanService()
-    plan = service.create_plan(project, views=[CaptureViewType.FRONT, CaptureViewType.TOP])
+    plan = CapturePlanService().create_plan(project, views=[CaptureViewType.FRONT, CaptureViewType.TOP])
+    service = CaptureSessionService(
+        JsonCaptureSessionRepository(tmp_path),
+        FileSystemArtifactStore(tmp_path),
+    )
 
-    session = service.start_session(plan)
+    session = service.start(plan)
+    restored = service.get(session.session_id)
 
-    assert session.project_id == project.project_id
-    assert session.plan_id == plan.plan_id
-    assert [view.status for view in session.views] == [
-        CaptureViewStatus.PLANNED,
-        CaptureViewStatus.PLANNED,
-    ]
+    assert restored == session
+    assert [view.view for view in restored.views] == [CaptureViewType.FRONT, CaptureViewType.TOP]
