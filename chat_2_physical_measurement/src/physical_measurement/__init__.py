@@ -1,5 +1,6 @@
 """Chat 2 Physical Measurement internal domain package."""
 
+from .boundary import CanonicalMeasurementAdapter
 from .models import (
     FeatureAnchor,
     MeasurementSession,
@@ -11,6 +12,7 @@ from .repository import InMemoryMeasurementSessionRepository
 from .service import MeasurementSessionService
 
 __all__ = [
+    "CanonicalMeasurementAdapter",
     "FeatureAnchor",
     "InMemoryMeasurementSessionRepository",
     "MeasurementSession",
