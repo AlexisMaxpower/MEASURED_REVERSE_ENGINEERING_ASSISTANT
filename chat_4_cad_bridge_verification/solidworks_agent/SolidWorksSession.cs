@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
 using SolidWorks.Interop.swconst;
@@ -7,20 +8,25 @@ namespace Mrea.SolidWorksCadAgent
 {
     internal sealed class SolidWorksSession : IDisposable
     {
+        private const int SupportedRevisionMajor = 34; // SOLIDWORKS 2026 API revision major.
+
         private dynamic _app;
         private dynamic _model;
         private readonly bool _launchedByAgent;
+        private readonly string _version;
         private bool _disposed;
 
-        private SolidWorksSession(dynamic app, dynamic model, bool launchedByAgent)
+        private SolidWorksSession(dynamic app, dynamic model, bool launchedByAgent, string version)
         {
             _app = app;
             _model = model;
             _launchedByAgent = launchedByAgent;
+            _version = version;
         }
 
         public dynamic App { get { return _app; } }
         public dynamic Model { get { return _model; } }
+        public string Version { get { return _version; } }
 
         public static SolidWorksSession Open(AgentRequest request)
         {
@@ -53,6 +59,7 @@ namespace Mrea.SolidWorksCadAgent
             if (app == null)
                 throw new InvalidOperationException("SOLIDWORKS is not running and allow_launch=false.");
 
+            string version = ReadAndValidateVersion(app);
             var template = ResolvePartTemplate(app, request.part_template_path);
             dynamic model = app.NewDocument(template, (int)swDwgPaperSizes_e.swDwgPaperAsize, 0.0, 0.0);
             if (model == null)
@@ -64,7 +71,34 @@ namespace Mrea.SolidWorksCadAgent
             if (sketchManager.ActiveSketch == null)
                 throw new InvalidOperationException("SOLIDWORKS did not enter a FRONT-plane sketch.");
 
-            return new SolidWorksSession(app, model, launched);
+            return new SolidWorksSession(app, model, launched, version);
+        }
+
+        private static string ReadAndValidateVersion(dynamic app)
+        {
+            string revision;
+            try
+            {
+                revision = Convert.ToString(app.RevisionNumber(), CultureInfo.InvariantCulture);
+            }
+            catch (Exception exc)
+            {
+                throw new InvalidOperationException("SOLIDWORKS RevisionNumber() failed.", exc);
+            }
+
+            if (string.IsNullOrWhiteSpace(revision))
+                throw new InvalidOperationException("SOLIDWORKS returned an empty RevisionNumber().");
+
+            var dot = revision.IndexOf('.');
+            var majorText = dot >= 0 ? revision.Substring(0, dot) : revision;
+            int major;
+            if (!int.TryParse(majorText, NumberStyles.Integer, CultureInfo.InvariantCulture, out major))
+                throw new InvalidOperationException("Cannot parse SOLIDWORKS revision number: " + revision);
+            if (major != SupportedRevisionMajor)
+                throw new InvalidOperationException(
+                    "SOLIDWORKS version mismatch: adapter requires 2026 revision major " +
+                    SupportedRevisionMajor + ", actual RevisionNumber=" + revision);
+            return revision;
         }
 
         private static string ResolvePartTemplate(dynamic app, string requested)
