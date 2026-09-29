@@ -1,6 +1,6 @@
 # Chat 5 — Lifecycle & Engineering Knowledge
 
-Статус: **initialized / documentation baseline**  
+Статус: **Phase 1 domain/runtime baseline implemented**  
 Проект: **MREA — Measured Reverse Engineering Assistant**  
 Источник истины: **MREA SSOT v0.1 от 2026-09-29**
 
@@ -35,7 +35,7 @@ Chat 5 отвечает за:
 - lifecycle timeline;
 - engineering knowledge queries.
 
-Планируемые компоненты:
+Реализованный Phase 1 содержит:
 
 - `RevisionService`
 - `ManufacturingService`
@@ -45,7 +45,9 @@ Chat 5 отвечает за:
 - `RevisionComparison`
 - `EquipmentPartRegistry`
 - `LifecycleTimeline`
+- `LifecycleStateProjection`
 - `KnowledgeQueryService`
+- `InMemoryLifecycleStore`
 
 ## Не входит в ownership
 
@@ -61,10 +63,26 @@ Chat 5 самостоятельно не изменяет:
 
 Cross-slice изменения оформляются через `CHANGE_REQUEST` для Integrator.
 
-## Документация
+## Структура
 
-- [`docs/CHAT_5_ROLE.md`](docs/CHAT_5_ROLE.md) — роль, границы, модель, контракты, правила и план реализации.
-- [`docs/IMPLEMENTATION_STATE.md`](docs/IMPLEMENTATION_STATE.md) — текущее фактическое состояние области, проверки, ограничения и следующий шаг.
+```text
+chat_5_lifecycle_engineering_knowledge/
+├── README.md
+├── docs/
+│   ├── CHAT_5_ROLE.md
+│   ├── IMPLEMENTATION_STATE.md
+│   └── PHASE_1_DOMAIN_BASELINE.md
+├── src/
+│   └── mrea_lifecycle/
+│       ├── __init__.py
+│       ├── models.py
+│       ├── projections.py
+│       ├── services.py
+│       └── store.py
+└── tests/
+    ├── test_acceptance_flow.py
+    └── test_invariants.py
+```
 
 ## Первый acceptance-flow
 
@@ -73,15 +91,35 @@ REV01
 → manufactured
 → installed
 → failed
-→ failure evidence
+→ failure evidence retained
 → REV02
 → manufactured
 → installed
 → active
 ```
 
-Первый кодовый этап должен реализовать этот сценарий детерминированно через fixtures, без AI.
+Этот flow реализован и локально проверен.
 
-## Текущее состояние
+## Verification
 
-На момент инициализации области создана только документационная база Chat 5. Runtime/domain/persistence/API код ещё не реализован и не должен считаться существующим до отдельной зафиксированной итерации.
+```text
+PYTHONPATH=src pytest -q
+```
+
+Результат Phase 1:
+
+```text
+4 passed
+```
+
+## Важное ограничение
+
+`LifecycleEvent`, `LifecycleEventType` и `LifecycleState` в текущем коде являются **внутренними типами Chat 5**, а не shared contracts проекта.
+
+Integrator-owned schemas/fixtures на момент Phase 1 в проверенной структуре repository отсутствовали. Shared contracts не изменялись.
+
+## Документация
+
+- [`docs/CHAT_5_ROLE.md`](docs/CHAT_5_ROLE.md) — роль, ownership, границы и архитектурная модель.
+- [`docs/PHASE_1_DOMAIN_BASELINE.md`](docs/PHASE_1_DOMAIN_BASELINE.md) — реализованный Phase 1, invariants, verification и ограничения.
+- [`docs/IMPLEMENTATION_STATE.md`](docs/IMPLEMENTATION_STATE.md) — актуальное фактическое состояние и следующий шаг.
