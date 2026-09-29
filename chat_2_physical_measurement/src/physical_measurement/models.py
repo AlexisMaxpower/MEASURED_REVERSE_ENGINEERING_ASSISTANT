@@ -79,10 +79,11 @@ class FeatureAnchor:
 
 @dataclass(frozen=True, slots=True)
 class PhysicalMeasurement:
-    """Internal representation for Chat 2 Phase A.
+    """Internal physical measurement with unit-neutral uncertainty semantics.
 
-    This model mirrors SSOT semantics but is deliberately not named or serialized
-    as the canonical shared contract. Shared schema ownership remains with Integrator.
+    ``uncertainty`` is expressed in the measurement's own ``unit``. The legacy
+    ``uncertainty_mm`` field remains temporarily available only as a compatibility
+    bridge for millimetre measurements created by older Chat 2 callers.
     """
 
     measurement_id: str
@@ -94,6 +95,7 @@ class PhysicalMeasurement:
     anchor_a: FeatureAnchor
     anchor_b: FeatureAnchor
     evidence_frame_id: str | None = None
+    uncertainty: Decimal | None = None
     uncertainty_mm: Decimal | None = None
     instrument_type: str | None = None
     confirmed: bool = False
@@ -106,11 +108,42 @@ class PhysicalMeasurement:
         object.__setattr__(self, "view_id", _non_empty(self.view_id, "view_id"))
         object.__setattr__(self, "unit", _non_empty(self.unit, "unit"))
         object.__setattr__(self, "value", decimal_value(self.value))
-        if self.uncertainty_mm is not None:
-            uncertainty = decimal_value(self.uncertainty_mm, "uncertainty_mm")
-            if uncertainty < 0:
-                raise ValueError("uncertainty_mm must be >= 0")
-            object.__setattr__(self, "uncertainty_mm", uncertainty)
+
+        neutral_uncertainty = (
+            decimal_value(self.uncertainty, "uncertainty")
+            if self.uncertainty is not None
+            else None
+        )
+        legacy_uncertainty = (
+            decimal_value(self.uncertainty_mm, "uncertainty_mm")
+            if self.uncertainty_mm is not None
+            else None
+        )
+        for field_name, candidate in (
+            ("uncertainty", neutral_uncertainty),
+            ("uncertainty_mm", legacy_uncertainty),
+        ):
+            if candidate is not None and candidate < 0:
+                raise ValueError(f"{field_name} must be >= 0")
+
+        if legacy_uncertainty is not None and self.unit != "mm":
+            raise ValueError("uncertainty_mm compatibility input is only valid for mm measurements")
+        if (
+            neutral_uncertainty is not None
+            and legacy_uncertainty is not None
+            and neutral_uncertainty != legacy_uncertainty
+        ):
+            raise ValueError("uncertainty and uncertainty_mm must match when both are supplied")
+
+        resolved_uncertainty = (
+            neutral_uncertainty if neutral_uncertainty is not None else legacy_uncertainty
+        )
+        object.__setattr__(self, "uncertainty", resolved_uncertainty)
+        object.__setattr__(
+            self,
+            "uncertainty_mm",
+            resolved_uncertainty if self.unit == "mm" else None,
+        )
 
         if self.anchor_a.anchor_id == self.anchor_b.anchor_id:
             raise ValueError("anchor_a and anchor_b must be different")
