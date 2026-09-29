@@ -2,24 +2,24 @@
 
 **Date:** 2026-09-30  
 **Repository:** `AlexisMaxpower/MEASURED_REVERSE_ENGINEERING_ASSISTANT`  
-**Active branch:** `chat-3/pass-5`  
+**Active branch:** `chat-3/pass-6`  
 **Role:** Chat 3 — Geometry & Semi-Automatic Sketch  
-**Ring:** 5  
-**Authorization:** explicit user-requested continuation; no newer Chat 6 worker directive for Chat 3 was present when Ring 5 started.
+**Ring:** 6  
+**Authorization:** explicit user-requested continuation; no newer Chat 3 worker directive than OD-2026-09-29-003 was present on `main` when Ring 6 started.
 
 ## Baseline
 
-Ring 5 branches from frozen Ring 4 head:
+Ring 6 branches from frozen Ring 5 head:
 
 ```text
-aa53603b4f845b63a0962ddacd921ea4dbf01b54
+f450b3a857fc7353c3b0f8881050cae0ae3199d5
 ```
 
-This preserves Ring 3 vision extraction and Ring 4 constraint resolution without modifying older frozen worker branches.
+This preserves Rings 3–5 vision extraction, constraint resolution and Dimensioned View work without modifying older frozen worker branches.
 
-## Capabilities through Ring 4
+## Capabilities through Ring 5
 
-Chat 3 currently provides:
+Chat 3 already provides:
 
 - canonical CapturePackage / MeasurementPackage adapter;
 - `IMAGE_PX -> MAT_XY_MM` homography normalization;
@@ -27,151 +27,92 @@ Chat 3 currently provides:
 - deterministic GeometryGraph;
 - physical measurement binding and conflict visibility;
 - deterministic SketchPackage v1 generation;
-- OpenCV-backed LINE/CIRCLE/ARC candidate extraction;
+- OpenCV-backed LINE/CIRCLE/ARC image candidate extraction;
 - truthful `VISION_DETECTED` provenance;
 - fail-closed ambiguous/unsupported geometry handling;
-- `ConstraintResolver` with confidence, measurement-truth and redundancy gates;
-- constraint-aware VisionGeometryPipeline.
+- `ConstraintResolver` with confidence, verified-measurement and redundancy gates;
+- constraint-aware VisionGeometryPipeline;
+- deterministic SVG Dimensioned View with measurement/provenance/confidence traceability.
 
-## Ring 5 — Dimensioned View
+## Ring 6 — Topology Constraint Candidates
 
-Ring 5 implements the SSOT visualization composition:
+Ring 6 completes the Chat 3 candidate vocabulary for the canonical v1 constraint kinds that can be conservatively inferred without numerical solving.
 
-```text
-Clean Reference Image
-+
-Geometry Overlay
-+
-Dimension Lines
-+
-Physical Measurements
-+
-Confidence / Provenance
-```
+### New generated kinds
 
-New module:
+- `COINCIDENT`;
+- `TANGENT`;
+- `SYMMETRIC`.
 
-```text
-src/mrea_geometry/dimensioned_view.py
-```
+Existing generated kinds remain:
 
-Public API:
+- HORIZONTAL;
+- VERTICAL;
+- PARALLEL;
+- PERPENDICULAR;
+- CONCENTRIC;
+- EQUAL.
 
-- `ReferenceImageLayer`;
-- `DimensionedViewArtifact`;
-- `DimensionedViewRenderer`.
+### COINCIDENT policy
 
-## Renderer semantics
+Coincidence is generated only from directly observed finite contact:
 
-Input:
+- explicit POINT contact;
+- LINE endpoint contact;
+- ARC endpoint contact.
 
-```text
-SketchPackage v1 / MAT_XY_MM
-```
+Pure interior/interior crossings are not interpreted as intended topology.
 
-Output:
+### TANGENT policy
 
-```text
-deterministic SVG Dimensioned View
-```
+Supported:
 
-The SVG is a slice-local derived artifact. It is **not** a replacement shared contract; Chat 4 still consumes `SketchPackage v1`.
+- LINE ↔ CIRCLE;
+- LINE ↔ ARC;
+- CIRCLE/ARC ↔ CIRCLE/ARC.
 
-### Geometry overlay
+Finite LINE segments and observed ARC spans are respected. External/internal round tangency is supported; concentric degeneracy is rejected.
 
-Supported entity visuals:
+### SYMMETRIC policy
 
-- `POINT`;
-- `LINE`;
-- `CIRCLE`;
-- `ARC`.
+Requires an explicit LINE entity as symmetry axis.
 
-SVG geometry retains entity id, provenance and confidence metadata.
+Conservative Ring 6 peers:
 
-### Dimensions
+- POINT ↔ POINT;
+- equal-radius CIRCLE ↔ CIRCLE.
 
-Supported dimension visuals:
+No hidden symmetry axis is invented.
 
-- `DISTANCE`;
-- `DIAMETER`;
-- `RADIUS`;
-- `ANGLE`.
+### Resolver / truth hierarchy
 
-Each dimension preserves/displays:
+New candidates still pass through the existing `ConstraintResolver`.
 
-- dimension id;
-- measurement id when available;
-- canonical value/unit;
-- provenance;
-- verified state.
-
-The renderer does not recalculate verified values from geometry.
-
-### Confidence / provenance / unresolved
-
-The generated artifact contains a deterministic traceability footer showing:
-
-- geometry provenance;
-- confidence range;
-- dimension provenance;
-- preserved verification state;
-- canonical unresolved ids/codes.
-
-### Clean Reference Image
-
-Optional reference imagery requires explicit `MAT_XY_MM` bounds through `ReferenceImageLayer`.
-
-The renderer does not guess pixel-to-geometry registration from image dimensions or sketch extents. Invalid or zero-area bounds fail closed.
-
-## Truth invariant
+They therefore remain subject to entity existence and effective-confidence gates and never replace verified physical measurements.
 
 ```text
-verified physical measurement > image-derived / geometry-derived information
+verified physical measurement > image/geometry-derived relation
 ```
 
-Dimensioned View is read-only. It does not:
+The engine still does not move or solve geometry.
 
-- change measurement values or units;
-- change verification state;
-- change provenance;
-- resolve conflicts;
-- move entities;
-- infer hidden geometry.
+## Vision golden behavior
 
-## Determinism
+The front-plate vision golden now includes four inferred COINCIDENT constraints at the four observed rectangle corners.
 
-Stable output includes:
+Verified MANUAL_MEASURED dimensions remain unchanged.
 
-- entity ordering;
-- dimension ordering;
-- mm-to-SVG projection;
-- annotation lanes;
-- numeric formatting;
-- traceability footer;
-- exact SVG golden.
-
-## Golden fixture
-
-```text
-tests/fixtures/dimensioned_view/front_plate_dimensioned_view.svg
-```
-
-It visualizes the Ring 4 front-plate SketchPackage including:
-
-- VISION_DETECTED geometry;
-- entity confidence values;
-- verified MANUAL_MEASURED dimensions;
-- explicit unresolved low-confidence relation.
+The low-confidence EQUAL relation between the two detected holes remains explicit unresolved because entity confidence is `0.766 < 0.95`.
 
 ## Runtime / dependencies
 
 Package version:
 
 ```text
-0.5.0
+0.6.0
 ```
 
-New Ring 5 dependencies: **none**.
+New Ring 6 dependencies: **none**.
 
 Existing OpenCV dependency remains unchanged.
 
@@ -180,37 +121,38 @@ Existing OpenCV dependency remains unchanged.
 GitHub Actions implementation run:
 
 ```text
-run: 36637771870
-head: 9244a0f58e0fda35504ae5a7004cdaa0af40ef94
+run: 36643777256
+head: 14feaad3e08d622cf17f5f7da60ac09565df908e
 ```
 
 Authoritative Chat 3 result:
 
 ```text
-41 passed in 0.42s
+50 passed in 0.38s
 ```
 
-Additional observed gates:
+Additional gates:
 
 - contracts: SUCCESS;
-- Chat 1/2/4/5 slice jobs: SUCCESS;
-- Chat 2 -> Chat 3 test step: SUCCESS;
-- Chat 3 -> Chat 4 fails only on the stale shared `cad_verification_report["dimensions"]` lookup inherited from the frozen Ring 4 base.
+- Chat 2: SUCCESS;
+- Chat 2 -> Chat 3: SUCCESS;
+- Chat 4 generic CAD: SUCCESS;
+- Chat 3 -> Chat 4 fails only on the stale shared `cad_verification_report["dimensions"]` lookup inherited from frozen Ring 5 ancestry.
 
-Current `main` already contains the orchestrator correction to canonical `cad_verification_report["items"]` at:
+Current `main` uses the corrected canonical field:
 
 ```text
-1a54ef40f84119d7482d971deb1e58749bf657b0
+cad_verification_report["items"]
 ```
 
-Ring 5 does not modify/backport shared integration infrastructure; Integrator must combine worker changes with the current corrected shared baseline.
+Ring 6 does not modify or backport shared integration infrastructure.
 
 ## Shared ownership
 
-Ring 5 modifies no:
+Ring 6 modifies no:
 
 - shared contracts;
-- canonical contract fixtures;
+- shared canonical fixtures;
 - repository integration tests;
 - CI workflow;
 - other chat directories.
@@ -219,23 +161,21 @@ No Change Request was needed.
 
 ## Deferred Chat 3 work
 
-- richer dimension-label collision/layout optimization;
-- evidence-click UI wiring;
-- COINCIDENT/TANGENT/SYMMETRIC candidate generation;
-- numerical geometry solving/entity movement;
+- numerical constraint solving/entity movement;
+- wider symmetry families such as LINE/ARC peers;
+- richer noisy-geometry confidence models;
+- interactive evidence navigation from Dimensioned View;
 - multi-view geometry relationships;
 - CAD-native logic.
 
 ## Current status
 
 ```text
-READY_FOR_RING5_INTEGRATOR_REVIEW
+READY_FOR_RING6_INTEGRATOR_REVIEW
 ```
 
-Chat 3's Ring 5 implementation is independently green on GitHub-hosted CI. The remaining failing Chat 3 -> Chat 4 check on this worker branch is baseline drift from the frozen branch base and has already been corrected on current `main`.
+## Ring 6 documents
 
-## Ring 5 documents
-
-- `BUILD_REUSE_CHECK_RING5_DIMENSIONED_VIEW.md`;
-- `IMPLEMENTATION_REPORT_RING5_DIMENSIONED_VIEW_2026-09-30.md`;
+- `BUILD_REUSE_CHECK_RING6_TOPOLOGY_CONSTRAINTS.md`;
+- `IMPLEMENTATION_REPORT_RING6_TOPOLOGY_CONSTRAINTS_2026-09-30.md`;
 - `ORCHESTRATOR_HANDOFF.md`.
