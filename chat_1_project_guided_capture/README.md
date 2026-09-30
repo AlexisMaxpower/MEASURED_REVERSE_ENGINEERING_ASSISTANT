@@ -6,9 +6,10 @@ Chat 1 owns the MREA vertical slice from Project/Capture setup through canonical
 
 - Pass 1: **accepted** by Chat 6;
 - Pass 2: **accepted** and integrated into `main`;
-- current directive: `OD-2026-09-29-003`;
-- Pass 3 branch: `chat-1/pass-3`;
-- Pass 3 gate: Guided Capture Quality baseline.
+- Pass 3: **accepted** in the certified Round-3 baseline;
+- current directive: `OD-2026-09-30-004`;
+- current worker branch: `chat-1/pass-4`;
+- Pass 4 is in **completion/review preparation**: no further feature expansion; publish the truthful Pass-4 handoff and freeze the branch.
 
 ## Current implementation
 
@@ -69,6 +70,7 @@ chat_1_project_guided_capture/
 │  ├─ quality.py
 │  ├─ lineage.py
 │  ├─ guidance.py
+│  ├─ history.py
 │  ├─ rectification.py
 │  ├─ repositories.py
 │  └─ services.py
@@ -82,14 +84,15 @@ chat_1_project_guided_capture/
 │  ├─ test_quality.py
 │  ├─ test_guidance.py
 │  ├─ test_recapture.py
-│  └─ test_reopen.py
+│  ├─ test_reopen.py
+│  └─ test_attempt_history.py
 └─ docs/
    ├─ IMPLEMENTATION_STATE.md
    ├─ BUILD_REUSE_CHECK_PASS3_GUIDED_QUALITY.md
    └─ IMPLEMENTATION_REPORT_PASS3_GUIDED_QUALITY_2026-09-29.md
 ```
 
-## Pass 3 local verification
+## Accepted Pass 3 — historical local verification
 
 ```text
 pytest -q tests/test_quality.py
@@ -99,15 +102,15 @@ pytest -q tests/test_quality.py
 
 The generated fixtures cover good capture, strong blur, under/over exposure, localized glare, border-framing risk, low marker visibility, deterministic repeated analysis, persistence and explicit decode failure.
 
-Full repository CI is required for final Pass 3 acceptance because the local archive workspace does not contain repository-root shared-contract files.
+Pass 3 is now accepted in the certified Round-3 baseline. The local result below is retained as historical worker evidence; authoritative acceptance evidence is owned by Chat 6 / repository CI.
 
 ## Contract policy
 
 Guided quality is internal diagnostic state. `CapturePackage v1` is unchanged; no quality inference is emitted as physical measurement truth.
 
-## Remaining work after Pass 3
+## Post-Pass-3 backlog
 
-Subject to the next Chat 6 directive:
+These items remain future work unless a later Chat 6 directive selects them:
 
 - real-device threshold calibration;
 - printed Measurement Mat / physical accuracy validation;
@@ -117,12 +120,12 @@ Subject to the next Chat 6 directive:
 - voice-trigger capture in its later roadmap gate.
 
 
-## Isolated Pass 4 — Guided Capture Readiness
+## Pass 4 — Guided Capture Readiness
 
-Pending Round-3 closure / official OD-004, `chat-1/pass-4` contains an isolated future-work layer that derives deterministic next actions and required-view completeness from existing CaptureSession evidence. It does not modify canonical contracts and must not be treated as integrated into `main` until orchestration approval.
+Under `OD-2026-09-30-004`, `chat-1/pass-4` is the selected Round-4 worker cut. The readiness layer derives deterministic next actions and required-view completeness from existing `CaptureSession` evidence. It does not modify canonical contracts. Stage-1 acceptance remains pending Chat 6 review.
 
 
-### Isolated Pass 4 extension — immutable recapture lineage
+### Pass 4 extension — immutable recapture lineage
 
 The guided workflow can now recover from a rejected clean-reference attempt without deleting evidence:
 
@@ -134,13 +137,12 @@ The guided workflow can now recover from a rejected clean-reference attempt with
 - canonical `CapturePackage v1` exposes only active clean-reference evidence and active-attempt measurement frames;
 - accepted views cannot be silently recaptured without a future explicit reopen workflow.
 
-This remains isolated on `chat-1/pass-4` until Round 3 closes and Chat 6 issues the official next directive.
+This lineage is part of the selected Pass-4 worker result. It remains unmerged and pending Chat 6 Stage-1 review.
 
-### Isolated Pass 4 — Explicit accepted-view revision
+### Pass 4 — Explicit accepted-view revision
 
 Accepted views can now be intentionally reopened through an audited `reopen_view(...)` operation. Reopening never deletes evidence: it records a `CaptureViewRevisionEvent`, clears completion, and requires a fresh clean-reference attempt before the view can be accepted again. Guided Capture exposes this as `RECAPTURE_CLEAN_REFERENCE` with `VIEW_REOPENED_RECAPTURE_REQUIRED`. This state remains internal and does not change `CapturePackage v1`.
 
-### Isolated Pass 4 extension — deterministic capture-attempt history
+### Pass 4 extension — deterministic capture-attempt history
 
 `history.py` now projects the immutable clean-reference lineage into an explicit per-view attempt history for UI/orchestration. Each attempt carries its clean artifact identity, predecessor/successor links, acceptance/revision evidence, calibration, quality verdict, rectification and measurement-frame IDs. The projection is read-only and keeps active vs historical evidence unambiguous. The history projection fails closed on multiple roots, disconnected clean-reference components, missing predecessors, branches or cycles.
-
