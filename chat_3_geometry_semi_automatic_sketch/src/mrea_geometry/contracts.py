@@ -30,6 +30,15 @@ def _as_finite_number(value: object, *, field_name: str) -> float:
     return number
 
 
+def _optional_uncertainty(value: object) -> float | None:
+    if value is None:
+        return None
+    uncertainty = _as_finite_number(value, field_name="measurement.uncertainty")
+    if uncertainty < 0:
+        raise ValueError("measurement.uncertainty must be non-negative")
+    return uncertainty
+
+
 def _homography_determinant(values: tuple[float, ...]) -> float:
     a, b, c, d, e, f, g, h, i = values
     return a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g)
@@ -167,6 +176,7 @@ class CanonicalInputAdapter:
                     verified=bool(item["verified"]),
                     source=item["source"],
                     anchors=tuple(anchors),
+                    uncertainty=_optional_uncertainty(item.get("uncertainty")),
                 )
             )
 
