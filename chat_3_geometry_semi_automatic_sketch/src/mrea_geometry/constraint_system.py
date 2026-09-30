@@ -144,9 +144,10 @@ class ConstraintSystemAnalyzer:
         )
 
     @staticmethod
-    def _priority_key(constraint: ResolvedConstraint) -> tuple[float, int, str]:
+    def _priority_key(constraint: ResolvedConstraint) -> tuple[float, int, int, str]:
         status_rank = 0 if constraint.status == "DETECTED" else 1
-        return (-constraint.confidence, status_rank, constraint.constraint_id)
+        directness_rank = 0 if constraint.kind in {"HORIZONTAL", "VERTICAL"} else 1
+        return (-constraint.confidence, status_rank, directness_rank, constraint.constraint_id)
 
     def _classify(
         self,
