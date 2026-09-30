@@ -178,9 +178,43 @@ class SolidWorksAgentBoundaryTests(unittest.TestCase):
             constraint("K-PERP", "PERPENDICULAR", ["L-BOTTOM", "L-RIGHT"]),
             constraint("K-CONC", "CONCENTRIC", ["C-HOLE-1", "C-HOLE-2"]),
             constraint("K-EQ", "EQUAL", ["L-BOTTOM", "L-TOP"]),
+            constraint("K-TAN", "TANGENT", ["L-BOTTOM", "C-HOLE-1"]),
         ]
         request = build_solidworks_agent_request(self.mapped(package), self.config)
         self.assertEqual(request["constraints"], package["constraints"])
+
+    def test_tangent_line_circle_is_preserved_for_worker(self):
+        package = copy.deepcopy(GOLDEN)
+        package["constraints"] = [
+            constraint("K-TAN", "TANGENT", ["L-BOTTOM", "C-HOLE-1"])
+        ]
+        request = build_solidworks_agent_request(self.mapped(package), self.config)
+        self.assertEqual(request["constraints"], package["constraints"])
+
+    def test_tangent_two_lines_fail_closed(self):
+        package = copy.deepcopy(GOLDEN)
+        package["constraints"] = [
+            constraint("K-TAN", "TANGENT", ["L-BOTTOM", "L-RIGHT"])
+        ]
+        with self.assertRaises(CadAdapterError):
+            build_solidworks_agent_request(self.mapped(package), self.config)
+
+    def test_tangent_point_participation_fails_closed(self):
+        package = copy.deepcopy(GOLDEN)
+        package["entities"].append(
+            {
+                "entity_id": "P-DATUM",
+                "type": "POINT",
+                "point": {"x": 12.5, "y": 8.25},
+                "provenance": "GEOMETRY_DERIVED",
+                "confidence": 1.0,
+            }
+        )
+        package["constraints"] = [
+            constraint("K-TAN", "TANGENT", ["P-DATUM", "C-HOLE-1"])
+        ]
+        with self.assertRaises(CadAdapterError):
+            build_solidworks_agent_request(self.mapped(package), self.config)
 
     def test_unsupported_constraint_type_fails_closed(self):
         package = copy.deepcopy(GOLDEN)
