@@ -120,3 +120,7 @@ ROUND_3 = NOT_CLOSED
 ```
 
 The merge must reject if PR #27 head is no longer the exact authorized SHA above.
+
+## Upload verification before merge
+
+This decision file was re-read from GitHub after publication. PR #27 was also re-read immediately before merge authorization and still reported head `1c9ccb432664e57a24be8fe586bb07ad13fd5075`, base `dcdb1b7a1399415522a1a17a7979dda536f116f4`, `mergeable=true`, and `merged=false`.
