@@ -2,18 +2,18 @@
 
 **Date:** 2026-09-30  
 **Repository:** `AlexisMaxpower/MEASURED_REVERSE_ENGINEERING_ASSISTANT`  
-**Active branch:** `chat-3/pass-8`  
+**Active branch:** `chat-3/pass-9`  
 **Role:** Chat 3 — Geometry & Semi-Automatic Sketch  
-**Ring:** 8  
-**Authorization:** explicit user-requested continuation; no newer Chat 3 worker directive than OD-2026-09-29-003 was present on `main` when Ring 8 started.
+**Ring:** 9  
+**Authorization:** explicit user-requested continuation; no newer Chat 3 worker directive than OD-2026-09-29-003 was present on `main` when Ring 9 started.
 
 ## Baseline
 
-Ring 8 branches from frozen Ring 7 head:
+Ring 9 branches from frozen Ring 8 head:
 
-`40340f38974ea71ea626a73d4d7f3c5c271dd086`
+`d786e1d49b5c8f2837a3ce936f7f1c0d93336d49`
 
-## Capabilities through Ring 7
+## Capabilities through Ring 8
 
 Chat 3 already provides:
 
@@ -26,77 +26,87 @@ Chat 3 already provides:
 - OpenCV LINE/CIRCLE/ARC extraction with `VISION_DETECTED` provenance;
 - fail-closed ambiguous geometry handling;
 - all canonical v1 constraint candidate families;
-- `ConstraintResolver` with confidence, verified-measurement and redundancy gates;
+- `ConstraintResolver` with verified-measurement, confidence and redundancy gates;
 - `ConstraintSatisfactionAnalyzer` with explicit residuals and `UNSATISFIED_CONSTRAINT` diagnostics;
+- residual-aware `ConstraintConfidenceModel`;
 - deterministic SVG Dimensioned View.
 
-## Ring 8 — Residual-Aware Constraint Confidence
+## Ring 9 — Global Constraint-Set Diagnostics
 
 New module:
 
-`src/mrea_geometry/constraint_confidence.py`
+`src/mrea_geometry/constraint_system.py`
 
 Public API:
 
-- `ConstraintConfidence`;
-- `ConstraintConfidenceModel`.
+- `ConstraintSystemAnalysis`;
+- `ConstraintSystemAnalyzer`.
 
-### Purpose
+### Orientation consistency
 
-A relation that only barely satisfies a configured geometric tolerance is no longer treated as equally reliable to an exact relation.
+Global orientation relations are modeled as a parity graph:
 
-For satisfied geometry:
+- HORIZONTAL -> world parity 0;
+- VERTICAL -> world parity 1;
+- PARALLEL -> entity parity 0;
+- PERPENDICULAR -> entity parity 1.
+
+The analyzer detects relations that are independent, redundant or contradictory with the accepted orientation graph.
+
+### Evidence priority
+
+Processing order is deterministic:
+
+1. higher confidence;
+2. `DETECTED` before `INFERRED`;
+3. direct HORIZONTAL/VERTICAL before pair relations at equal evidence strength;
+4. constraint ID tie-breaker.
+
+A proven contradiction becomes:
+
+`OVERCONSTRAINED_ORIENTATION_CONFLICT`
+
+and is not published.
+
+### Safe transitive reduction
+
+Provably redundant cycles are also removed independently for:
+
+- PARALLEL through the parity graph;
+- EQUAL;
+- CONCENTRIC.
+
+No transitive assumption is made for COINCIDENT, TANGENT or SYMMETRIC.
+
+### Pipeline order
+
+The vision path is now:
 
 ```text
-ratio = clamp(residual / tolerance, 0, 1)
-confidence = 1 - (1 - boundary_confidence) * ratio^2
+ImageGeometryExtractor
+-> GeometryPipeline
+-> ConstraintResolver
+-> ConstraintSystemAnalyzer
+-> SketchPackageBuilder
 ```
 
-Default `boundary_confidence = 0.5`.
-
-### Resolver behavior
-
-Resolver order is now:
-
-1. entity existence;
-2. geometric satisfaction;
-3. residual-derived confidence;
-4. effective confidence gate;
-5. redundancy policy;
-6. verified measurement conflict policy;
-7. canonical publication.
-
-Effective confidence is:
-
-```text
-min(candidate confidence, entity confidences, residual-derived confidence)
-```
-
-The residual model can only lower confidence; it cannot increase source evidence.
-
-### Distinct fail-closed outcomes
-
-- relation outside tolerance -> `UNSATISFIED_CONSTRAINT`;
-- relation inside tolerance but too noisy -> `CONSTRAINT_BELOW_PROMOTION_CONFIDENCE`;
-- exact/high-quality relation -> publishable if all other gates pass.
-
-Verified physical measurements remain unchanged and higher priority.
+Existing resolver issues are preserved.
 
 ## Runtime / dependencies
 
 Package version:
 
-`0.8.0`
+`0.9.0`
 
-New Ring 8 dependencies: **none**.
+New Ring 9 dependencies: **none**.
 
 ## Verification
 
 GitHub Actions implementation run:
 
-- run: `36651103396`;
-- implementation head: `1a6b58e6e87786b8e67e6f8525ece98e588dfad3`;
-- Chat 3 / Geometry: **65 passed in 0.61s**;
+- run: `36652647774`;
+- implementation head: `7b317e0c0a3e7c5f69000f8c51dd47adff362aa6`;
+- Chat 3 / Geometry: **73 passed in 0.46s**;
 - Contracts: SUCCESS;
 - Chat 1: SUCCESS;
 - Chat 2: SUCCESS;
@@ -104,11 +114,11 @@ GitHub Actions implementation run:
 - Chat 5: SUCCESS;
 - Chat 2 -> Chat 3: SUCCESS.
 
-The worker branch's Chat 3 -> Chat 4 gate still inherits the old shared `cad_verification_report["dimensions"]` lookup; current `main` uses canonical `cad_verification_report["items"]`. Ring 8 does not modify shared integration infrastructure.
+The worker ancestry's Chat 3 -> Chat 4 gate still contains the old shared `cad_verification_report["dimensions"]` lookup and fails only there after successful package/CAD/schema verification. Current `main` uses canonical `cad_verification_report["items"]`. Ring 9 does not modify shared integration infrastructure.
 
 ## Shared ownership
 
-Ring 8 modifies no:
+Ring 9 modifies no:
 
 - shared contracts;
 - canonical shared fixtures;
@@ -118,18 +128,18 @@ Ring 8 modifies no:
 
 ## Deferred Chat 3 work
 
-- numerical constraint solving/entity movement;
-- global over-constrained-system diagnosis;
+- full numerical constraint solving/entity movement;
+- complete degrees-of-freedom accounting and nonlinear global consistency;
 - uncertainty propagation from calibration/vision into tolerance selection;
 - multi-view geometry relationships;
 - CAD-native logic.
 
 ## Current status
 
-`READY_FOR_RING8_INTEGRATOR_REVIEW`
+`READY_FOR_RING9_INTEGRATOR_REVIEW`
 
-## Ring 8 documents
+## Ring 9 documents
 
-- `BUILD_REUSE_CHECK_RING8_RESIDUAL_CONFIDENCE.md`;
-- `IMPLEMENTATION_REPORT_RING8_RESIDUAL_CONFIDENCE_2026-09-30.md`;
+- `BUILD_REUSE_CHECK_RING9_GLOBAL_CONSTRAINT_DIAGNOSTICS.md`;
+- `IMPLEMENTATION_REPORT_RING9_GLOBAL_CONSTRAINT_DIAGNOSTICS_2026-09-30.md`;
 - `ORCHESTRATOR_HANDOFF.md`.
