@@ -139,18 +139,24 @@ class ConstraintCandidateEngine:
             if isclose(first.radius, second.radius, abs_tol=self.metric_tolerance, rel_tol=0.0):
                 result.append(self._pair("EQUAL", first.entity_id, second.entity_id))
 
+        # Topological contact is deliberately finite/observable: an explicit point or
+        # a LINE/ARC endpoint must lie on the other primitive. Pure crossing of two
+        # interiors is not promoted as COINCIDENT.
         for first, second in combinations(ordered, 2):
             if self._observable_contact(first, second):
                 result.append(self._pair("COINCIDENT", first.entity_id, second.entity_id))
             if self._are_tangent(first, second):
                 result.append(self._pair("TANGENT", first.entity_id, second.entity_id))
 
+        # Symmetry is only inferred when an explicit LINE entity supplies the axis.
         peers = tuple(entity for entity in ordered if isinstance(entity, (PointEntity, Circle)))
         for axis in lines:
             for first, second in combinations(peers, 2):
                 if self._symmetric_about_axis(first, second, axis):
                     result.append(self._symmetric(first.entity_id, second.entity_id, axis.entity_id))
 
+        # Candidate IDs are deterministic, but keep a defensive de-duplication boundary
+        # because one observable contact can satisfy multiple endpoint checks.
         by_id = {candidate.constraint_id: candidate for candidate in result}
         return tuple(by_id[key] for key in sorted(by_id))
 
@@ -204,7 +210,9 @@ class ConstraintCandidateEngine:
             return False
         return not isinstance(round_entity, Arc) or self._point_on_arc(nearest, round_entity)
 
-    def _round_round_tangent(self, first: Circle | Arc, second: Circle | Arc) -> bool:
+    def _round_round_tangent(
+        self, first: Circle | Arc, second: Circle | Arc
+    ) -> bool:
         dx = second.center.x - first.center.x
         dy = second.center.y - first.center.y
         distance = hypot(dx, dy)
@@ -217,8 +225,12 @@ class ConstraintCandidateEngine:
             or isclose(distance, internal, abs_tol=self.metric_tolerance, rel_tol=0.0)
         ):
             return False
+
+        # At tangency the standard two-circle intersection solution has h == 0.
         axis_distance = (
-            first.radius * first.radius - second.radius * second.radius + distance * distance
+            first.radius * first.radius
+            - second.radius * second.radius
+            + distance * distance
         ) / (2.0 * distance)
         tangent = Point2D(
             first.center.x + dx * axis_distance / distance,
@@ -237,7 +249,9 @@ class ConstraintCandidateEngine:
         length_sq = dx * dx + dy * dy
         if length_sq == 0:
             return line.start, 0.0
-        parameter = ((point.x - line.start.x) * dx + (point.y - line.start.y) * dy) / length_sq
+        parameter = (
+            (point.x - line.start.x) * dx + (point.y - line.start.y) * dy
+        ) / length_sq
         return Point2D(line.start.x + parameter * dx, line.start.y + parameter * dy), parameter
 
     @staticmethod
@@ -251,7 +265,9 @@ class ConstraintCandidateEngine:
         if type(first) is not type(second):
             return False
         if isinstance(first, Circle) and isinstance(second, Circle):
-            if not isclose(first.radius, second.radius, abs_tol=self.metric_tolerance, rel_tol=0.0):
+            if not isclose(
+                first.radius, second.radius, abs_tol=self.metric_tolerance, rel_tol=0.0
+            ):
                 return False
             first_point, second_point = first.center, second.center
         elif isinstance(first, PointEntity) and isinstance(second, PointEntity):
@@ -267,7 +283,9 @@ class ConstraintCandidateEngine:
         length_sq = dx * dx + dy * dy
         if length_sq <= self.axis_tolerance * self.axis_tolerance:
             return Point2D(float("inf"), float("inf"))
-        parameter = ((point.x - axis.start.x) * dx + (point.y - axis.start.y) * dy) / length_sq
+        parameter = (
+            (point.x - axis.start.x) * dx + (point.y - axis.start.y) * dy
+        ) / length_sq
         foot_x = axis.start.x + parameter * dx
         foot_y = axis.start.y + parameter * dy
         return Point2D(2.0 * foot_x - point.x, 2.0 * foot_y - point.y)
@@ -283,7 +301,9 @@ class ConstraintCandidateEngine:
     def _pair(kind: str, first: str, second: str) -> ConstraintCandidate:
         entity_ids = tuple(sorted((first, second)))
         return ConstraintCandidate(
-            f"C_{kind}_{entity_ids[0]}_{entity_ids[1]}", kind, entity_ids  # type: ignore[arg-type]
+            f"C_{kind}_{entity_ids[0]}_{entity_ids[1]}",
+            kind,  # type: ignore[arg-type]
+            entity_ids,
         )
 
     @staticmethod
@@ -291,7 +311,9 @@ class ConstraintCandidateEngine:
         peers = tuple(sorted((first, second)))
         entity_ids = (peers[0], peers[1], axis)
         return ConstraintCandidate(
-            f"C_SYMMETRIC_{peers[0]}_{peers[1]}_ABOUT_{axis}", "SYMMETRIC", entity_ids
+            f"C_SYMMETRIC_{peers[0]}_{peers[1]}_ABOUT_{axis}",
+            "SYMMETRIC",
+            entity_ids,
         )
 
 
