@@ -28,15 +28,16 @@ This removes the need for UI/orchestration code to infer evidence ownership inde
 
 `project_session(...)` returns histories in persisted view/CapturePlan order, including views that have no capture attempt yet.
 
-### Persisted lineage hardening
+### Projection-level lineage hardening
 
-`CaptureSession` now rejects:
+`CaptureAttemptHistoryService` rejects ambiguous or malformed lineages:
 
 - more than one root clean reference for one view;
 - disconnected clean-reference components;
-- cycles in the clean-reference supersession chain.
+- missing predecessors;
+- branching or cycles.
 
-The existing active-leaf, no-branch, same-view and evidence-source rules remain in force.
+The existing persisted active-leaf, no-branch, same-view and evidence-source rules remain unchanged.
 
 ## Tests
 
@@ -49,7 +50,7 @@ Added `tests/test_attempt_history.py` covering:
 5. evidence from attempt 1 and attempt 2 never mixes;
 6. session projection preserves view order;
 7. views without attempts are explicit empty histories;
-8. disconnected clean-reference roots fail closed.
+8. ambiguous multiple-root clean-reference history fails closed at projection time.
 
 Schema-independent regression:
 
