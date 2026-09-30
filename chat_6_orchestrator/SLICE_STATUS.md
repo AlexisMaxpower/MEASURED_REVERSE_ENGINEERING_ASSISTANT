@@ -2,21 +2,21 @@
 
 **Central round:** 4  
 **Directive:** `OD-2026-09-30-004`  
-**Status:** Stage 2 ACCEPTED — READY FOR CHAT 8 FINAL REVIEW
+**Status:** Stage 2 TECHNICALLY ACCEPTED — FINAL-REVIEW CANDIDATE REBUILD PENDING AFTER DOC FREEZE
 
 ## Frozen Round-4 cuts
 
-| Slice | Frozen worker cut | Current Round-4 status |
+| Slice | Frozen worker cut | Round-4 status |
 |---|---|---|
-| Chat 1 — Project & Guided Capture | `chat-1/pass-4` @ `a7d607f8cdd281749ae40529de15c2d84dfda78e` | `IN_OFFICIAL_CANDIDATE` |
-| Chat 2 — Physical Measurement | `chat-2/pass-6` @ `539d58567046fd29ccf2d42b629227ffe8da6546` | `IN_OFFICIAL_CANDIDATE` |
-| Chat 3 — Geometry & Sketch | `chat-3/pass-8` @ `d786e1d49b5c8f2837a3ce936f7f1c0d93336d49` | `IN_OFFICIAL_CANDIDATE` |
-| Chat 4 — CAD Bridge & Verification | `chat-4/pass-7` @ `61f37a4dd46921b7fe9145bcbe5242bc3f6417b3` | `IN_OFFICIAL_CANDIDATE` |
-| Chat 5 — Lifecycle & Engineering Knowledge | `chat-5/pass-8` @ `82e2203aaeb69ee1fe9f89fd42d0aea451b8690f` | `IN_OFFICIAL_CANDIDATE` |
+| Chat 1 — Project & Guided Capture | `chat-1/pass-4` @ `a7d607f8cdd281749ae40529de15c2d84dfda78e` | `ACCEPTED_REPLAY_INPUT` |
+| Chat 2 — Physical Measurement | `chat-2/pass-6` @ `539d58567046fd29ccf2d42b629227ffe8da6546` | `ACCEPTED_REPLAY_INPUT` |
+| Chat 3 — Geometry & Sketch | `chat-3/pass-8` @ `d786e1d49b5c8f2837a3ce936f7f1c0d93336d49` | `ACCEPTED_REPLAY_INPUT` |
+| Chat 4 — CAD Bridge & Verification | `chat-4/pass-7` @ `61f37a4dd46921b7fe9145bcbe5242bc3f6417b3` | `ACCEPTED_REPLAY_INPUT` |
+| Chat 5 — Lifecycle & Engineering Knowledge | `chat-5/pass-8` @ `82e2203aaeb69ee1fe9f89fd42d0aea451b8690f` | `ACCEPTED_REPLAY_INPUT` |
 
-All five exact frozen refs were rechecked during Stage 2 and still resolve to these SHAs.
+All five exact selected refs were independently rechecked and remain unchanged.
 
-Newer worker pass branches exist for some slices, but they are not part of the current central Round-4 candidate.
+Newer worker-local pass branches are not part of this Round-4 candidate.
 
 ## Stage-1 validation
 
@@ -26,43 +26,22 @@ SHA:    0a46ebb27abd3267e46afaf86b50383ab6b7d5a0
 CI:     36726156911 = SUCCESS
 ```
 
-## Stage-2 official candidate
+## Stage-2 evidence already verified
+
+Deputy-1 candidate verified during Stage 2:
 
 ```text
-base main: 11975decc69caf80952942c58377f9d896d70303
-branch:    integration/pass-4-candidate
-SHA:       05f999e1cc24307cfb4842d19bc5d42a1f1c9721
-tree:      fa751dce49166023741324c338f1dd587b24cc49
-PR:        #38
+base: 11975decc69caf80952942c58377f9d896d70303
+SHA:  05f999e1cc24307cfb4842d19bc5d42a1f1c9721
+PR:   #38
 ```
 
-Candidate provenance verdict:
+Candidate CI evidence:
 
-`VERIFIED`
+- push `36728546973` = `SUCCESS`
+- PR `36728980497` = `SUCCESS`
 
-Candidate replay-manifest match:
-
-`VERIFIED`
-
-Shared/protected infrastructure preservation:
-
-`VERIFIED`
-
-Blind worker-history merge:
-
-`NOT PRESENT`
-
-## Candidate CI
-
-Push run:
-
-`36728546973` — `SUCCESS`
-
-PR run:
-
-`36728980497` — `SUCCESS`
-
-Actually executed + successful on exact candidate SHA:
+Required jobs actually executed + successful:
 
 - Contracts / canonical fixtures
 - Chat 1 / Capture
@@ -76,24 +55,38 @@ Actually executed + successful on exact candidate SHA:
 - Integration / Chat 4 -> Chat 5
 - Integration / Round 3 golden path
 
+Technical Stage-2 verdict:
+
+`ACCEPTED_WITH_DOCUMENTATION_PROCESS_DEFECT`
+
 ## Process defect
 
-Deputy 1 did not create the two specifically requested repository documents:
+Deputy 1 did not create the two specifically requested repo documents:
 
 - `ROUND_4_DEPUTY1_AUDIT.md`
 - `ROUND_4_INTEGRATION_CANDIDATE_REPORT.md`
 
-This is recorded as `DOCUMENTATION_PROCESS_DEFECT`, not hidden or treated as completed.
+This is explicitly recorded and is not represented as completed.
 
-The technical/provenance evidence was independently reverified by Chat 6 and is captured in `ROUND_4_STAGE2_REVIEW_2026-09-30.md`.
+## Final-review rebuild
 
-## Stage-2 state
+Chat-6 Stage-2 evidence files advanced `main` after candidate `05f999e1...` was tested.
+
+Therefore that SHA remains Stage-2 evidence but is superseded as the final-review target.
+
+After this documentation freeze, Chat 6 must rebuild `integration/pass-4-candidate` from the final `main` documentation HEAD with the same verified worker replay content and run full CI again.
+
+Exact rebuilt candidate identity will be recorded as the latest Chat-6 handoff comment on PR #38 rather than committed back into `main`.
+
+## Current state
 
 ```text
 ROUND_4_STAGE1_COMPLETE = TRUE
-ROUND_4_STAGE2_CANDIDATE_VERIFIED = TRUE
-ROUND_4_STAGE2 = ACCEPTED_WITH_DOCUMENTATION_PROCESS_DEFECT
-CHAT8_FINAL_REVIEW_AUTHORIZED = TRUE
+ROUND_4_STAGE2_TECHNICALLY_ACCEPTED = TRUE
+DEPUTY1_DOCUMENTATION_PROCESS_DEFECT = TRUE
+CHAT6_MAIN_DOC_FREEZE = TRUE
+FINAL_REVIEW_CANDIDATE_REBUILD_PENDING = TRUE
+CHAT8_FINAL_REVIEW_AUTHORIZED_AFTER_REBUILD_GREEN = TRUE
 MERGE_TO_MAIN_AUTHORIZED = FALSE
 ```
 
