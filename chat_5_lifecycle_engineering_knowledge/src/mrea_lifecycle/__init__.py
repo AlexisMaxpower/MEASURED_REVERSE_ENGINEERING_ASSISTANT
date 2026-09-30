@@ -38,10 +38,14 @@ from .http_cursor import (
     HttpCursorAuthenticator,
     LifecycleHttpCursorError,
 )
+from .keyset_knowledge import SQLiteKeysetEngineeringKnowledgeRepository
 from .knowledge_paging import (
     DEFAULT_KNOWLEDGE_PAGE_LIMIT,
     KNOWLEDGE_CURSOR_FORMAT_VERSION,
+    KNOWLEDGE_KEYSET_CURSOR_FORMAT_VERSION,
     MAX_KNOWLEDGE_PAGE_LIMIT,
+    KnowledgeCursorState,
+    KnowledgeKeysetCursorState,
     KnowledgePage,
     LifecycleKnowledgeCursorError,
 )
@@ -132,6 +136,9 @@ __all__ = [
     "Installation",
     "InstallationService",
     "KNOWLEDGE_CURSOR_FORMAT_VERSION",
+    "KNOWLEDGE_KEYSET_CURSOR_FORMAT_VERSION",
+    "KnowledgeCursorState",
+    "KnowledgeKeysetCursorState",
     "KnowledgePage",
     "KnowledgeQueryService",
     "LIFECYCLE_BACKUP_FORMAT_VERSION",
@@ -190,6 +197,7 @@ __all__ = [
     "SQLITE_RELATIONAL_SCHEMA_VERSION",
     "SQLITE_SNAPSHOT_SCHEMA_VERSION",
     "SQLiteEngineeringKnowledgeRepository",
+    "SQLiteKeysetEngineeringKnowledgeRepository",
     "SQLiteLifecycleQueryRepository",
     "SQLiteLifecycleReadOnlySession",
     "SQLiteLifecycleStore",
