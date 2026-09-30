@@ -53,3 +53,9 @@ No shared contract or Chat 2–5 file is modified. This delta remains provisiona
 The branch also contains an audited reopen path for an already accepted view. A reopen records reason/timestamps/source clean provenance, resets completion, and requires a fresh clean reference before the view can be accepted again. This closes the safety gap identified by immutable recapture: accepted evidence cannot be silently replaced, but an intentional revision now has an explicit controlled path.
 
 Local schema-independent regression including quality: `33 passed`.
+
+## Additional isolated delta — capture attempt history
+
+The branch now includes a deterministic, read-only capture-attempt history projection. It exposes active and historical attempts without mixing evidence across clean-reference generations and fails closed on ambiguous/malformed lineage instead of guessing attempt order.
+
+Local schema-independent regression: `37 passed`. No shared contract is modified.
