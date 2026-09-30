@@ -3,12 +3,12 @@
 ## Snapshot
 
 - Date: **2026-09-30**
-- Branch: `chat-5/pass-9`
+- Branch: `chat-5/pass-10`
 - Slice: **Lifecycle & Engineering Knowledge**
 - SSOT: **MREA v0.1 + orchestration addendum v0.2**
-- Pass 9 authorization: **direct user instruction; no newer Chat-5-specific directive present on `main` at branch start**
-- Base SHA: `82e2203aaeb69ee1fe9f89fd42d0aea451b8690f` (frozen Chat 5 Pass 8)
-- State: **read-only HTTP/API transport implemented; final cross-slice gates and handoff pending**
+- Pass 10 authorization: **direct user instruction; no newer Chat-5-specific directive present on `main` at branch start**
+- Base SHA: `07b9b768404436707575869e7188e0392a021ba5` (frozen Chat 5 Pass 9)
+- State: **authenticated HTTP cursors implemented; final CI/cross-slice gates and handoff pending**
 
 ## Preserved baseline
 
@@ -29,210 +29,184 @@ Still active and unchanged:
 - verified backup/restore;
 - read-only SQLite query session;
 - deterministic engineering knowledge queries;
-- snapshot-bound knowledge pagination.
+- snapshot-bound knowledge pagination;
+- Pass-9 GET-only HTTP/API transport.
 
 No shared contract, canonical fixture, CI workflow, integration test, SQLite migration, or other chat-owned file was changed.
 
-## Pass 9 additions
+## Pass 10 additions
 
-### Read-only HTTP transport
+### Authenticated HTTP cursor primitive
 
-Added `src/mrea_lifecycle/http_api.py`.
+Added `src/mrea_lifecycle/http_cursor.py`.
 
 Public surface:
 
-- `ReadOnlyLifecycleHttpAPI`;
-- `build_read_only_lifecycle_http_app()`;
-- `LifecycleHttpResponse`;
-- `LifecycleHttpRequestError`;
-- `LifecycleHttpNotFoundError`;
-- `LifecycleHttpMethodNotAllowedError`;
-- `LIFECYCLE_HTTP_API_SCHEMA_VERSION = mrea.lifecycle-http.v1`.
+- `HttpCursorAuthenticator`;
+- `LifecycleHttpCursorError`;
+- `HTTP_CURSOR_FORMAT_VERSION = mrea.http-cursor.v1`;
+- `MIN_HTTP_CURSOR_KEY_BYTES = 32`.
 
-The adapter is a dependency-free WSGI callable.
+The authenticator wraps the existing Pass-8 knowledge cursor rather than replacing it.
 
-### Dependency boundary
+### Authentication model
 
-No FastAPI/Flask dependency was introduced.
-
-Reason:
-
-- current Chat 5 CI installs Python + pytest only;
-- shared dependency/CI policy is outside Chat 5 ownership;
-- WSGI provides a real HTTP boundary using Python standard library only.
-
-### Exposed routes
-
-Health:
+Authenticated envelope fields:
 
 ```text
-GET /health
+v    cursor format
+kid  key identifier
+c    inner knowledge cursor
+mac  HMAC-SHA256(v,kid,c)
 ```
 
-SQL-native lifecycle read routes:
+The MAC is computed over canonical JSON with sorted keys and compact separators.
+
+Verification uses `hmac.compare_digest()`.
+
+### Key validation
+
+Fail-closed configuration rules:
+
+- signing key must be `bytes`;
+- signing key must be at least 32 bytes;
+- key ID must be a non-empty string;
+- key ID length is limited to 128 characters;
+- active key ID cannot map to conflicting verification-key bytes.
+
+### HTTP integration
+
+`ReadOnlyLifecycleHttpAPI` now accepts an optional `HttpCursorAuthenticator`.
+
+`build_read_only_lifecycle_http_app()` adds:
+
+```python
+cursor_signing_key: bytes | None
+cursor_key_id: str = "default"
+cursor_verification_keys: Mapping[str, bytes] | None
+```
+
+Authenticated mode flow:
 
 ```text
-GET /v1/lifecycle/revisions
-GET /v1/lifecycle/failures
-GET /v1/lifecycle/equipment-occupancy
-GET /v1/lifecycle/physical-timeline
+external signed cursor
+→ HMAC verification
+→ inner mrea.knowledge-cursor.v1
+→ existing query/snapshot validation
+→ query execution
+→ inner next_cursor
+→ HMAC signing with active key
+→ external signed cursor
 ```
 
-Engineering knowledge routes:
+### Key rotation
+
+Previous keys may be supplied through `cursor_verification_keys`.
+
+A cursor signed with a previous key remains accepted while that key ID is in the verification map. Every newly emitted cursor is signed with the current active key.
+
+### Health metadata
+
+Without authenticated mode:
 
 ```text
-GET /v1/knowledge/revision-lineage
-GET /v1/knowledge/revision-outcomes
-GET /v1/knowledge/equipment-history
-GET /v1/knowledge/failure-patterns
-GET /v1/knowledge/replacement-chain
+cursor_authentication = checksum-only
 ```
 
-### Request validation
-
-Transport fails closed for:
-
-- non-GET methods;
-- unknown routes;
-- unknown parameters;
-- duplicate parameters;
-- missing/blank required identifiers;
-- non-integer limits;
-- invalid limits;
-- invalid/tampered/query-mismatched/stale cursors.
-
-### Status contract
+With authenticated mode:
 
 ```text
-200 success
-400 invalid request / cursor
-404 route not found
-405 method not allowed
-409 read model stale
-503 read model unavailable
+cursor_authentication = hmac-sha256
+cursor_key_id = <active key id>
 ```
 
-`405` includes `Allow: GET`.
-
-All responses include JSON content type, `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`.
-
-### Read-only invariant
-
-Every successful data request opens a fresh `SQLiteLifecycleReadOnlySession`.
-
-The existing session still enforces:
-
-```text
-SQLite mode=ro
-PRAGMA query_only = ON
-snapshot schema check
-relational schema check
-snapshot_version == read_model_version
-```
-
-Production HTTP code does not import `SQLiteLifecycleStore`, mutation services or `LifecycleUnitOfWork`.
-
-### Deterministic JSON
-
-Serialization supports:
-
-- dataclasses;
-- mappings;
-- tuples/lists;
-- datetime/date as ISO-8601;
-- Enum values;
-- Decimal as strings.
-
-Keys are sorted and compact separators are used, giving byte-identical JSON for identical requests against the same snapshot.
+No secret key material is serialized.
 
 ## Backward compatibility
 
-Pass 9 is additive.
+Pass 10 is additive.
 
 Unchanged:
 
 - direct Python lifecycle queries;
 - direct engineering knowledge queries;
-- Pass-8 cursor format and semantics;
+- `mrea.knowledge-cursor.v1` inner format;
+- query/filter binding;
+- snapshot-version binding;
 - persistence and relational schemas;
 - lifecycle state transitions;
 - CAD verification/manufacturing eligibility;
-- canonical shared contracts.
+- canonical shared contracts;
+- checksum-only Pass-9 HTTP mode when no signing key is configured.
 
 ## Verification
 
 ### New tests
 
-Added `tests/test_http_api.py`.
+Added `tests/test_http_cursor_auth.py`.
 
 Coverage verifies:
 
-1. health reports verified read-only state;
-2. all nine read routes return committed facts;
-3. pagination cursor round-trips through HTTP;
-4. query-bound cursor mismatch returns 400;
-5. POST returns 405;
-6. rejected write attempt does not advance snapshot version;
-7. duplicate parameters fail closed;
-8. unexpected parameters fail closed;
-9. unknown route returns 404;
-10. stale read model returns 409;
-11. missing database returns 503;
-12. repeated identical requests return byte-identical JSON.
+1. HMAC sign/verify round-trip;
+2. tampered token rejection;
+3. minimum signing-key length;
+4. binary key-type enforcement;
+5. signed HTTP pagination round-trip;
+6. authenticated health metadata;
+7. wrong-key / unknown-key rejection;
+8. rejection of raw unsigned cursor when authenticated mode is active;
+9. previous-key acceptance during rotation;
+10. re-signing with the current active key;
+11. preservation of query binding;
+12. preservation of snapshot staleness detection;
+13. checksum-only mode backward compatibility.
 
-### GitHub-hosted implementation run
+### Required final gates
 
-Implementation SHA:
+Before handoff, verify on the documented pre-handoff SHA:
 
-```text
-44dc38b040ee5e72248e9554c7bde44bd553632d
-```
+- `Chat 5 / Lifecycle`;
+- `Contracts / canonical fixtures`;
+- `Chat 4 / Generic CAD gate`;
+- `Integration / Chat 4 -> Chat 5`.
 
-Workflow:
+## Files added in Pass 10
 
-```text
-MREA CI / 36653295496
-```
+- `src/mrea_lifecycle/http_cursor.py`;
+- `tests/test_http_cursor_auth.py`;
+- `docs/PASS_10_AUTHENTICATED_HTTP_CURSORS.md`.
 
-Chat 5 result:
-
-```text
-46 passed in 1.66s
-```
-
-Status: **SUCCESS**.
-
-Required cross-slice gates are rechecked on the documented pre-handoff SHA before `ORCHESTRATOR_HANDOFF.md` is published.
-
-## Files added in Pass 9
+## Files modified in Pass 10
 
 - `src/mrea_lifecycle/http_api.py`;
-- `tests/test_http_api.py`;
-- `docs/PASS_9_READ_ONLY_HTTP_API.md`.
-
-## Files modified in Pass 9
-
 - `src/mrea_lifecycle/__init__.py`;
 - `README.md`;
 - `docs/IMPLEMENTATION_STATE.md`;
 - `ORCHESTRATOR_HANDOFF.md` at final freeze.
 
-## Known limitations
+## Security limitations
+
+Cursor authentication does not provide:
+
+- user/client authentication;
+- authorization;
+- TLS;
+- reverse-proxy hardening;
+- CORS policy;
+- rate limiting;
+- secure secret provisioning/storage.
+
+Those are required before arbitrary remote Internet exposure and are owned by the future integration/deployment layer.
+
+## Other known limitations
 
 Still open:
 
-- public/remote network exposure;
-- authentication/authorization;
-- TLS/reverse-proxy/CORS policy;
-- framework-specific application shell;
-- authenticated cursor signing across external trust boundaries;
 - keyset pagination for very large histories;
 - materialized analytical aggregates;
 - semantic/AI interpretation;
 - field-device synchronization.
 
-Pass 9 transport is therefore a **local/internal read API**, not an Internet-facing security boundary.
-
 ## Handoff rule
 
-After `ORCHESTRATOR_HANDOFF.md` is published as the final worker commit, `chat-5/pass-9` is frozen. No later commit is allowed unless final verification finds a real missing/incorrect GitHub file or Chat 6 explicitly requests a correction.
+After `ORCHESTRATOR_HANDOFF.md` is published as the final worker commit, `chat-5/pass-10` is frozen. No later commit is allowed unless final verification finds a real missing/incorrect GitHub file or Chat 6 explicitly requests a correction.
