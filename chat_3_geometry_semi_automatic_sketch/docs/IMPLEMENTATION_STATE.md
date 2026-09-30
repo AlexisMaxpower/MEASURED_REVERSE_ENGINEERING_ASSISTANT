@@ -2,111 +2,116 @@
 
 **Date:** 2026-09-30  
 **Repository:** `AlexisMaxpower/MEASURED_REVERSE_ENGINEERING_ASSISTANT`  
-**Active branch:** `chat-3/pass-9`  
+**Active branch:** `chat-3/pass-10`  
 **Role:** Chat 3 — Geometry & Semi-Automatic Sketch  
-**Ring:** 9  
-**Authorization:** explicit user-requested continuation; no newer Chat 3 worker directive than OD-2026-09-29-003 was present on `main` when Ring 9 started.
+**Ring:** 10  
+**Authorization:** explicit user-requested continuation; no newer Chat 3 worker directive than OD-2026-09-29-003 was present when Ring 10 started.
 
 ## Baseline
 
-Ring 9 branches from frozen Ring 8 head:
+Ring 10 branches from frozen Ring 9 head:
 
-`d786e1d49b5c8f2837a3ce936f7f1c0d93336d49`
+`0b657c07cc6d325be8e813c565fe5ca6bcad309a`
 
-## Capabilities through Ring 8
+## Capabilities through Ring 9
 
 Chat 3 already provides:
 
 - canonical CapturePackage / MeasurementPackage adapter;
-- `IMAGE_PX -> MAT_XY_MM` normalization;
+- IMAGE_PX -> MAT_XY_MM normalization;
 - POINT / LINE / CIRCLE / ARC models;
 - deterministic GeometryGraph;
-- measurement binding and conflict visibility;
+- measurement binding and verified-vs-derived conflict visibility;
 - deterministic SketchPackage v1 generation;
-- OpenCV LINE/CIRCLE/ARC extraction with `VISION_DETECTED` provenance;
+- OpenCV LINE/CIRCLE/ARC extraction with VISION_DETECTED provenance;
 - fail-closed ambiguous geometry handling;
 - all canonical v1 constraint candidate families;
-- `ConstraintResolver` with verified-measurement, confidence and redundancy gates;
-- `ConstraintSatisfactionAnalyzer` with explicit residuals and `UNSATISFIED_CONSTRAINT` diagnostics;
-- residual-aware `ConstraintConfidenceModel`;
+- ConstraintResolver with verified-measurement, confidence and redundancy gates;
+- ConstraintSatisfactionAnalyzer with explicit residuals;
+- residual-aware ConstraintConfidenceModel;
+- global ConstraintSystemAnalyzer for proven orientation conflicts and safe transitive reduction;
 - deterministic SVG Dimensioned View.
 
-## Ring 9 — Global Constraint-Set Diagnostics
+## Ring 10 — Structural DOF Audit
 
 New module:
 
-`src/mrea_geometry/constraint_system.py`
+`src/mrea_geometry/dof_audit.py`
 
 Public API:
 
-- `ConstraintSystemAnalysis`;
-- `ConstraintSystemAnalyzer`.
+- `StructuralDofAudit`;
+- `StructuralDofAnalyzer`.
 
-### Orientation consistency
+### Safe semantics
 
-Global orientation relations are modeled as a parity graph:
+The analyzer counts exact primitive parameters and a conservative upper bound on scalar equations supplied by retained constraints plus bound dimensions.
 
-- HORIZONTAL -> world parity 0;
-- VERTICAL -> world parity 1;
-- PARALLEL -> entity parity 0;
-- PERPENDICULAR -> entity parity 1.
+Primitive parameter counts:
 
-The analyzer detects relations that are independent, redundant or contradictory with the accepted orientation graph.
+- POINT: 2;
+- LINE: 4;
+- CIRCLE: 3;
+- ARC: 5.
 
-### Evidence priority
-
-Processing order is deterministic:
-
-1. higher confidence;
-2. `DETECTED` before `INFERRED`;
-3. direct HORIZONTAL/VERTICAL before pair relations at equal evidence strength;
-4. constraint ID tie-breaker.
-
-A proven contradiction becomes:
-
-`OVERCONSTRAINED_ORIENTATION_CONFLICT`
-
-and is not published.
-
-### Safe transitive reduction
-
-Provably redundant cycles are also removed independently for:
-
-- PARALLEL through the parity graph;
-- EQUAL;
-- CONCENTRIC.
-
-No transitive assumption is made for COINCIDENT, TANGENT or SYMMETRIC.
-
-### Pipeline order
-
-The vision path is now:
+If:
 
 ```text
-ImageGeometryExtractor
--> GeometryPipeline
--> ConstraintResolver
--> ConstraintSystemAnalyzer
--> SketchPackageBuilder
+parameter_count > total_equation_upper_bound
 ```
 
-Existing resolver issues are preserved.
+then the sketch is classified:
+
+`DEFINITELY_UNDERCONSTRAINED`
+
+and the positive difference is a proven lower bound on remaining DOF.
+
+If the equation budget reaches or exceeds the parameter count, the result is only:
+
+`NOT_PROVEN_UNDERCONSTRAINED`
+
+Ring 10 deliberately does not claim `FULLY_CONSTRAINED` without a future numerical rank/solver proof.
+
+Unknown future constraint arity yields:
+
+`INDETERMINATE_UNKNOWN_CONSTRAINT_ARITY`
+
+with no asserted DOF lower bound.
+
+### Pipeline API
+
+`VisionGeometryPipeline.audit_structural_dof(...)` performs:
+
+```text
+GeometryPipeline
+-> ConstraintResolver
+-> ConstraintSystemAnalyzer
+-> StructuralDofAnalyzer
+```
+
+The canonical SketchPackage output remains unchanged.
 
 ## Runtime / dependencies
 
 Package version:
 
-`0.9.0`
+`0.10.0`
 
-New Ring 9 dependencies: **none**.
+New Ring 10 dependencies: **none**.
 
 ## Verification
 
-GitHub Actions implementation run:
+Authoritative code/test head:
 
-- run: `36652647774`;
-- implementation head: `7b317e0c0a3e7c5f69000f8c51dd47adff362aa6`;
-- Chat 3 / Geometry: **73 passed in 0.46s**;
+`77ca90a17b8b9bdc60c5cbade996b5bd412364a9`
+
+GitHub Actions run:
+
+`36659318018`
+
+Observed:
+
+- Chat 3 / Geometry: **81 passed in 0.50s**;
 - Contracts: SUCCESS;
 - Chat 1: SUCCESS;
 - Chat 2: SUCCESS;
@@ -114,32 +119,33 @@ GitHub Actions implementation run:
 - Chat 5: SUCCESS;
 - Chat 2 -> Chat 3: SUCCESS.
 
-The worker ancestry's Chat 3 -> Chat 4 gate still contains the old shared `cad_verification_report["dimensions"]` lookup and fails only there after successful package/CAD/schema verification. Current `main` uses canonical `cad_verification_report["items"]`. Ring 9 does not modify shared integration infrastructure.
+The inherited worker Chat 3 -> Chat 4 test still fails only on old `cad_verification_report["dimensions"]`; current `main` uses canonical `items`. Ring 10 does not modify shared integration infrastructure.
 
 ## Shared ownership
 
-Ring 9 modifies no:
+Ring 10 modifies no:
 
 - shared contracts;
-- canonical shared fixtures;
+- shared canonical fixtures;
 - repository integration tests;
 - CI workflow;
 - other chat directories.
 
 ## Deferred Chat 3 work
 
-- full numerical constraint solving/entity movement;
-- complete degrees-of-freedom accounting and nonlinear global consistency;
+- numerical Jacobian-rank DOF proof;
+- numerical constraint solving / entity movement;
+- nonlinear/global geometric consistency beyond the proven graph subset;
 - uncertainty propagation from calibration/vision into tolerance selection;
 - multi-view geometry relationships;
 - CAD-native logic.
 
 ## Current status
 
-`READY_FOR_RING9_INTEGRATOR_REVIEW`
+`READY_FOR_RING10_INTEGRATOR_REVIEW`
 
-## Ring 9 documents
+## Ring 10 documents
 
-- `BUILD_REUSE_CHECK_RING9_GLOBAL_CONSTRAINT_DIAGNOSTICS.md`;
-- `IMPLEMENTATION_REPORT_RING9_GLOBAL_CONSTRAINT_DIAGNOSTICS_2026-09-30.md`;
+- `BUILD_REUSE_CHECK_RING10_STRUCTURAL_DOF_AUDIT.md`;
+- `IMPLEMENTATION_REPORT_RING10_STRUCTURAL_DOF_AUDIT_2026-09-30.md`;
 - `ORCHESTRATOR_HANDOFF.md`.
