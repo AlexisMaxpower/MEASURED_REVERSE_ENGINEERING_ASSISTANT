@@ -54,7 +54,8 @@ class MeasurementCandidateContext:
     measurement_type: MeasurementType
     view_id: str
     anchor_a: FeatureAnchor
-    anchor_b: FeatureAnchor
+    anchor_b: FeatureAnchor | None = None
+    anchor_c: FeatureAnchor | None = None
     evidence_frame_id: str | None = None
     uncertainty: Decimal | int | float | str | None = None
     uncertainty_mm: Decimal | int | float | str | None = None
@@ -87,13 +88,6 @@ def _normalize_text(text: str) -> str:
 
 
 def normalize_measurement_number(payload: str) -> Decimal:
-    """Normalize one explicit numeric token using dot/comma decimal separators.
-
-    Thousands separators, exponent notation, mixed comma/dot forms and multiple
-    numeric tokens are deliberately rejected so speech-provider text cannot be
-    silently guessed into a physical value.
-    """
-
     normalized = _normalize_text(payload)
     parts = normalized.split()
     if parts and parts[-1] in {"мм", "mm"}:
@@ -128,53 +122,30 @@ class MeasurementCommandParser:
 
     def parse(self, text: str) -> ParsedMeasurementCommand:
         normalized = _normalize_text(text)
-
         if normalized == "замер":
-            return ParsedMeasurementCommand(
-                intent=MeasurementCommandIntent.TRIGGER,
-                normalized_text=normalized,
-            )
-
+            return ParsedMeasurementCommand(MeasurementCommandIntent.TRIGGER, normalized)
         if normalized.startswith("замер "):
-            value = normalize_measurement_number(normalized.removeprefix("замер "))
             return ParsedMeasurementCommand(
-                intent=MeasurementCommandIntent.VALUE,
-                normalized_text=normalized,
-                value=value,
+                MeasurementCommandIntent.VALUE,
+                normalized,
+                normalize_measurement_number(normalized.removeprefix("замер ")),
             )
-
         if normalized in self._CONFIRM:
-            return ParsedMeasurementCommand(
-                intent=MeasurementCommandIntent.CONFIRM,
-                normalized_text=normalized,
-            )
-
+            return ParsedMeasurementCommand(MeasurementCommandIntent.CONFIRM, normalized)
         if normalized in self._REJECT:
-            return ParsedMeasurementCommand(
-                intent=MeasurementCommandIntent.REJECT,
-                normalized_text=normalized,
-            )
-
+            return ParsedMeasurementCommand(MeasurementCommandIntent.REJECT, normalized)
         for prefix in self._CORRECT_PREFIXES:
             if normalized.startswith(prefix):
-                value = normalize_measurement_number(normalized.removeprefix(prefix))
                 return ParsedMeasurementCommand(
-                    intent=MeasurementCommandIntent.CORRECT,
-                    normalized_text=normalized,
-                    value=value,
+                    MeasurementCommandIntent.CORRECT,
+                    normalized,
+                    normalize_measurement_number(normalized.removeprefix(prefix)),
                 )
-
         raise MeasurementCommandError(f"unsupported measurement command: {normalized!r}")
 
 
 class HandsFreeMeasurementController:
-    """State machine for candidate creation and explicit verification.
-
-    The controller is deliberately speech-provider agnostic. Voice text enters via
-    :meth:`process_voice_command`; OCR/device adapters can call :meth:`submit_candidate`
-    directly with truthful provenance. All sources remain unverified until the
-    explicit confirmation transition.
-    """
+    """State machine for candidate creation and explicit verification."""
 
     def __init__(
         self,
@@ -196,52 +167,33 @@ class HandsFreeMeasurementController:
 
     def process_voice_command(self, text: str) -> HandsFreeTransition:
         command = self._parser.parse(text)
-
         if command.intent is MeasurementCommandIntent.TRIGGER:
             return self._trigger(command)
         if command.intent is MeasurementCommandIntent.VALUE:
             assert command.value is not None
-            return self._submit_candidate(
-                value=command.value,
-                source=ProvenanceSource.VOICE_REPORTED,
-                command=command,
-            )
+            return self._submit_candidate(command.value, ProvenanceSource.VOICE_REPORTED, command)
         if command.intent is MeasurementCommandIntent.CONFIRM:
             return self._confirm(command)
         if command.intent is MeasurementCommandIntent.REJECT:
             return self._reject(command)
         if command.intent is MeasurementCommandIntent.CORRECT:
-            assert command.value is not None
             return self._correct(command)
         raise AssertionError(f"unhandled command intent: {command.intent}")
 
     def submit_candidate(
-        self,
-        *,
-        value: Decimal | int | float | str,
-        source: ProvenanceSource,
+        self, *, value: Decimal | int | float | str, source: ProvenanceSource
     ) -> HandsFreeTransition:
-        """Submit an OCR/device/voice candidate without coupling to its provider."""
-
         if source not in {
             ProvenanceSource.VOICE_REPORTED,
             ProvenanceSource.OCR_MEASURED,
             ProvenanceSource.DEVICE_REPORTED,
         }:
             raise ValueError("hands-free candidate source must be voice, OCR or device")
-        return self._submit_candidate(value=value, source=source, command=None)
+        return self._submit_candidate(value, source, None)
 
     def submit_manual_fallback(
-        self,
-        *,
-        value: Decimal | int | float | str,
+        self, *, value: Decimal | int | float | str
     ) -> HandsFreeTransition:
-        """Replace any pending reported candidate with a manual candidate.
-
-        Manual entry remains available as the authoritative fallback, but it still
-        requires the same explicit confirmation transition before becoming verified.
-        """
-
         if self._state.phase is HandsFreePhase.CANDIDATE_PENDING:
             self._discard_current_candidate()
         elif self._state.phase not in {
@@ -254,9 +206,9 @@ class HandsFreeMeasurementController:
                 f"manual fallback is not allowed from {self._state.phase.value}"
             )
         return self._submit_candidate(
-            value=value,
-            source=ProvenanceSource.MANUAL_MEASURED,
-            command=None,
+            value,
+            ProvenanceSource.MANUAL_MEASURED,
+            None,
             allow_terminal_state=True,
         )
 
@@ -278,7 +230,6 @@ class HandsFreeMeasurementController:
 
     def _submit_candidate(
         self,
-        *,
         value: Decimal | int | float | str,
         source: ProvenanceSource,
         command: ParsedMeasurementCommand | None,
@@ -291,7 +242,6 @@ class HandsFreeMeasurementController:
             raise InvalidMeasurementTransition(
                 f"new candidate is not allowed from {self._state.phase.value}"
             )
-
         measurement = self._service.add_candidate(
             session_id=self._session_id,
             measurement_type=self._context.measurement_type,
@@ -300,6 +250,7 @@ class HandsFreeMeasurementController:
             view_id=self._context.view_id,
             anchor_a=self._context.anchor_a,
             anchor_b=self._context.anchor_b,
+            anchor_c=self._context.anchor_c,
             evidence_frame_id=self._context.evidence_frame_id,
             uncertainty=self._context.uncertainty,
             uncertainty_mm=self._context.uncertainty_mm,
@@ -330,8 +281,7 @@ class HandsFreeMeasurementController:
     def _reject(self, command: ParsedMeasurementCommand) -> HandsFreeTransition:
         measurement_id = self._require_pending_candidate("reject")
         measurement = self._service.reject_candidate(
-            session_id=self._session_id,
-            measurement_id=measurement_id,
+            session_id=self._session_id, measurement_id=measurement_id
         )
         self._state = HandsFreeMeasurementState(
             phase=HandsFreePhase.REJECTED,
@@ -343,8 +293,7 @@ class HandsFreeMeasurementController:
     def _correct(self, command: ParsedMeasurementCommand) -> HandsFreeTransition:
         old_measurement_id = self._require_pending_candidate("correct")
         self._service.reject_candidate(
-            session_id=self._session_id,
-            measurement_id=old_measurement_id,
+            session_id=self._session_id, measurement_id=old_measurement_id
         )
         self._state = HandsFreeMeasurementState(
             phase=HandsFreePhase.AWAITING_VALUE,
@@ -353,16 +302,13 @@ class HandsFreeMeasurementController:
         )
         assert command.value is not None
         return self._submit_candidate(
-            value=command.value,
-            source=ProvenanceSource.VOICE_REPORTED,
-            command=command,
+            command.value, ProvenanceSource.VOICE_REPORTED, command
         )
 
     def _discard_current_candidate(self) -> PhysicalMeasurement:
         measurement_id = self._require_pending_candidate("replace with manual fallback")
         measurement = self._service.reject_candidate(
-            session_id=self._session_id,
-            measurement_id=measurement_id,
+            session_id=self._session_id, measurement_id=measurement_id
         )
         self._state = HandsFreeMeasurementState(
             phase=HandsFreePhase.AWAITING_VALUE,
