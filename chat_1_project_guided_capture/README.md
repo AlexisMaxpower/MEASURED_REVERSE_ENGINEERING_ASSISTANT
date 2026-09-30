@@ -67,6 +67,7 @@ chat_1_project_guided_capture/
 │  ├─ contracts.py
 │  ├─ models.py
 │  ├─ quality.py
+│  ├─ lineage.py
 │  ├─ guidance.py
 │  ├─ rectification.py
 │  ├─ repositories.py
@@ -79,7 +80,8 @@ chat_1_project_guided_capture/
 │  ├─ test_calibration.py
 │  ├─ test_rectification.py
 │  ├─ test_quality.py
-│  └─ test_guidance.py
+│  ├─ test_guidance.py
+│  └─ test_recapture.py
 └─ docs/
    ├─ IMPLEMENTATION_STATE.md
    ├─ BUILD_REUSE_CHECK_PASS3_GUIDED_QUALITY.md
@@ -117,3 +119,18 @@ Subject to the next Chat 6 directive:
 ## Isolated Pass 4 — Guided Capture Readiness
 
 Pending Round-3 closure / official OD-004, `chat-1/pass-4` contains an isolated future-work layer that derives deterministic next actions and required-view completeness from existing CaptureSession evidence. It does not modify canonical contracts and must not be treated as integrated into `main` until orchestration approval.
+
+
+### Isolated Pass 4 extension — immutable recapture lineage
+
+The guided workflow can now recover from a rejected clean-reference attempt without deleting evidence:
+
+- each view stores an explicit `active_clean_reference_frame_id`;
+- a recaptured clean frame records `supersedes_frame_id`;
+- measurement frames record `source_clean_reference_frame_id`;
+- prior clean/calibration/quality/rectification/measurement evidence remains immutable;
+- calibration, quality, rectification, readiness and canonical serialization resolve only the active attempt;
+- canonical `CapturePackage v1` exposes only active clean-reference evidence and active-attempt measurement frames;
+- accepted views cannot be silently recaptured without a future explicit reopen workflow.
+
+This remains isolated on `chat-1/pass-4` until Round 3 closes and Chat 6 issues the official next directive.
