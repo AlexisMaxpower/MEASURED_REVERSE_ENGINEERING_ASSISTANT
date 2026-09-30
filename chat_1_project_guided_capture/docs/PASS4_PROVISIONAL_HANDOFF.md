@@ -1,14 +1,14 @@
-# Chat 1 — Pass 4 Provisional Handoff
+# Chat 1 — Pass 4 Provisional Handoff (Historical / Superseded)
 
 **Date:** 2026-09-30  
 **Branch:** `chat-1/pass-4`  
-**Status:** PROVISIONAL / ISOLATED — NOT AN OFFICIAL OD-004 ACCEPTANCE HANDOFF
+**Status:** HISTORICAL PROVISIONAL RECORD — superseded by `OD-2026-09-30-004`; not the final handoff
 
-## Why provisional
+## Historical context
 
-Round 3 is not yet closed. `main` still carries `OD-2026-09-29-003`, and Chat 8's current blocker belongs to Chat-6-owned post-merge golden-path CI coverage. Chat 1 Pass 3 must not be reopened for that defect.
+This file records the pre-OD-004 provisional state of the branch and is retained only for audit continuity. Round 3 is now closed; Chat 1 Pass 3 is accepted, and `OD-2026-09-30-004` selects `chat-1/pass-4` for Round-4 Stage-1 intake.
 
-This document records future Chat 1 work only so it can be inspected without pretending it is already accepted.
+The authoritative completion artifact is the root `ORCHESTRATOR_HANDOFF.md` published as the final Pass-4 branch mutation.
 
 ## Delivered future-work delta
 
@@ -23,15 +23,9 @@ This document records future Chat 1 work only so it can be inspected without pre
 
 `24 passed` in the schema-independent local regression set.
 
-## Integration requirement
+## OD-004 completion requirement
 
-Before this work can be considered official Pass 4:
-
-1. Round 3 must close;
-2. Chat 6 must publish the next Chat 1 directive/baseline;
-3. this branch must be rebased/reconstructed onto that accepted baseline if required;
-4. full repository CI and Chat 1 -> Chat 2 boundary must be green;
-5. only then should an official `ORCHESTRATOR_HANDOFF.md` be published/frozen.
+`OD-2026-09-30-004` is now active. Pass 4 must be checked against the accepted Round-3 contracts/baseline, required gates must be recorded, and a truthful root `ORCHESTRATOR_HANDOFF.md` must be published as the final commit. That commit freezes `chat-1/pass-4` pending Chat 6 review.
 
 
 ## Additional isolated delta — recapture lineage
@@ -46,7 +40,7 @@ The branch also closes the rejected-capture recovery gap:
 - `RECAPTURE_CLEAN_REFERENCE` is now an executable guided action for rejected quality;
 - legacy single-clean persisted sessions migrate deterministically.
 
-No shared contract or Chat 2–5 file is modified. This delta remains provisional until the official next Chat 1 directive.
+No shared contract or Chat 2–5 file is modified. This delta is part of the selected Pass-4 worker cut and remains pending Chat 6 Stage-1 review.
 
 ## Additional isolated delta — explicit accepted-view revision
 
