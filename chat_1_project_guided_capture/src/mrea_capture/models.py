@@ -228,6 +228,75 @@ class RectifiedReferenceRecord(StrictModel):
             raise ValueError("rectified reference timestamp must be timezone-aware")
         return self
 
+class CaptureQualityVerdict(StrEnum):
+    ACCEPT = "ACCEPT"
+    WARN = "WARN"
+    REJECT = "REJECT"
+
+
+class QualitySeverity(StrEnum):
+    WARN = "WARN"
+    REJECT = "REJECT"
+
+
+class QualityReasonCode(StrEnum):
+    BLUR = "BLUR"
+    UNDEREXPOSED = "UNDEREXPOSED"
+    OVEREXPOSED = "OVEREXPOSED"
+    DARK_CLIPPING = "DARK_CLIPPING"
+    BRIGHT_CLIPPING = "BRIGHT_CLIPPING"
+    GLARE_RISK = "GLARE_RISK"
+    LOW_SCENE_DETAIL = "LOW_SCENE_DETAIL"
+    FRAMING_BORDER_ACTIVITY = "FRAMING_BORDER_ACTIVITY"
+    LOW_MARKER_VISIBILITY = "LOW_MARKER_VISIBILITY"
+
+
+class CaptureQualityMetrics(StrictModel):
+    laplacian_variance: float = Field(ge=0)
+    mean_luma: float = Field(ge=0, le=255)
+    dark_clipped_fraction: float = Field(ge=0, le=1)
+    bright_clipped_fraction: float = Field(ge=0, le=1)
+    glare_proxy_fraction: float = Field(ge=0, le=1)
+    edge_density: float = Field(ge=0, le=1)
+    border_edge_ratio: float = Field(ge=0, le=1)
+    marker_corner_visibility: float | None = Field(default=None, ge=0, le=1)
+
+
+class CaptureQualityFinding(StrictModel):
+    code: QualityReasonCode
+    severity: QualitySeverity
+    metric: NonBlank
+    observed: float
+    threshold: float
+    comparison: NonBlank
+
+
+class CaptureQualityResult(StrictModel):
+    analysis_id: UUID
+    source_frame_id: UUID
+    view: CaptureViewType
+    calibration_id: UUID | None = None
+    mat_id: NonBlank | None = None
+    policy_version: NonBlank
+    verdict: CaptureQualityVerdict
+    metrics: CaptureQualityMetrics
+    findings: list[CaptureQualityFinding] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_verdict(self) -> "CaptureQualityResult":
+        has_reject = any(item.severity is QualitySeverity.REJECT for item in self.findings)
+        has_warn = any(item.severity is QualitySeverity.WARN for item in self.findings)
+        expected = (
+            CaptureQualityVerdict.REJECT
+            if has_reject
+            else CaptureQualityVerdict.WARN
+            if has_warn
+            else CaptureQualityVerdict.ACCEPT
+        )
+        if self.verdict is not expected:
+            raise ValueError("quality verdict must match finding severities")
+        return self
+
 
 class CaptureViewProgress(StrictModel):
     view: CaptureViewType
@@ -246,6 +315,7 @@ class CaptureSession(StrictModel):
     frames: list[FrameRecord] = Field(default_factory=list)
     calibrations: list[CalibrationResult] = Field(default_factory=list)
     rectified_references: list[RectifiedReferenceRecord] = Field(default_factory=list)
+    quality_analyses: list[CaptureQualityResult] = Field(default_factory=list)
     started_at: datetime = Field(default_factory=utc_now)
     completed_at: datetime | None = None
 
@@ -262,6 +332,16 @@ class CaptureSession(StrictModel):
         rectified_views = [item.view for item in self.rectified_references]
         if len(rectified_views) != len(set(rectified_views)):
             raise ValueError("capture session cannot contain duplicate rectified references per view")
+        quality_sources = [item.source_frame_id for item in self.quality_analyses]
+        if len(quality_sources) != len(set(quality_sources)):
+            raise ValueError("capture session cannot contain duplicate quality analyses per frame")
+        frames_by_id = {frame.frame_id: frame for frame in self.frames}
+        for item in self.quality_analyses:
+            source = frames_by_id.get(item.source_frame_id)
+            if source is None:
+                raise ValueError("quality analysis must reference a frame in the capture session")
+            if source.view is not item.view:
+                raise ValueError("quality analysis view must match its source frame")
         if self.started_at.tzinfo is None:
             raise ValueError("started_at must be timezone-aware")
         if self.completed_at is not None and self.completed_at.tzinfo is None:

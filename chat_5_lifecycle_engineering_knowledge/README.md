@@ -1,103 +1,120 @@
 # Chat 5 — Lifecycle & Engineering Knowledge
 
-Статус: **Pass 2 CAD verification → lifecycle gate implemented**  
+Статус: **Pass 3 physical part instance lifecycle implemented**  
 Проект: **MREA — Measured Reverse Engineering Assistant**  
 Источник истины: **MREA SSOT v0.1 + orchestration addendum v0.2**  
-Текущая директива: **OD-2026-09-29-002**  
-Рабочая ветка: `chat-5/pass-2`
+Текущая директива: **OD-2026-09-29-003**  
+Рабочая ветка: `chat-5/pass-3`
 
 ## Назначение области
 
-Vertical slice Chat 5 отвечает за физическую инженерную жизнь ревизии:
+Chat 5 хранит как инженерную историю ревизии, так и фактическую жизнь конкретно изготовленного экземпляра:
 
 ```text
 Revision
-→ Manufacturing
-→ Installation
-→ Test
-→ Failure / Success
-→ Next Revision
-→ Engineering Knowledge
+→ ManufacturingRecord
+→ PhysicalPartInstance
+→ Installed
+→ Tested
+→ Active / In service
+→ Failed
+→ Removed
+→ Superseded by replacement
 ```
 
 ## Реализовано
 
-### Pass 1 baseline
+### Pass 1
 
-- lifecycle domain models;
-- Revision/Manufacturing/Installation/Test/Failure services;
-- `LifecycleTimeline`;
-- `EquipmentPartRegistry`;
-- `LifecycleStateProjection`;
-- `RevisionComparison`;
-- deterministic `KnowledgeQueryService`;
-- `CanonicalLifecycleEventAdapter`;
-- canonical `mrea.lifecycle-event.v1` export.
+- Revision / Manufacturing / Installation / Test / Failure domain;
+- revision-level timeline, registry and projections;
+- deterministic knowledge queries;
+- canonical `LifecycleEvent v1` outbound adapter.
 
 ### Pass 2
 
-Закрыта граница Chat 4 → Chat 5:
+- canonical `CADPackage + CADVerificationReport` → lifecycle Revision;
+- CAD traceability retention;
+- `VERIFIED` manufacturing eligibility gate;
+- failed/unverified CAD transfer cannot enter manufacturing.
+
+### Pass 3
+
+Добавлен отдельный internal physical-instance layer:
+
+- `PhysicalPartInstance`;
+- `PhysicalPartState`;
+- `PhysicalLifecycleEvent`;
+- `PhysicalPartLifecycleService`;
+- `PhysicalPartTimeline`;
+- `PhysicalPartStateProjection`;
+- `PhysicalEquipmentRegistry`;
+- exact instance linkage on Installation/Test/Failure records;
+- explicit `PASSED` test gate before activation;
+- removal and replacement/supersession traceability;
+- occupied equipment/position protection;
+- monotonic instance chronology;
+- fail-closed invalid-transition rejection.
+
+## Physical state machine
+
+Normal path:
 
 ```text
-canonical CADPackage
-+ canonical CADVerificationReport
-→ CAD-linked lifecycle Revision
-→ VERIFIED manufacturing eligibility
-→ existing lifecycle event flow
+MANUFACTURED
+→ INSTALLED
+→ TESTED
+→ ACTIVE
 ```
 
-Добавлены:
+Service exit paths:
 
-- `RevisionOrigin`;
-- `CADVerificationStatus`;
-- `CADArtifactReference`;
-- `CADRevisionLink`;
-- `CADRevisionPreparationService`;
-- explicit manufacturing eligibility gate for CAD-origin revisions.
+```text
+INSTALLED / TESTED / ACTIVE
+→ FAILED
+→ REMOVED
+→ SUPERSEDED
 
-`FAILED` CAD verification сохраняется как traceable lifecycle Revision, но не допускается к manufacturing.
+INSTALLED / TESTED / ACTIVE
+→ REMOVED
+→ SUPERSEDED
+```
+
+`SUPERSEDED` requires a different physical instance of the same part to be installed/in service at the same equipment/position.
 
 ## Shared-contract boundary
 
-Chat 5 не изменяет shared contracts.
+Physical-instance events are intentionally internal in Pass 3.
 
-Canonical inputs принадлежат Chat 6:
+Canonical `mrea.lifecycle-event.v1` remains unchanged and still exports only:
 
-- `core/contracts/mrea_contracts_v1.schema.json`;
-- `core/contracts/POLICIES_V1.md`;
-- canonical CAD/lifecycle fixtures.
+- `REVISION_CREATED`;
+- `MANUFACTURED`;
+- `INSTALLED`;
+- `TESTED`;
+- `FAILED`.
 
-Rich lifecycle/CAD linkage remains internal. Shared lifecycle output remains `LifecycleEvent v1`.
+`ACTIVE`, `REMOVED` and `SUPERSEDED` do not leak into the shared v1 contract.
 
-## Verification
+## Verification target
 
-```text
-PYTHONPATH=src pytest -q
-13 passed
-```
+Pass 3 must keep green:
 
-## Pass 2 files
+- `Chat 5 / Lifecycle`;
+- `Integration / Chat 4 -> Chat 5`;
+- canonical contract checks;
+- new deterministic physical lifecycle tests.
 
-Основной отчёт:
+## Documentation
 
-- `docs/PASS_2_CAD_LIFECYCLE_LINKAGE.md`
-
-Актуальное состояние:
-
+- `docs/PASS_3_PHYSICAL_PART_INSTANCE_LIFECYCLE.md`
 - `docs/IMPLEMENTATION_STATE.md`
-
-Handoff для Chat 6:
-
 - `ORCHESTRATOR_HANDOFF.md`
 
-## Scope boundary
+## Still intentionally out of scope
 
-В Pass 2 намеренно не добавлялись:
-
-- AI / semantic search;
-- production database persistence;
+- AI / semantic failure analysis;
+- production persistence;
 - REST/API;
-- physical removal/replacement model;
-- manufacturing override.
-
-Следующий этап определяется следующей директивой Chat 6 после acceptance gate.
+- concurrency/versioning;
+- shared contract expansion for physical events.

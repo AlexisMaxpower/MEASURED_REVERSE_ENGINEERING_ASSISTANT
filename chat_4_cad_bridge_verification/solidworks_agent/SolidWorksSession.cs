@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
 using SolidWorks.Interop.swconst;
@@ -7,64 +8,134 @@ namespace Mrea.SolidWorksCadAgent
 {
     internal sealed class SolidWorksSession : IDisposable
     {
+        private const int SupportedRevisionMajor = 34;
+
         private dynamic _app;
         private dynamic _model;
         private readonly bool _launchedByAgent;
+        private readonly string _version;
         private bool _disposed;
 
-        private SolidWorksSession(dynamic app, dynamic model, bool launchedByAgent)
+        private SolidWorksSession(dynamic app, dynamic model, bool launchedByAgent, string version)
         {
             _app = app;
             _model = model;
             _launchedByAgent = launchedByAgent;
+            _version = version;
         }
 
         public dynamic App { get { return _app; } }
         public dynamic Model { get { return _model; } }
+        public string Version { get { return _version; } }
 
         public static SolidWorksSession Open(AgentRequest request)
         {
             dynamic app = null;
+            dynamic model = null;
             var launched = false;
 
-            if (request.attach_to_running)
+            try
             {
-                try
+                if (request.attach_to_running)
                 {
-                    app = Marshal.GetActiveObject("SldWorks.Application");
+                    try
+                    {
+                        app = Marshal.GetActiveObject("SldWorks.Application");
+                    }
+                    catch (COMException)
+                    {
+                        app = null;
+                    }
                 }
-                catch (COMException)
+
+                if (app == null && request.allow_launch)
                 {
-                    app = null;
+                    var progId = Type.GetTypeFromProgID("SldWorks.Application", throwOnError: false);
+                    if (progId == null)
+                        throw new InvalidOperationException("SOLIDWORKS COM ProgID SldWorks.Application is not registered.");
+                    app = Activator.CreateInstance(progId);
+                    launched = true;
+                    app.Visible = true;
+                    try { app.UserControl = true; } catch { }
+                }
+
+                if (app == null)
+                    throw new InvalidOperationException("SOLIDWORKS is not running and allow_launch=false.");
+
+                string version = ReadAndValidateVersion(app);
+                var template = ResolvePartTemplate(app, request.part_template_path);
+                model = app.NewDocument(template, (int)swDwgPaperSizes_e.swDwgPaperAsize, 0.0, 0.0);
+                if (model == null)
+                    throw new InvalidOperationException("SOLIDWORKS failed to create a new part document from template: " + template);
+
+                SelectFrontPlaneWithoutLocalizedName(app, model);
+                dynamic sketchManager = model.SketchManager;
+                sketchManager.InsertSketch(true);
+                if (sketchManager.ActiveSketch == null)
+                    throw new InvalidOperationException("SOLIDWORKS did not enter a FRONT-plane sketch.");
+
+                var session = new SolidWorksSession(app, model, launched, version);
+                app = null;
+                model = null;
+                return session;
+            }
+            catch
+            {
+                CleanupFailedOpen(app, model, launched);
+                throw;
+            }
+        }
+
+        private static void CleanupFailedOpen(dynamic app, dynamic model, bool launched)
+        {
+            try
+            {
+                if (model != null && app != null)
+                {
+                    string title = null;
+                    try { title = model.GetTitle(); } catch { }
+                    if (!string.IsNullOrWhiteSpace(title))
+                    {
+                        try { app.CloseDoc(title); } catch { }
+                    }
                 }
             }
-
-            if (app == null && request.allow_launch)
+            finally
             {
-                var progId = Type.GetTypeFromProgID("SldWorks.Application", throwOnError: false);
-                if (progId == null)
-                    throw new InvalidOperationException("SOLIDWORKS COM ProgID SldWorks.Application is not registered.");
-                app = Activator.CreateInstance(progId);
-                launched = true;
-                app.Visible = true;
-                try { app.UserControl = true; } catch { }
+                ReleaseCom(model);
+                if (launched && app != null)
+                {
+                    try { app.ExitApp(); } catch { }
+                }
+                ReleaseCom(app);
+            }
+        }
+
+        private static string ReadAndValidateVersion(dynamic app)
+        {
+            string revision;
+            try
+            {
+                revision = Convert.ToString(app.RevisionNumber(), CultureInfo.InvariantCulture);
+            }
+            catch (Exception exc)
+            {
+                throw new InvalidOperationException("SOLIDWORKS RevisionNumber() failed.", exc);
             }
 
-            if (app == null)
-                throw new InvalidOperationException("SOLIDWORKS is not running and allow_launch=false.");
+            if (string.IsNullOrWhiteSpace(revision))
+                throw new InvalidOperationException("SOLIDWORKS returned an empty RevisionNumber().");
 
-            var template = ResolvePartTemplate(app, request.part_template_path);
-            dynamic model = app.NewDocument(template, (int)swDwgPaperSizes_e.swDwgPaperAsize, 0.0, 0.0);
-            if (model == null)
-                throw new InvalidOperationException("SOLIDWORKS failed to create a new part document from template: " + template);
-
-            SelectFrontPlaneWithoutLocalizedName(app, model);
-            dynamic sketchManager = model.SketchManager;
-            sketchManager.InsertSketch(true);
-            if (sketchManager.ActiveSketch == null)
-                throw new InvalidOperationException("SOLIDWORKS did not enter a FRONT-plane sketch.");
-
-            return new SolidWorksSession(app, model, launched);
+            var dot = revision.IndexOf('.');
+            var majorText = dot >= 0 ? revision.Substring(0, dot) : revision;
+            int major;
+            if (!int.TryParse(majorText, NumberStyles.Integer, CultureInfo.InvariantCulture, out major))
+                throw new InvalidOperationException("Cannot parse SOLIDWORKS revision number: " + revision);
+            if (major != SupportedRevisionMajor)
+                throw new InvalidOperationException(
+                    "SOLIDWORKS version mismatch: adapter requires 2026 revision major " +
+                    SupportedRevisionMajor + ", actual RevisionNumber=" + revision);
+            return revision;
         }
 
         private static string ResolvePartTemplate(dynamic app, string requested)
@@ -111,8 +182,6 @@ namespace Mrea.SolidWorksCadAgent
                         {
                             var normalDotZ = n[2];
                             var originDistance = Math.Sqrt(o[0] * o[0] + o[1] * o[1] + o[2] * o[2]);
-                            // SOLIDWORKS defines canonical RefPlane orientation as the system Front Plane.
-                            // Prefer +Z normal and a plane through the origin, without localized feature names.
                             var score = normalDotZ * 1000.0 - originDistance;
                             if (score > bestScore)
                             {
@@ -123,7 +192,6 @@ namespace Mrea.SolidWorksCadAgent
                     }
                     catch
                     {
-                        // Keep traversing: a user plane must not hide a usable system Front Plane.
                     }
                 }
                 feature = feature.GetNextFeature();
@@ -180,7 +248,6 @@ namespace Mrea.SolidWorksCadAgent
                 _model = null;
                 if (_launchedByAgent)
                 {
-                    // UserControl is enabled when launched; never terminate the whole user session here.
                 }
                 ReleaseCom(_app);
                 _app = null;

@@ -24,6 +24,7 @@ from .models import (
     UnresolvedBinding,
 )
 from .sketch_package import SketchPackageBuilder
+from .vision import CandidateIssue, GeometryExtractionResult, ImageGeometryExtractor, VisionGeometryPipeline
 
 __all__ = [
     "AnchorEntityMatcher",
@@ -31,6 +32,7 @@ __all__ = [
     "Arc",
     "CanonicalGeometryInput",
     "CanonicalInputAdapter",
+    "CandidateIssue",
     "Circle",
     "ConstraintCandidate",
     "ConstraintCandidateEngine",
@@ -40,11 +42,14 @@ __all__ = [
     "GeometryConflictDetector",
     "GeometryDraft",
     "GeometryGraph",
+    "GeometryExtractionResult",
     "GeometryPipeline",
+    "ImageGeometryExtractor",
     "Line",
     "MeasurementRef",
     "Point2D",
     "PointEntity",
     "SketchPackageBuilder",
     "UnresolvedBinding",
+    "VisionGeometryPipeline",
 ]
