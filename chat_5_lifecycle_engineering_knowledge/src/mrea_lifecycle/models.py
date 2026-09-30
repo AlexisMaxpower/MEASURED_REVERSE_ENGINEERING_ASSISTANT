@@ -40,6 +40,14 @@ class CADVerificationStatus(str, Enum):
     FAILED = "FAILED"
 
 
+class CADRuntimeStatus(str, Enum):
+    """Vendor-neutral snapshot of explicit CAD runtime evidence status."""
+
+    VERIFIED = "VERIFIED"
+    FAILED = "FAILED"
+    UNVERIFIED = "UNVERIFIED"
+
+
 class PhysicalPartState(str, Enum):
     """Internal state of one real manufactured part instance."""
 
@@ -93,6 +101,9 @@ class CADRevisionLink:
     cad_adapter: str
     verification_status: CADVerificationStatus
     artifacts: Tuple[CADArtifactReference, ...] = ()
+    runtime_status: Optional[CADRuntimeStatus] = None
+    runtime_evidence_schema_version: Optional[str] = None
+    runtime_real_host_executed: Optional[bool] = None
 
 
 @dataclass(frozen=True, slots=True)
