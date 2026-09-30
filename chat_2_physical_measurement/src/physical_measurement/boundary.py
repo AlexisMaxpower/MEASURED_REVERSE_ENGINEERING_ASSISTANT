@@ -127,7 +127,7 @@ class CanonicalMeasurementAdapter:
             )
 
         expected_reference_frame_id = view["reference_frame_id"]
-        for anchor in (measurement.anchor_a, measurement.anchor_b):
+        for anchor in measurement.anchors:
             if anchor.reference_frame_id != expected_reference_frame_id:
                 raise ValueError(
                     f"anchor {anchor.anchor_id} reference_frame_id does not match "
@@ -154,10 +154,7 @@ class CanonicalMeasurementAdapter:
             ),
             "source": measurement.source.value,
             "view_id": measurement.view_id,
-            "anchors": [
-                self._serialize_anchor(measurement.anchor_a),
-                self._serialize_anchor(measurement.anchor_b),
-            ],
+            "anchors": [self._serialize_anchor(anchor) for anchor in measurement.anchors],
             "evidence_frame_id": measurement.evidence_frame_id,
             "instrument": (
                 {"type": measurement.instrument_type}
