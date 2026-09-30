@@ -6,6 +6,7 @@ from .constraint_system import ConstraintSystemAnalysis, ConstraintSystemAnalyze
 from .constraints import ConstraintIssue, ConstraintResolution, ConstraintResolver, ResolvedConstraint
 from .contracts import CanonicalGeometryInput, CanonicalInputAdapter
 from .dimensioned_view import DimensionedViewArtifact, DimensionedViewRenderer, ReferenceImageLayer
+from .dof_audit import StructuralDofAnalyzer, StructuralDofAudit
 from .core import (
     AnchorEntityMatcher,
     ConstraintCandidateEngine,
@@ -69,6 +70,8 @@ __all__ = [
     "ReferenceImageLayer",
     "ResolvedConstraint",
     "SketchPackageBuilder",
+    "StructuralDofAnalyzer",
+    "StructuralDofAudit",
     "UnresolvedBinding",
     "VisionGeometryPipeline",
 ]
