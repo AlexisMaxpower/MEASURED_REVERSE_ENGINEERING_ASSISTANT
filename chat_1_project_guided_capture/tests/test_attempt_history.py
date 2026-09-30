@@ -5,7 +5,7 @@ import pytest
 
 from mrea_capture.artifacts import FileSystemArtifactStore
 from mrea_capture.calibration import CalibrationService
-from mrea_capture.history import CaptureAttemptHistoryService
+from mrea_capture.history import CaptureAttemptHistoryError, CaptureAttemptHistoryService
 from mrea_capture.models import (
     CalibrationResult,
     CameraMetadata,
@@ -260,5 +260,6 @@ def test_session_validation_rejects_disconnected_clean_reference_roots(tmp_path:
     payload["frames"].append(duplicate)
     payload["views"][0]["active_clean_reference_frame_id"] = str(first.frame_id)
 
-    with pytest.raises(ValueError, match="exactly one root"):
-        CaptureSession.model_validate(payload)
+    corrupted = CaptureSession.model_validate(payload)
+    with pytest.raises(CaptureAttemptHistoryError, match="exactly one clean-reference lineage root"):
+        CaptureAttemptHistoryService().project_view(corrupted, CaptureViewType.FRONT)
