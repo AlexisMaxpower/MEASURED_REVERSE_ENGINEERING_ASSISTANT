@@ -14,6 +14,12 @@ class SnapSelectionStatus(StrEnum):
     AMBIGUOUS = "AMBIGUOUS"
 
 
+def _non_empty(value: str, field_name: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{field_name} must be a non-empty string")
+    return value.strip()
+
+
 @dataclass(frozen=True, slots=True)
 class FeatureSnapCandidate:
     feature_id: str
@@ -25,13 +31,13 @@ class FeatureSnapCandidate:
     source: ProvenanceSource = ProvenanceSource.VISION_DETECTED
 
     def __post_init__(self) -> None:
-        for field_name, value in (
-            ("feature_id", self.feature_id),
-            ("view_id", self.view_id),
-            ("reference_frame_id", self.reference_frame_id),
-        ):
-            if not isinstance(value, str) or not value.strip():
-                raise ValueError(f"{field_name} must be a non-empty string")
+        object.__setattr__(self, "feature_id", _non_empty(self.feature_id, "feature_id"))
+        object.__setattr__(self, "view_id", _non_empty(self.view_id, "view_id"))
+        object.__setattr__(
+            self,
+            "reference_frame_id",
+            _non_empty(self.reference_frame_id, "reference_frame_id"),
+        )
         if not isfinite(self.x_px) or not isfinite(self.y_px):
             raise ValueError("snap candidate coordinates must be finite")
         if self.x_px < 0 or self.y_px < 0:
@@ -54,6 +60,27 @@ class FeatureSnapProposal:
     distance_px: float
     confidence: float | None
     source: ProvenanceSource = ProvenanceSource.VISION_DETECTED
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "anchor_id", _non_empty(self.anchor_id, "anchor_id"))
+        object.__setattr__(self, "feature_id", _non_empty(self.feature_id, "feature_id"))
+        object.__setattr__(self, "view_id", _non_empty(self.view_id, "view_id"))
+        object.__setattr__(
+            self,
+            "reference_frame_id",
+            _non_empty(self.reference_frame_id, "reference_frame_id"),
+        )
+        if not isfinite(self.x_px) or not isfinite(self.y_px):
+            raise ValueError("snap proposal coordinates must be finite")
+        if self.x_px < 0 or self.y_px < 0:
+            raise ValueError("snap proposal coordinates must be >= 0")
+        if not isfinite(self.distance_px) or self.distance_px < 0:
+            raise ValueError("distance_px must be finite and >= 0")
+        if self.confidence is not None:
+            if not isfinite(self.confidence) or not 0 <= self.confidence <= 1:
+                raise ValueError("confidence must be within [0, 1]")
+        if self.source is not ProvenanceSource.VISION_DETECTED:
+            raise ValueError("snap proposal must use VISION_DETECTED provenance")
 
 
 @dataclass(frozen=True, slots=True)
