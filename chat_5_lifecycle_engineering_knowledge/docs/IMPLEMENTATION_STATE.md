@@ -9,7 +9,7 @@
 - Pass 10.1 authorization: **direct user instruction**
 - Central orchestrator state at start: **OD-2026-09-30-004 selects frozen Pass 8 for Round-4 review and does not centrally request new worker implementation**
 - Base SHA: `8044451abd050f69556c9274aec1a83caefad408` (frozen Chat 5 Pass 10)
-- State: **keyset pagination implementation complete; required pre-handoff gates green; handoff published and final freeze pending state reconciliation commit**
+- State: **keyset pagination implementation complete; required gates green; handoff published; branch frozen**
 
 ## Orchestration truth
 
@@ -195,6 +195,10 @@ Results:
 
 The warning is the pre-existing Chat 4 `TestDoubleCadAdapter` pytest collection warning and is outside Chat 5 ownership.
 
+### Final handoff CI
+
+The final branch handoff commit is required to pass the same MREA CI workflow before external delivery. Its exact SHA and workflow result are verified after the final handoff commit is published.
+
 ## Files added in Pass 10.1
 
 - `src/mrea_lifecycle/keyset_knowledge.py`;
@@ -223,4 +227,4 @@ Still open:
 
 ## Handoff rule
 
-The handoff has been published after all required pre-handoff gates passed. This state reconciliation commit records that fact. `ORCHESTRATOR_HANDOFF.md` must now be re-published as the final commit; after that, `chat-5/pass-10.1` is frozen unless final GitHub verification finds a real missing/incorrect file or Chat 6 explicitly requests a correction.
+`ORCHESTRATOR_HANDOFF.md` is the final worker commit. After that commit, `chat-5/pass-10.1` is frozen. No later commit is allowed unless final verification finds a real missing/incorrect GitHub file or Chat 6 explicitly requests a correction.
