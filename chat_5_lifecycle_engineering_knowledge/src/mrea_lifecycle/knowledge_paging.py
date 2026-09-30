@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import base64
 import hashlib
 import json
-from typing import Generic, Mapping, Optional, Sequence, TypeVar
+from typing import Callable, Generic, Mapping, Optional, Sequence, TypeVar
 
 
 # v1 remains supported for continuation of offset cursors issued by Pass 8-10.
@@ -307,7 +307,7 @@ def keyset_page_from_rows(
     limit: int,
     query_fingerprint_value: str,
     snapshot_version: int,
-    key_for_item: callable,
+    key_for_item: Callable[[T], Sequence[CursorScalar]],
 ) -> KnowledgePage[T]:
     """Build a v2 keyset page from rows fetched with `limit + 1` semantics."""
     page_limit = validate_page_limit(limit)
@@ -315,11 +315,10 @@ def keyset_page_from_rows(
     has_more = len(rows) > page_limit
     next_cursor = None
     if has_more and visible:
-        raw_key = key_for_item(visible[-1])
         next_cursor = encode_knowledge_keyset_cursor(
             query_fingerprint_value=query_fingerprint_value,
             snapshot_version=snapshot_version,
-            key=raw_key,
+            key=key_for_item(visible[-1]),
         )
     return KnowledgePage(
         items=visible,
