@@ -142,5 +142,5 @@ Accepted views can now be intentionally reopened through an audited `reopen_view
 
 ### Isolated Pass 4 extension — deterministic capture-attempt history
 
-`history.py` now projects the immutable clean-reference lineage into an explicit per-view attempt history for UI/orchestration. Each attempt carries its clean artifact identity, predecessor/successor links, acceptance/revision evidence, calibration, quality verdict, rectification and measurement-frame IDs. The projection is read-only and keeps active vs historical evidence unambiguous. Persisted sessions now fail closed on multiple roots, disconnected clean-reference components or cycles.
+`history.py` now projects the immutable clean-reference lineage into an explicit per-view attempt history for UI/orchestration. Each attempt carries its clean artifact identity, predecessor/successor links, acceptance/revision evidence, calibration, quality verdict, rectification and measurement-frame IDs. The projection is read-only and keeps active vs historical evidence unambiguous. The history projection fails closed on multiple roots, disconnected clean-reference components, missing predecessors, branches or cycles.
 
