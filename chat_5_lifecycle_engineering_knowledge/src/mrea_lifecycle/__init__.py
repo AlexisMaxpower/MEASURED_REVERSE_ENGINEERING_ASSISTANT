@@ -23,6 +23,13 @@ from .engineering_knowledge import (
     RevisionOutcomeSummary,
     SQLiteEngineeringKnowledgeRepository,
 )
+from .knowledge_paging import (
+    DEFAULT_KNOWLEDGE_PAGE_LIMIT,
+    KNOWLEDGE_CURSOR_FORMAT_VERSION,
+    MAX_KNOWLEDGE_PAGE_LIMIT,
+    KnowledgePage,
+    LifecycleKnowledgeCursorError,
+)
 from .models import (
     CADArtifactReference,
     CADRevisionLink,
@@ -96,6 +103,7 @@ __all__ = [
     "CADRevisionPreparationService",
     "CADVerificationStatus",
     "CanonicalLifecycleEventAdapter",
+    "DEFAULT_KNOWLEDGE_PAGE_LIMIT",
     "EquipmentOccupancyQueryResult",
     "EquipmentPartRegistry",
     "EquipmentPositionHistoryEntry",
@@ -106,6 +114,8 @@ __all__ = [
     "InMemoryLifecycleStore",
     "Installation",
     "InstallationService",
+    "KNOWLEDGE_CURSOR_FORMAT_VERSION",
+    "KnowledgePage",
     "KnowledgeQueryService",
     "LIFECYCLE_BACKUP_FORMAT_VERSION",
     "LifecycleBackupConsistencyError",
@@ -119,6 +129,7 @@ __all__ = [
     "LifecycleEvent",
     "LifecycleEventType",
     "LifecycleInvariantError",
+    "LifecycleKnowledgeCursorError",
     "LifecycleKnowledgeIntegrityError",
     "LifecyclePersistenceError",
     "LifecycleReadOnlyError",
@@ -129,6 +140,7 @@ __all__ = [
     "LifecycleTimeline",
     "LifecycleTransactionRequiredError",
     "LifecycleUnitOfWork",
+    "MAX_KNOWLEDGE_PAGE_LIMIT",
     "ManufacturingRecord",
     "ManufacturingService",
     "PhysicalEquipmentRegistry",
