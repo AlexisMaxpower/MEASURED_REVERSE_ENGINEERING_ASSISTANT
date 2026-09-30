@@ -4,6 +4,7 @@ from pathlib import Path
 import sqlite3
 
 from .engineering_knowledge import SQLiteEngineeringKnowledgeRepository
+from .keyset_knowledge import SQLiteKeysetEngineeringKnowledgeRepository
 from .persistence import SQLITE_SNAPSHOT_SCHEMA_VERSION
 from .relational import SQLiteLifecycleQueryRepository
 from .sqlite_schema import SQLITE_RELATIONAL_SCHEMA_VERSION
@@ -26,6 +27,8 @@ class SQLiteLifecycleReadOnlySession:
 
     The session never opens a writable SQLite handle. It also refuses to serve a
     relational projection that does not represent the current authoritative snapshot.
+    High-cardinality knowledge pages use the Pass-10.1 keyset adapter while the public
+    knowledge interface remains backward compatible with the base repository.
     """
 
     def __init__(self, database: str | Path) -> None:
@@ -111,7 +114,7 @@ class SQLiteLifecycleReadOnlySession:
 
         self._connection = connection
         self._queries = SQLiteLifecycleQueryRepository(connection)
-        self._knowledge = SQLiteEngineeringKnowledgeRepository(
+        self._knowledge = SQLiteKeysetEngineeringKnowledgeRepository(
             connection,
             snapshot_version=snapshot_version,
         )
