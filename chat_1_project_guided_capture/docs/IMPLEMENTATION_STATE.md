@@ -196,4 +196,4 @@ Added an explicit reopen/revision gate on top of immutable recapture lineage.
 - `recapture_clean_reference(...)` clears the gate only after a new immutable clean artifact is active.
 - Guided Capture returns `RECAPTURE_CLEAN_REFERENCE` / `VIEW_REOPENED_RECAPTURE_REQUIRED` until recapture occurs.
 
-Local schema-independent regression including quality: `33 passed in 0.32s`.
+Local schema-independent regression including quality: `33 passed`.
