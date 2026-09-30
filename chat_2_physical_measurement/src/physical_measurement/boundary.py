@@ -29,7 +29,7 @@ def _utc_rfc3339(value: datetime) -> str:
 
 
 class CanonicalMeasurementAdapter:
-    """Maps Chat 2 internal Phase A models to Integrator-owned wire contracts."""
+    """Maps Chat 2 internal physical-measurement models to canonical wire contracts."""
 
     def __init__(self, *, id_factory: Callable[[str], str] | None = None) -> None:
         self._id_factory = id_factory or (lambda prefix: f"{prefix}_{uuid4().hex}")
@@ -127,7 +127,7 @@ class CanonicalMeasurementAdapter:
             )
 
         expected_reference_frame_id = view["reference_frame_id"]
-        for anchor in (measurement.anchor_a, measurement.anchor_b):
+        for anchor in measurement.anchors:
             if anchor.reference_frame_id != expected_reference_frame_id:
                 raise ValueError(
                     f"anchor {anchor.anchor_id} reference_frame_id does not match "
@@ -148,16 +148,13 @@ class CanonicalMeasurementAdapter:
             "value": _as_number(measurement.value),
             "unit": measurement.unit,
             "uncertainty": (
-                _as_number(measurement.uncertainty_mm)
-                if measurement.uncertainty_mm is not None
+                _as_number(measurement.uncertainty)
+                if measurement.uncertainty is not None
                 else None
             ),
             "source": measurement.source.value,
             "view_id": measurement.view_id,
-            "anchors": [
-                self._serialize_anchor(measurement.anchor_a),
-                self._serialize_anchor(measurement.anchor_b),
-            ],
+            "anchors": [self._serialize_anchor(anchor) for anchor in measurement.anchors],
             "evidence_frame_id": measurement.evidence_frame_id,
             "instrument": (
                 {"type": measurement.instrument_type}

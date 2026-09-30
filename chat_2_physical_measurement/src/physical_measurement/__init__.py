@@ -18,6 +18,7 @@ from .hands_free import (
 from .models import FeatureAnchor, MeasurementSession, MeasurementType, PhysicalMeasurement, ProvenanceSource
 from .repository import InMemoryMeasurementSessionRepository
 from .service import MeasurementSessionService
+from .type_registry import MeasurementTypeRegistry, MeasurementTypeSemantics
 
 __all__ = [
     "AmbiguousMeasurementCommand",
@@ -36,6 +37,8 @@ __all__ = [
     "MeasurementSession",
     "MeasurementSessionService",
     "MeasurementType",
+    "MeasurementTypeRegistry",
+    "MeasurementTypeSemantics",
     "ParsedMeasurementCommand",
     "PhysicalMeasurement",
     "ProvenanceSource",

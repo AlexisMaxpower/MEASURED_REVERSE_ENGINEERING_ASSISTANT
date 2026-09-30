@@ -4,7 +4,12 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import NAMESPACE_URL, UUID, uuid5
 
-from .models import ArtifactRecord, CaptureSession, CaptureViewType, FrameKind, FrameRecord, Project
+from .lineage import (
+    active_clean_reference,
+    calibration_for_active_reference,
+    measurement_frames_for_active_reference,
+)
+from .models import ArtifactRecord, CaptureSession, CaptureViewType, FrameRecord, Project
 
 
 class CanonicalContractError(ValueError):
@@ -89,39 +94,22 @@ class CanonicalContractBuilder:
 
         views: list[dict[str, Any]] = []
         for progress in session.views:
-            clean_frames = [
-                frame
-                for frame in session.frames
-                if frame.view is progress.view and frame.kind is FrameKind.CLEAN_REFERENCE
-            ]
-            if not clean_frames:
+            clean = active_clean_reference(session, progress.view)
+            if clean is None:
                 if progress.required:
                     raise CanonicalContractError(
-                        f"required view {progress.view.value} has no clean reference frame"
+                        f"required view {progress.view.value} has no active clean reference frame"
                     )
                 continue
-            if len(clean_frames) != 1:
-                raise CanonicalContractError(
-                    f"view {progress.view.value} must have exactly one clean reference frame"
-                )
 
             view_id = _view_id(session, progress.view)
-            clean = clean_frames[0]
             measurements = [
                 cls._measurement_capture_frame(frame, view_id=view_id)
-                for frame in session.frames
-                if frame.view is progress.view and frame.kind is FrameKind.MEASUREMENT
+                for frame in measurement_frames_for_active_reference(session, progress.view)
             ]
-            calibration = next(
-                (item for item in session.calibrations if item.view is progress.view),
-                None,
-            )
+            calibration = calibration_for_active_reference(session, progress.view)
             canonical_calibration = None
             if calibration is not None:
-                if calibration.source_frame_id != clean.frame_id:
-                    raise CanonicalContractError(
-                        f"calibration for {progress.view.value} does not reference its clean frame"
-                    )
                 canonical_calibration = {
                     "coordinate_system": "MAT_XY_MM",
                     "mat_id": calibration.mat_id,

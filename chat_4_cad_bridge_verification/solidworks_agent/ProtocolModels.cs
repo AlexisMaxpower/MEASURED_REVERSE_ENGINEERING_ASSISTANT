@@ -25,10 +25,13 @@ namespace Mrea.SolidWorksCadAgent
     {
         public string entity_id { get; set; }
         public string type { get; set; }
+        public PointSpec point { get; set; }
         public PointSpec start { get; set; }
         public PointSpec end { get; set; }
         public PointSpec center { get; set; }
         public double radius { get; set; }
+        public double start_angle_deg { get; set; }
+        public double end_angle_deg { get; set; }
     }
 
     internal sealed class DimensionSpec

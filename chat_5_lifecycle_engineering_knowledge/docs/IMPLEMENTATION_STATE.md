@@ -2,195 +2,209 @@
 
 ## Snapshot
 
-- Date: **2026-09-29**
-- Branch: `chat-5/pass-3`
+- Date: **2026-09-30**
+- Branch: `chat-5/pass-8`
 - Slice: **Lifecycle & Engineering Knowledge**
 - SSOT: **MREA v0.1 + orchestration addendum v0.2**
-- Orchestrator directive: **OD-2026-09-29-003**
-- Accepted baseline: **Pass 2 ACCEPTED**
-- State: **Pass 3 physical part instance lifecycle implemented; acceptance pending CI/handoff**
+- Pass 8 authorization: **direct user instruction; no newer Chat-5-specific directive present on `main` at branch start**
+- Base SHA: `d9bed012eb8bbcea338522847a46572bb5415026` (frozen Chat 5 Pass 7)
+- State: **snapshot-bound knowledge pagination implemented; final handoff pending required gates**
 
-## Accepted baseline
+## Preserved baseline
 
 Still active and unchanged:
 
 - Revision / Manufacturing / Installation / Test / Failure domain;
-- CAD-linked Revision preparation;
-- CAD verification manufacturing eligibility gate;
-- canonical `LifecycleEvent v1` outbound adapter;
-- revision-level timeline/state/comparison/knowledge queries;
-- real Chat 4 -> Chat 5 boundary gate.
+- canonical CADPackage + CADVerificationReport transfer;
+- VERIFIED manufacturing eligibility gate;
+- canonical `LifecycleEvent v1` adapter;
+- physical-instance state machine;
+- exact instance/evidence linkage;
+- equipment/position occupancy protection;
+- removal/replacement/supersession semantics;
+- LifecycleRepository + LifecycleUnitOfWork;
+- authoritative SQLite snapshot;
+- normalized relational read model and migrations;
+- SQL-native lifecycle queries;
+- verified backup/restore;
+- read-only SQLite query session;
+- deterministic engineering knowledge queries from Pass 7.
 
-Pass 2 independent CI was green before Pass 3 began, including:
-- `Contracts / canonical fixtures`;
-- `Chat 5 / Lifecycle`;
-- `Integration / Chat 4 -> Chat 5`.
+No shared contract, canonical fixture, CI workflow, integration test, SQLite migration, or other chat-owned file was changed.
 
-## Pass 3 additions
+## Pass 8 additions
 
-### Physical identity
+### Cursor primitive
 
-`PhysicalPartInstance` is a slice-local identity for one real manufactured item.
+Added `knowledge_paging.py` with:
 
-It retains:
-- `instance_id`;
-- `part_id`;
-- `revision_id`;
-- `manufacturing_id`;
-- material;
-- manufacturing method;
-- manufactured timestamp;
-- batch/machine/print profile snapshot where available.
+- `KNOWLEDGE_CURSOR_FORMAT_VERSION = mrea.knowledge-cursor.v1`;
+- `KnowledgePage[T]`;
+- `LifecycleKnowledgeCursorError`;
+- `DEFAULT_KNOWLEDGE_PAGE_LIMIT = 100`;
+- `MAX_KNOWLEDGE_PAGE_LIMIT = 500`;
+- deterministic query fingerprinting;
+- URL-safe cursor encoding/decoding;
+- cursor checksum validation;
+- snapshot-version validation;
+- page-limit validation.
 
-A physical instance can only be registered from an existing `ManufacturingRecord`, so a failed/unverified CAD revision still cannot bypass the existing manufacturing eligibility gate.
+### Query-bound cursors
 
-### Internal physical state machine
-
-States:
-
-```text
-MANUFACTURED
-INSTALLED
-TESTED
-ACTIVE
-FAILED
-REMOVED
-SUPERSEDED
-```
-
-Normal progression:
+Every cursor includes a fingerprint of:
 
 ```text
-MANUFACTURED -> INSTALLED -> TESTED -> ACTIVE
+query name + normalized filter set
 ```
 
-Supported service exits:
+A cursor therefore fails closed when reused for a different equipment, position, event type, revision, instance, part, or other filter state.
 
-```text
-INSTALLED / TESTED / ACTIVE -> FAILED -> REMOVED -> SUPERSEDED
-INSTALLED / TESTED / ACTIVE -> REMOVED -> SUPERSEDED
-```
+Page size is intentionally not part of query identity so callers may change page size while continuing the same deterministic snapshot traversal.
 
-Rules are fail-closed:
-- activation requires the latest physical test to be explicitly `PASSED`;
-- timestamps cannot move backward for one physical instance;
-- a physical installation must carry non-empty equipment/position;
-- one equipment/position cannot contain two non-removed physical instances;
-- supersession requires the old instance to be `REMOVED`;
-- replacement must be a different instance of the same part;
-- replacement must occupy the same equipment/position.
+### Snapshot binding
 
-### Exact evidence linkage
+`SQLiteLifecycleReadOnlySession` now passes its verified committed `snapshot_version` into `SQLiteEngineeringKnowledgeRepository`.
 
-`Installation`, `TestRecord`, and `FailureRecord` now support optional `instance_id`.
+Each cursor records that version.
 
-The Pass 3 physical path requires this identity and checks:
-- revision equality;
-- manufacturing equality;
-- installation equality for tests/failures;
-- failure evidence remains attached to the exact `FailureRecord` and exact physical instance.
+If the database advances from snapshot N to N+1, a new read-only session refuses to continue an N cursor and raises `LifecycleKnowledgeCursorError`.
 
-Legacy revision-level callers remain compatible because `instance_id` is optional outside the physical-instance application path.
+This prevents mixed-version traversal.
 
-### Physical event stream
-
-Added internal `PhysicalLifecycleEvent` and `PhysicalLifecycleEventType`.
-
-Physical events are independent from shared `LifecycleEvent v1` and include:
-- concrete `instance_id`;
-- revision/manufacturing identity;
-- installation/test/failure references;
-- equipment/position context;
-- explicit test outcome;
-- replacement instance identity for supersession.
-
-This avoids changing the Chat-6-owned shared lifecycle contract merely to represent internal real-world states.
-
-### Projections
+### Paginated revision outcomes
 
 Added:
-- `PhysicalPartTimeline`;
-- `PhysicalPartStateProjection`;
-- `PhysicalEquipmentRegistry`;
-- `PhysicalPartLifecycleService`.
 
-## Shared contract compatibility
-
-No shared contract or canonical fixture was changed.
-
-Canonical lifecycle export remains limited to:
-
-```text
-REVISION_CREATED
-MANUFACTURED
-INSTALLED
-TESTED
-FAILED
+```python
+revision_outcomes_page(part_id, *, limit=100, cursor=None)
 ```
 
-Internal states/events such as `ACTIVATED`, `REMOVED`, and `SUPERSEDED` are not exported as canonical `LifecycleEvent v1`.
+Ordering remains deterministic by revision creation time and revision ID.
 
-## Build / Reuse decision
+### Paginated equipment/position history
 
-No new dependency was added.
+Added:
 
-Pass 3 deliberately reuses:
-- existing `InMemoryLifecycleStore`;
-- existing `InstallationService`;
-- existing `TestService`;
-- existing `FailureService`;
-- existing `ManufacturingService` eligibility invariant;
-- existing canonical lifecycle adapter.
+```python
+equipment_position_history_page(
+    *,
+    equipment_id,
+    position=None,
+    event_type=None,
+    revision_id=None,
+    instance_id=None,
+    limit=100,
+    cursor=None,
+)
+```
 
-A separate physical-instance service/state machine was added only for behavior not represented by the shared v1 contract.
+Ordering remains:
 
-## New deterministic tests
+```text
+occurred_at, sequence, event_id
+```
 
-`tests/test_physical_instance_lifecycle.py` covers:
+### Paginated failure patterns
 
-1. manufacturing record -> physical instance identity;
-2. install -> test -> active;
-3. failure with exact instance/revision/evidence linkage;
-4. removal;
-5. replacement/supersession by a new instance;
-6. equipment/position registry update;
-7. canonical export remaining thin;
-8. activation before test rejected;
-9. failed test cannot activate;
-10. backward-time transition rejected;
-11. occupied equipment/position rejected without partial canonical mutation;
-12. supersession before removal rejected.
+Added:
 
-## Files added in Pass 3
+```python
+failure_patterns_page(
+    *,
+    part_id=None,
+    revision_id=None,
+    limit=100,
+    cursor=None,
+)
+```
 
-- `src/mrea_lifecycle/physical.py`;
-- `tests/test_physical_instance_lifecycle.py`;
-- `docs/PASS_3_PHYSICAL_PART_INSTANCE_LIFECYCLE.md`.
+Ordering remains the exact factual Pass-7 grouping order.
 
-## Files modified in Pass 3
+### Integrity-preserving non-paged operations
 
-- `src/mrea_lifecycle/models.py`;
-- `src/mrea_lifecycle/store.py`;
+`revision_lineage()` remains whole-graph because missing-parent/cycle validation requires the complete ancestry graph.
+
+`replacement_chain()` remains whole-chain because every replacement link must be checked for cycles, missing instances and valid physical state.
+
+Pass 8 does not weaken those fail-closed guarantees merely to expose a page boundary.
+
+## Backward compatibility
+
+Existing Pass-7 knowledge methods remain unchanged:
+
+- `revision_lineage()`;
+- `revision_outcomes()`;
+- `equipment_position_history()`;
+- `failure_patterns()`;
+- `replacement_chain()`.
+
+Pagination is additive.
+
+No schema migration was added.
+
+## Verification
+
+### New tests
+
+`tests/test_engineering_knowledge_paging.py` verifies:
+
+1. five revision outcomes traverse limit-2 pages with no duplicates or omissions;
+2. every page carries the active read-only snapshot version;
+3. equipment history continues deterministically across pages;
+4. a cursor fails when filter identity changes;
+5. a cursor fails after a writer advances the committed snapshot;
+6. a modified cursor fails integrity validation;
+7. page limits below 1 or above 500 fail closed;
+8. two failure-pattern groups traverse page size one exactly;
+9. paginated failure-pattern output equals the legacy tuple query;
+10. legacy revision outcome ordering remains unchanged.
+
+### GitHub-hosted implementation run
+
+Implementation SHA:
+
+```text
+1a6803bff00eeaa43ffb18fb18c86695c59403d2
+```
+
+Exact Chat 5 result:
+
+```text
+40 passed in 1.51s
+```
+
+Status: **SUCCESS**.
+
+Contracts also passed on that workflow run. Required final gates are rechecked on the documented pre-handoff SHA before publishing `ORCHESTRATOR_HANDOFF.md`.
+
+## Files added in Pass 8
+
+- `src/mrea_lifecycle/knowledge_paging.py`;
+- `tests/test_engineering_knowledge_paging.py`;
+- `docs/PASS_8_KNOWLEDGE_PAGINATION.md`.
+
+## Files modified in Pass 8
+
+- `src/mrea_lifecycle/engineering_knowledge.py`;
+- `src/mrea_lifecycle/read_only.py`;
 - `src/mrea_lifecycle/__init__.py`;
 - `README.md`;
 - `docs/IMPLEMENTATION_STATE.md`;
 - `ORCHESTRATOR_HANDOFF.md` at final freeze.
 
-## Not implemented
+## Known limitations
 
-- production persistence;
-- repository abstraction;
-- REST/API;
-- concurrency/versioning;
-- migrations;
-- AI / semantic failure analysis;
-- shared physical-instance event contract.
+Still open:
 
-## Acceptance gate
+- REST/API transport;
+- authenticated cursor signing if cursors cross an untrusted external boundary;
+- keyset pagination for very large tables;
+- materialized analytical aggregates;
+- semantic/AI interpretation;
+- field-device synchronization.
 
-Before handoff:
-- Chat 5 suite must be green;
-- canonical contract job must remain green;
-- real `Integration / Chat 4 -> Chat 5` must remain green.
+The current offset cursor is safe against mixed snapshots because it is snapshot-bound. Keyset pagination is a later performance optimization, not a correctness requirement for this pass.
 
-Handoff then freezes `chat-5/pass-3`.
+## Handoff rule
+
+After `ORCHESTRATOR_HANDOFF.md` is published as the final worker commit, `chat-5/pass-8` is frozen. No later commit is allowed unless final verification finds a real missing/incorrect GitHub file or Chat 6 explicitly requests a correction.
