@@ -304,6 +304,23 @@ class CaptureQualityResult(StrictModel):
         return self
 
 
+class CaptureViewRevisionEvent(StrictModel):
+    revision_id: UUID = Field(default_factory=uuid4)
+    view: CaptureViewType
+    reason: NonBlank
+    reopened_at: datetime = Field(default_factory=utc_now)
+    previous_accepted_at: datetime
+    active_clean_reference_frame_id: UUID
+
+    @model_validator(mode="after")
+    def validate_revision_event(self) -> "CaptureViewRevisionEvent":
+        if self.reopened_at.tzinfo is None or self.previous_accepted_at.tzinfo is None:
+            raise ValueError("revision timestamps must be timezone-aware")
+        if self.reopened_at < self.previous_accepted_at:
+            raise ValueError("reopened_at cannot be earlier than previous_accepted_at")
+        return self
+
+
 class CaptureViewProgress(StrictModel):
     view: CaptureViewType
     required: bool = True
@@ -312,6 +329,7 @@ class CaptureViewProgress(StrictModel):
     captured_at: datetime | None = None
     accepted_at: datetime | None = None
     active_clean_reference_frame_id: UUID | None = None
+    recapture_required: bool = False
 
 
 class CaptureSession(StrictModel):
@@ -323,6 +341,7 @@ class CaptureSession(StrictModel):
     calibrations: list[CalibrationResult] = Field(default_factory=list)
     rectified_references: list[RectifiedReferenceRecord] = Field(default_factory=list)
     quality_analyses: list[CaptureQualityResult] = Field(default_factory=list)
+    revision_events: list[CaptureViewRevisionEvent] = Field(default_factory=list)
     started_at: datetime = Field(default_factory=utc_now)
     completed_at: datetime | None = None
 
@@ -435,6 +454,17 @@ class CaptureSession(StrictModel):
                 calibration = calibrations_by_id.get(item.calibration_id)
                 if calibration is None or calibration.source_frame_id != item.source_frame_id:
                     raise ValueError("quality calibration must belong to the same clean frame")
+
+        revision_ids = [item.revision_id for item in self.revision_events]
+        if len(revision_ids) != len(set(revision_ids)):
+            raise ValueError("capture session cannot contain duplicate revision ids")
+        for event in self.revision_events:
+            progress = progress_by_view.get(event.view)
+            if progress is None:
+                raise ValueError("revision event view must belong to capture session")
+            source = frames_by_id.get(event.active_clean_reference_frame_id)
+            if source is None or source.kind is not FrameKind.CLEAN_REFERENCE or source.view is not event.view:
+                raise ValueError("revision event must reference a clean frame in the same view")
 
         if self.started_at.tzinfo is None:
             raise ValueError("started_at must be timezone-aware")
