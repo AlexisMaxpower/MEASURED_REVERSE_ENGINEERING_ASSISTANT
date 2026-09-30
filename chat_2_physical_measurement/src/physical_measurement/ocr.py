@@ -107,7 +107,7 @@ def _canonical_unit(token: str | None) -> str | None:
 
 
 class OcrMeasurementReader:
-    """Deterministically parses a single physical value from provider OCR text."""
+    """Deterministically parses one physical value from provider OCR text."""
 
     def read(self, observation: OcrObservation, *, expected_unit: str) -> OcrReadResult:
         if expected_unit not in {"mm", "deg"}:
@@ -134,12 +134,6 @@ class OcrMeasurementReader:
             )
 
         numeric_token, unit_token = match.groups()
-        if "," in numeric_token and "." in numeric_token:
-            return OcrReadResult(
-                status=OcrReadStatus.AMBIGUOUS,
-                reason="mixed decimal separators are ambiguous",
-            )
-
         explicit_unit = _canonical_unit(unit_token)
         if explicit_unit is not None and explicit_unit != expected_unit:
             return OcrReadResult(
@@ -171,7 +165,7 @@ class OcrMeasurementReader:
 
 
 class OcrMeasurementPipeline:
-    """Bridges OCR text proposals into the existing explicit-confirmation state machine."""
+    """Bridges OCR proposals into the existing explicit-confirmation state machine."""
 
     def __init__(
         self,
@@ -179,25 +173,28 @@ class OcrMeasurementPipeline:
         reader: OcrMeasurementReader,
         controller: HandsFreeMeasurementController,
         expected_unit: str,
-        view_id: str,
-        reference_frame_id: str,
-        evidence_frame_id: str,
     ) -> None:
         if expected_unit not in {"mm", "deg"}:
             raise ValueError("expected_unit must be 'mm' or 'deg'")
-        for field_name, value in (
-            ("view_id", view_id),
-            ("reference_frame_id", reference_frame_id),
-            ("evidence_frame_id", evidence_frame_id),
-        ):
-            if not isinstance(value, str) or not value.strip():
-                raise ValueError(f"{field_name} must be a non-empty string")
+
+        context = controller.context
+        anchors = tuple(
+            anchor
+            for anchor in (context.anchor_a, context.anchor_b, context.anchor_c)
+            if anchor is not None
+        )
+        reference_frame_ids = {anchor.reference_frame_id for anchor in anchors}
+        if len(reference_frame_ids) != 1:
+            raise ValueError("OCR measurement context anchors must use one reference frame")
+        if context.evidence_frame_id is None:
+            raise ValueError("OCR measurement context requires evidence_frame_id")
+
         self._reader = reader
         self._controller = controller
         self._expected_unit = expected_unit
-        self._view_id = view_id
-        self._reference_frame_id = reference_frame_id
-        self._evidence_frame_id = evidence_frame_id
+        self._view_id = context.view_id
+        self._reference_frame_id = next(iter(reference_frame_ids))
+        self._evidence_frame_id = context.evidence_frame_id
 
     def process(self, observation: OcrObservation) -> OcrPipelineResult:
         if observation.view_id != self._view_id:
