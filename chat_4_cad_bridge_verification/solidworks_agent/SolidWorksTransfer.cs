@@ -37,6 +37,12 @@ namespace Mrea.SolidWorksCadAgent
                 sketchManager.AddToDB = false;
             }
 
+            ApplyConstraints(
+                model,
+                entities,
+                entitySpecs,
+                request.constraints ?? new List<ConstraintSpec>());
+
             foreach (var dimension in request.dimensions)
             {
                 dynamic modelDimension = CreateDimension(model, entities, entitySpecs, dimension);
@@ -160,6 +166,9 @@ namespace Mrea.SolidWorksCadAgent
                 }
             }
 
+            foreach (var constraint in request.constraints ?? new List<ConstraintSpec>())
+                ValidateConstraint(constraint, entitySpecs);
+
             var dimensionIds = new HashSet<string>(StringComparer.Ordinal);
             foreach (var dimension in request.dimensions)
             {
@@ -192,6 +201,119 @@ namespace Mrea.SolidWorksCadAgent
                     throw new NotSupportedException(
                         "Linear/radial real-host dimensions require mm: " + dimension.dimension_id + " unit=" + dimension.unit);
                 }
+            }
+        }
+
+        private static void ValidateConstraint(
+            ConstraintSpec constraint,
+            IDictionary<string, EntitySpec> entitySpecs)
+        {
+            if (constraint == null || string.IsNullOrWhiteSpace(constraint.constraint_id))
+                throw new InvalidDataException("Every constraint requires constraint_id.");
+            if (constraint.status != "VERIFIED")
+                throw new NotSupportedException(
+                    "Real-host constraint must be VERIFIED: " + constraint.constraint_id + " status=" + constraint.status);
+            if (constraint.entity_ids == null || constraint.entity_ids.Count == 0)
+                throw new InvalidDataException("Constraint has no entity_ids: " + constraint.constraint_id);
+            if (constraint.entity_ids.Distinct(StringComparer.Ordinal).Count() != constraint.entity_ids.Count)
+                throw new InvalidDataException("Constraint contains duplicate entity_ids: " + constraint.constraint_id);
+            foreach (var entityId in constraint.entity_ids)
+                if (!entitySpecs.ContainsKey(entityId))
+                    throw new InvalidDataException("Constraint references unknown entity: " + entityId);
+
+            if (constraint.type == "HORIZONTAL" || constraint.type == "VERTICAL")
+            {
+                if (constraint.entity_ids.Count != 1 || entitySpecs[constraint.entity_ids[0]].type != "LINE")
+                    throw new NotSupportedException(constraint.type + " requires one LINE: " + constraint.constraint_id);
+                return;
+            }
+
+            if (constraint.type == "PARALLEL" || constraint.type == "PERPENDICULAR" || constraint.type == "EQUAL")
+            {
+                if (constraint.entity_ids.Count != 2 ||
+                    entitySpecs[constraint.entity_ids[0]].type != "LINE" ||
+                    entitySpecs[constraint.entity_ids[1]].type != "LINE")
+                    throw new NotSupportedException(constraint.type + " requires two LINE entities: " + constraint.constraint_id);
+                return;
+            }
+
+            if (constraint.type == "CONCENTRIC")
+            {
+                if (constraint.entity_ids.Count != 2)
+                    throw new NotSupportedException("CONCENTRIC requires two CIRCLE/ARC entities: " + constraint.constraint_id);
+                foreach (var entityId in constraint.entity_ids)
+                {
+                    var type = entitySpecs[entityId].type;
+                    if (type != "CIRCLE" && type != "ARC")
+                        throw new NotSupportedException("CONCENTRIC requires two CIRCLE/ARC entities: " + constraint.constraint_id);
+                }
+                return;
+            }
+
+            throw new NotSupportedException(
+                "Unsupported fail-closed canonical constraint type: " + constraint.type + " id=" + constraint.constraint_id);
+        }
+
+        private static void ApplyConstraints(
+            dynamic model,
+            IDictionary<string, dynamic> entities,
+            IDictionary<string, EntitySpec> entitySpecs,
+            IEnumerable<ConstraintSpec> constraints)
+        {
+            dynamic activeSketch = model.GetActiveSketch2();
+            if (activeSketch == null)
+                throw new InvalidOperationException("No active sketch while applying canonical constraints.");
+            dynamic relationManager = activeSketch.RelationManager;
+            if (relationManager == null)
+                throw new InvalidOperationException("Active sketch did not expose RelationManager.");
+
+            foreach (var constraint in constraints)
+            {
+                ValidateConstraint(constraint, entitySpecs);
+                model.ClearSelection2(true);
+                try
+                {
+                    for (var index = 0; index < constraint.entity_ids.Count; index++)
+                    {
+                        dynamic entity = entities[constraint.entity_ids[index]];
+                        if (!entity.Select4(index > 0, null))
+                            throw new InvalidOperationException(
+                                "Failed to select entity for constraint " + constraint.constraint_id + ": " + constraint.entity_ids[index]);
+                    }
+
+                    var before = (int)relationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swAll);
+                    model.SketchAddConstraints(RelationId(constraint.type));
+                    model.EditRebuild3();
+                    var after = (int)relationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swAll);
+                    if (after <= before)
+                        throw new InvalidOperationException(
+                            "SOLIDWORKS did not create relation for constraint " + constraint.constraint_id);
+
+                    var overDefining = (int)relationManager.GetRelationsCount(
+                        (int)swSketchRelationFilterType_e.swOverDefining);
+                    if (overDefining > 0)
+                        throw new InvalidOperationException(
+                            "Constraint caused an over-defining sketch: " + constraint.constraint_id);
+                }
+                finally
+                {
+                    model.ClearSelection2(true);
+                }
+            }
+        }
+
+        private static string RelationId(string constraintType)
+        {
+            switch (constraintType)
+            {
+                case "HORIZONTAL": return "sgHORIZONTAL2D";
+                case "VERTICAL": return "sgVERTICAL2D";
+                case "PARALLEL": return "sgPARALLEL";
+                case "PERPENDICULAR": return "sgPERPENDICULAR";
+                case "CONCENTRIC": return "sgCONCENTRIC";
+                case "EQUAL": return "sgSAMELENGTH";
+                default:
+                    throw new NotSupportedException("Unsupported relation mapping: " + constraintType);
             }
         }
 
