@@ -41,6 +41,11 @@ from .runtime_validation import (
     evaluate_solidworks_runtime_inputs_v1,
     execute_cad_runtime_validation_v1,
 )
+from .solidworks_capabilities import (
+    SOLIDWORKS_CAPABILITIES_SCHEMA,
+    build_solidworks_capabilities_v1,
+    is_solidworks_constraint_supported_v1,
+)
 from .solidworks_runtime_inputs import (
     SOLIDWORKS_RUNTIME_ADAPTER_NAME,
     SOLIDWORKS_RUNTIME_INPUTS_PRODUCER,
@@ -112,6 +117,7 @@ __all__ = [
     "RuntimeDiagnostic",
     "RuntimeEvidenceStatus",
     "SOLIDWORKS_2026_REVISION_MAJOR",
+    "SOLIDWORKS_CAPABILITIES_SCHEMA",
     "SOLIDWORKS_RUNTIME_ADAPTER_NAME",
     "SOLIDWORKS_RUNTIME_INPUTS_PRODUCER",
     "SOLIDWORKS_RUNTIME_INPUTS_SCHEMA",
@@ -132,11 +138,13 @@ __all__ = [
     "build_runtime_evidence",
     "build_runtime_receipt_v1",
     "build_solidworks_agent_request",
+    "build_solidworks_capabilities_v1",
     "build_solidworks_runtime_evidence_from_inputs_v1",
     "canonical_json_bytes",
     "evaluate_solidworks_runtime_inputs_v1",
     "execute_cad_runtime_validation_v1",
     "execute_cad_transfer_v1",
+    "is_solidworks_constraint_supported_v1",
     "map_sketch_package_v1",
     "parse_host_readiness_report",
     "parse_runtime_diagnostic",
