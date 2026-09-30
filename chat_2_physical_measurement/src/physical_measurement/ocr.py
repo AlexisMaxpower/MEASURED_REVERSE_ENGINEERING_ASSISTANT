@@ -27,6 +27,16 @@ class OcrReadStatus(StrEnum):
     UNIT_MISMATCH = "UNIT_MISMATCH"
 
 
+def _validate_roi_bbox(bbox: tuple[float, float, float, float]) -> None:
+    if len(bbox) != 4:
+        raise ValueError("roi_bbox_px must contain x, y, width, height")
+    x, y, width, height = bbox
+    if any(not isfinite(float(value)) for value in bbox):
+        raise ValueError("roi_bbox_px values must be finite")
+    if x < 0 or y < 0 or width <= 0 or height <= 0:
+        raise ValueError("roi_bbox_px must have non-negative origin and positive size")
+
+
 @dataclass(frozen=True, slots=True)
 class OcrObservation:
     raw_text: str
@@ -35,6 +45,10 @@ class OcrObservation:
     evidence_frame_id: str
     confidence: float | None = None
     provider_name: str | None = None
+    roi_id: str | None = None
+    roi_bbox_px: tuple[float, float, float, float] | None = None
+    roi_confidence: float | None = None
+    roi_provider_name: str | None = None
 
     def __post_init__(self) -> None:
         for field_name, value in (
@@ -51,6 +65,27 @@ class OcrObservation:
         if self.provider_name is not None and not self.provider_name.strip():
             raise ValueError("provider_name must be non-empty when supplied")
 
+        roi_metadata_present = any(
+            value is not None
+            for value in (
+                self.roi_id,
+                self.roi_bbox_px,
+                self.roi_confidence,
+                self.roi_provider_name,
+            )
+        )
+        if roi_metadata_present:
+            if self.roi_id is None or not self.roi_id.strip():
+                raise ValueError("roi_id is required when ROI metadata is supplied")
+            if self.roi_bbox_px is None:
+                raise ValueError("roi_bbox_px is required when ROI metadata is supplied")
+            _validate_roi_bbox(self.roi_bbox_px)
+            if self.roi_confidence is not None:
+                if not isfinite(self.roi_confidence) or not 0 <= self.roi_confidence <= 1:
+                    raise ValueError("ROI confidence must be within [0, 1]")
+            if self.roi_provider_name is not None and not self.roi_provider_name.strip():
+                raise ValueError("roi_provider_name must be non-empty when supplied")
+
 
 @dataclass(frozen=True, slots=True)
 class OcrMeasurementProposal:
@@ -63,6 +98,10 @@ class OcrMeasurementProposal:
     evidence_frame_id: str
     confidence: float | None
     provider_name: str | None
+    roi_id: str | None = None
+    roi_bbox_px: tuple[float, float, float, float] | None = None
+    roi_confidence: float | None = None
+    roi_provider_name: str | None = None
     source: ProvenanceSource = ProvenanceSource.OCR_MEASURED
 
 
@@ -161,6 +200,10 @@ class OcrMeasurementReader:
                 evidence_frame_id=observation.evidence_frame_id,
                 confidence=observation.confidence,
                 provider_name=observation.provider_name,
+                roi_id=observation.roi_id,
+                roi_bbox_px=observation.roi_bbox_px,
+                roi_confidence=observation.roi_confidence,
+                roi_provider_name=observation.roi_provider_name,
             ),
         )
 
