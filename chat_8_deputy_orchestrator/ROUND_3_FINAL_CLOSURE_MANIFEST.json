@@ -63,5 +63,46 @@
     "real_solidworks_2026_host": "UNVERIFIED",
     "production_csharp_interop_build": "UNVERIFIED",
     "native_sldprt_generation_readback": "UNVERIFIED"
+  },
+  "next_round_input": {
+    "status": "READY_FOR_CHAT6",
+    "document": "chat_8_deputy_orchestrator/ROUND_3_NEXT_ROUND_INPUT.md",
+    "observed_main_sha": "bffc1dec2fe63c12b69a50c4bf348ef7df4cf662",
+    "central_orchestration_directive_observed": "OD-2026-09-29-003",
+    "next_directive_found_on_main": false,
+    "pass_4_plan_found_on_main": false,
+    "worker_backlog_observed": {
+      "chat_1": {
+        "branch": "chat-1/pass-4",
+        "head": "beed09508c8cba294b1e78d7b6b7f3226f72d734",
+        "current_pass_handoff_proven": false
+      },
+      "chat_2": {
+        "branch": "chat-2/pass-6",
+        "head": "539d58567046fd29ccf2d42b629227ffe8da6546",
+        "current_pass_handoff_proven": true,
+        "requires_current_main_reconciliation": true
+      },
+      "chat_3": {
+        "branch": "chat-3/pass-8",
+        "head": "d786e1d49b5c8f2837a3ce936f7f1c0d93336d49",
+        "current_pass_handoff_proven": true,
+        "known_shared_baseline_drift": true
+      },
+      "chat_4": {
+        "branch": "chat-4/pass-7",
+        "head": "d9633e3b8e95158d359e502e9797d4876384cd09",
+        "current_pass_handoff_proven": false,
+        "real_host": "UNVERIFIED"
+      },
+      "chat_5": {
+        "branch": "chat-5/pass-8",
+        "head": "82e2203aaeb69ee1fe9f89fd42d0aea451b8690f",
+        "current_pass_handoff_proven": true,
+        "requires_current_main_reconciliation": true
+      }
+    },
+    "chat8_accepts_pass4_plus_workers": false,
+    "next_central_round_designed": false
   }
 }
