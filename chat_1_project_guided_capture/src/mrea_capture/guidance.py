@@ -43,6 +43,7 @@ class GuidedCaptureBlockerCode(StrEnum):
     QUALITY_WARNING_REVIEW_REQUIRED = "QUALITY_WARNING_REVIEW_REQUIRED"
     MEASUREMENT_FRAME_MISSING = "MEASUREMENT_FRAME_MISSING"
     VIEW_NOT_ACCEPTED = "VIEW_NOT_ACCEPTED"
+    VIEW_REOPENED_RECAPTURE_REQUIRED = "VIEW_REOPENED_RECAPTURE_REQUIRED"
 
 
 class GuidedCapturePolicy(StrictModel):
@@ -136,6 +137,7 @@ class GuidedCaptureReadinessService:
 
         action, blockers, ready = self._next_action(
             accepted=progress.status is CaptureViewStatus.ACCEPTED,
+            recapture_required=progress.recapture_required,
             clean_present=clean is not None,
             calibration_present=calibration is not None,
             quality=quality,
@@ -160,6 +162,7 @@ class GuidedCaptureReadinessService:
         self,
         *,
         accepted: bool,
+        recapture_required: bool,
         clean_present: bool,
         calibration_present: bool,
         quality: CaptureQualityResult | None,
@@ -167,6 +170,13 @@ class GuidedCaptureReadinessService:
     ) -> tuple[GuidedCaptureAction, list[GuidedCaptureBlockerCode], bool]:
         if accepted:
             return GuidedCaptureAction.COMPLETE, [], True
+
+        if recapture_required:
+            return (
+                GuidedCaptureAction.RECAPTURE_CLEAN_REFERENCE,
+                [GuidedCaptureBlockerCode.VIEW_REOPENED_RECAPTURE_REQUIRED],
+                False,
+            )
 
         if not clean_present:
             return (
