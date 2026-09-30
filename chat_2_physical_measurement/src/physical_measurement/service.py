@@ -30,12 +30,7 @@ _CANDIDATE_SOURCES = {
 
 
 class MeasurementSessionService:
-    """Application service for physical-measurement candidates and verification.
-
-    Manual, voice, OCR and device-reported values can enter the session as
-    candidates. None of them becomes verified without the explicit confirmation
-    transition exposed by :meth:`confirm_measurement`.
-    """
+    """Application service for physical-measurement candidates and verification."""
 
     def __init__(
         self,
@@ -91,7 +86,8 @@ class MeasurementSessionService:
         source: ProvenanceSource,
         view_id: str,
         anchor_a: FeatureAnchor,
-        anchor_b: FeatureAnchor,
+        anchor_b: FeatureAnchor | None = None,
+        anchor_c: FeatureAnchor | None = None,
         evidence_frame_id: str | None = None,
         uncertainty: Decimal | int | float | str | None = None,
         uncertainty_mm: Decimal | int | float | str | None = None,
@@ -106,11 +102,7 @@ class MeasurementSessionService:
             measurement_type=measurement_type,
             value=decimal_value(value),
             unit=self._type_registry.unit_for(measurement_type),
-            uncertainty=(
-                decimal_value(uncertainty, "uncertainty")
-                if uncertainty is not None
-                else None
-            ),
+            uncertainty=(decimal_value(uncertainty, "uncertainty") if uncertainty is not None else None),
             uncertainty_mm=(
                 decimal_value(uncertainty_mm, "uncertainty_mm")
                 if uncertainty_mm is not None
@@ -120,6 +112,7 @@ class MeasurementSessionService:
             view_id=view_id,
             anchor_a=anchor_a,
             anchor_b=anchor_b,
+            anchor_c=anchor_c,
             evidence_frame_id=evidence_frame_id,
             instrument_type=instrument_type,
             confirmed=False,
@@ -136,7 +129,8 @@ class MeasurementSessionService:
         value: Decimal | int | float | str,
         view_id: str,
         anchor_a: FeatureAnchor,
-        anchor_b: FeatureAnchor,
+        anchor_b: FeatureAnchor | None = None,
+        anchor_c: FeatureAnchor | None = None,
         evidence_frame_id: str | None = None,
         uncertainty: Decimal | int | float | str | None = None,
         uncertainty_mm: Decimal | int | float | str | None = None,
@@ -150,6 +144,7 @@ class MeasurementSessionService:
             view_id=view_id,
             anchor_a=anchor_a,
             anchor_b=anchor_b,
+            anchor_c=anchor_c,
             evidence_frame_id=evidence_frame_id,
             uncertainty=uncertainty,
             uncertainty_mm=uncertainty_mm,
@@ -165,7 +160,8 @@ class MeasurementSessionService:
         source: ProvenanceSource,
         view_id: str,
         anchor_a: FeatureAnchor,
-        anchor_b: FeatureAnchor,
+        anchor_b: FeatureAnchor | None = None,
+        anchor_c: FeatureAnchor | None = None,
         evidence_frame_id: str | None = None,
         uncertainty: Decimal | int | float | str | None = None,
         uncertainty_mm: Decimal | int | float | str | None = None,
@@ -185,6 +181,7 @@ class MeasurementSessionService:
             view_id=view_id,
             anchor_a=anchor_a,
             anchor_b=anchor_b,
+            anchor_c=anchor_c,
             evidence_frame_id=evidence_frame_id,
             uncertainty=uncertainty,
             uncertainty_mm=uncertainty_mm,
@@ -200,7 +197,6 @@ class MeasurementSessionService:
     ) -> PhysicalMeasurement:
         if not explicit_user_confirmation:
             raise ValueError("verification requires explicit user confirmation")
-
         session = self._repository.get(session_id)
         measurement = session.get(measurement_id)
         if measurement.is_verified:
@@ -216,8 +212,6 @@ class MeasurementSessionService:
         measurement_id: str,
         explicit_user_confirmation: bool,
     ) -> PhysicalMeasurement:
-        """Backward-compatible Phase A confirmation entrypoint."""
-
         return self.confirm_measurement(
             session_id=session_id,
             measurement_id=measurement_id,
