@@ -197,3 +197,11 @@ Added an explicit reopen/revision gate on top of immutable recapture lineage.
 - Guided Capture returns `RECAPTURE_CLEAN_REFERENCE` / `VIEW_REOPENED_RECAPTURE_REQUIRED` until recapture occurs.
 
 Local schema-independent regression including quality: `33 passed`.
+
+## Isolated Pass 4 extension — capture attempt history projection
+
+Added `history.py` with a deterministic read-only projection of immutable per-view capture attempts. The projection groups calibration, quality, rectification, measurement and revision evidence by the exact clean-reference source frame and marks the active attempt explicitly. It preserves persisted view order and does not mutate session state.
+
+`CaptureAttemptHistoryService` fails closed when a view history has multiple roots, missing predecessors, disconnected components, branches or cycles, rather than guessing lineage order.
+
+Schema-independent regression after this extension: `37 passed`. A wider run reached 39 passes; its only 2 failures were missing repository-root canonical schema file loads in the patch workspace.
