@@ -1,11 +1,11 @@
 # Chat 5 — Lifecycle & Engineering Knowledge
 
-Статус: **Pass 7 deterministic engineering knowledge queries implemented**  
+Статус: **Pass 8 snapshot-bound engineering knowledge pagination implemented**  
 Проект: **MREA — Measured Reverse Engineering Assistant**  
 Источник истины: **MREA SSOT v0.1 + orchestration addendum v0.2**  
-Запуск Pass 7: **direct user instruction; newer Chat-5-specific directive was absent on `main`**  
-Рабочая ветка: `chat-5/pass-7`  
-База ветки: `68791080a5440c6426ef28329302c99a323344b0` (frozen Pass 6 handoff)
+Запуск Pass 8: **direct user instruction; newer Chat-5-specific directive was absent on `main`**  
+Рабочая ветка: `chat-5/pass-8`  
+База ветки: `d9bed012eb8bbcea338522847a46572bb5415026` (frozen Pass 7 handoff)
 
 ## Назначение области
 
@@ -22,6 +22,7 @@ Revision
 → Removed
 → Superseded by replacement
 → deterministic engineering knowledge queries
+→ bounded snapshot-consistent pages
 ```
 
 ## Реализовано
@@ -47,85 +48,71 @@ Revision
 
 ### Pass 7
 
-Added `SQLiteEngineeringKnowledgeRepository`, exposed as:
+- deterministic revision lineage;
+- factual revision outcome summaries;
+- equipment/position history;
+- exact recurring failure-pattern groups;
+- explicit replacement chains;
+- fail-closed graph integrity checks.
+
+### Pass 8
+
+Added opaque snapshot-bound knowledge pagination:
 
 ```python
-with SQLiteLifecycleReadOnlySession("lifecycle.db") as session:
-    session.knowledge.revision_lineage("PART-0042")
-    session.knowledge.revision_outcomes("PART-0042")
-    session.knowledge.equipment_position_history(
-        equipment_id="RACK-01",
-        position="LEFT",
+page = session.knowledge.revision_outcomes_page(
+    "PART-0042",
+    limit=100,
+)
+
+while page.next_cursor is not None:
+    page = session.knowledge.revision_outcomes_page(
+        "PART-0042",
+        limit=100,
+        cursor=page.next_cursor,
     )
-    session.knowledge.failure_patterns(part_id="PART-0042")
-    session.knowledge.replacement_chain("PI-001")
 ```
 
-Queries are deterministic and factual only.
-
-They return:
-
-- revision ancestry and lineage depth;
-- per-revision manufacturing/instance/activation/failure/removal/supersession counts;
-- complete equipment/position history;
-- recurring exact failure-pattern groups;
-- explicit physical replacement chains.
-
-They do **not**:
-
-- infer an unrecorded root cause;
-- rank revisions as better/worse;
-- recommend design changes;
-- convert estimated cause into confirmed cause;
-- use AI-generated conclusions.
-
-## Integrity behavior
-
-The knowledge layer fails closed when structured facts are inconsistent, including:
-
-- cyclic revision ancestry;
-- missing revision parent;
-- cyclic replacement chain;
-- replacement link to a missing physical instance;
-- physical instance without a valid state.
-
-No new SQLite migration was needed in Pass 7 because Pass 5 already normalized all required lifecycle facts.
-
-## Read-only guarantee
-
-Engineering knowledge is exposed through the same Pass-6 `SQLiteLifecycleReadOnlySession`:
+Cursor guarantees:
 
 ```text
-SQLite URI mode=ro
-PRAGMA query_only = ON
-snapshot_version == read_model_version
+format = mrea.knowledge-cursor.v1
+query/filter fingerprint must match
+cursor snapshot_version must equal current read-only snapshot
+checksum must match
+limit must be 1..500
 ```
 
-Knowledge queries cannot mutate or repair the lifecycle database.
+Paginated surfaces:
 
-## Shared-contract boundary
+- `revision_outcomes_page()`;
+- `equipment_position_history_page()`;
+- `failure_patterns_page()`.
 
-No shared MREA contract was changed.
+Equipment history pagination also supports exact filters for:
 
-Canonical `mrea.lifecycle-event.v1` remains limited to:
+- position;
+- event type;
+- revision ID;
+- physical instance ID.
 
-- `REVISION_CREATED`;
-- `MANUFACTURED`;
-- `INSTALLED`;
-- `TESTED`;
-- `FAILED`.
+`revision_lineage()` and `replacement_chain()` deliberately remain whole-graph/whole-chain integrity operations instead of being split into unsafe partial traversals.
 
-Knowledge summaries are internal Chat 5 projections over committed facts.
+## Backward compatibility
+
+All Pass-7 tuple-returning knowledge queries remain unchanged.
+
+No SQLite migration or shared MREA contract change was needed.
 
 ## Verification
 
-GitHub-hosted Chat 5 CI on implementation SHA `adca8d3dd60b2c727689c9969d4d0ba0d8178384`:
+Independent GitHub-hosted Chat 5 CI on implementation SHA `1a6803bff00eeaa43ffb18fb18c86695c59403d2`:
 
 ```text
-35 passed in 1.32s
+40 passed in 1.51s
 ```
 
-Final handoff is published only after required contracts and `Integration / Chat 4 -> Chat 5` gates are green on the final pre-handoff state.
+Required canonical contract and `Integration / Chat 4 -> Chat 5` gates are rechecked on the final documented pre-handoff state before branch freeze.
 
 ## Documentation
 
@@ -134,15 +121,16 @@ Final handoff is published only after required contracts and `Integration / Chat
 - `docs/PASS_5_RELATIONAL_READ_MODEL.md`
 - `docs/PASS_6_BACKUP_RESTORE_READ_ONLY.md`
 - `docs/PASS_7_ENGINEERING_KNOWLEDGE_QUERIES.md`
+- `docs/PASS_8_KNOWLEDGE_PAGINATION.md`
 - `docs/IMPLEMENTATION_STATE.md`
 - `ORCHESTRATOR_HANDOFF.md`
 
 ## Still intentionally out of scope
 
+- REST/API transport;
+- cryptographically authenticated cursors across an external trust boundary;
+- keyset pagination for very large datasets;
+- materialized analytical aggregates;
 - AI / semantic interpretation;
-- design recommendations;
-- confidence scoring for inferred conclusions;
-- REST/API;
-- large-history pagination/materialized analytical aggregates;
 - field-device synchronization;
 - shared contract expansion for physical-only events.
