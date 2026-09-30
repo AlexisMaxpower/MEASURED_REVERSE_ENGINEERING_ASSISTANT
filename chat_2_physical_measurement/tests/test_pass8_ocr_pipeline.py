@@ -45,6 +45,7 @@ def _service() -> MeasurementSessionService:
 def _controller(
     *,
     measurement_type: MeasurementType = MeasurementType.LINEAR_EXTERNAL,
+    evidence_frame_id: str | None = "FRAME-OCR-1",
 ) -> tuple[MeasurementSessionService, str, HandsFreeMeasurementController]:
     service = _service()
     session = service.create_session("P-PASS8")
@@ -68,7 +69,7 @@ def _controller(
             view_id="VIEW-FRONT",
             anchor_a=anchor_a,
             anchor_b=anchor_b,
-            evidence_frame_id="FRAME-OCR-1",
+            evidence_frame_id=evidence_frame_id,
             instrument_type="DIGITAL_CALIPER_DISPLAY",
         ),
     )
@@ -167,12 +168,30 @@ def test_reader_rejects_explicit_unit_mismatch() -> None:
     assert result.proposal is None
 
 
+def test_pipeline_derives_expected_unit_from_measurement_type() -> None:
+    _, _, linear_controller = _controller(measurement_type=MeasurementType.LINEAR_EXTERNAL)
+    _, _, angle_controller = _controller(measurement_type=MeasurementType.ANGLE)
+
+    assert OcrMeasurementPipeline(
+        reader=OcrMeasurementReader(), controller=linear_controller
+    ).expected_unit == "mm"
+    assert OcrMeasurementPipeline(
+        reader=OcrMeasurementReader(), controller=angle_controller
+    ).expected_unit == "deg"
+
+
+def test_pipeline_requires_evidence_frame_context() -> None:
+    _, _, controller = _controller(evidence_frame_id=None)
+
+    with pytest.raises(ValueError, match="requires evidence_frame_id"):
+        OcrMeasurementPipeline(reader=OcrMeasurementReader(), controller=controller)
+
+
 def test_pipeline_fails_closed_on_view_reference_or_evidence_mismatch() -> None:
     _, _, controller = _controller()
     pipeline = OcrMeasurementPipeline(
         reader=OcrMeasurementReader(),
         controller=controller,
-        expected_unit="mm",
     )
 
     with pytest.raises(ValueError, match="view_id"):
@@ -188,7 +207,6 @@ def test_non_value_ocr_result_creates_no_measurement_candidate() -> None:
     pipeline = OcrMeasurementPipeline(
         reader=OcrMeasurementReader(),
         controller=controller,
-        expected_unit="mm",
     )
 
     result = pipeline.process(_observation("42.18 43.00"))
@@ -204,7 +222,6 @@ def test_confidence_one_still_creates_only_unverified_ocr_candidate() -> None:
     pipeline = OcrMeasurementPipeline(
         reader=OcrMeasurementReader(),
         controller=controller,
-        expected_unit="mm",
     )
 
     result = pipeline.process(_observation("80.20 mm", confidence=1.0))
@@ -214,6 +231,7 @@ def test_confidence_one_still_creates_only_unverified_ocr_candidate() -> None:
     measurement = result.transition.measurement
     assert measurement is not None
     assert measurement.value == Decimal("80.20")
+    assert measurement.unit == "mm"
     assert measurement.source is ProvenanceSource.OCR_MEASURED
     assert measurement.evidence_frame_id == "FRAME-OCR-1"
     assert measurement.is_verified is False
@@ -226,7 +244,6 @@ def test_ocr_candidate_requires_same_explicit_user_confirmation_as_other_sources
     pipeline = OcrMeasurementPipeline(
         reader=OcrMeasurementReader(),
         controller=controller,
-        expected_unit="mm",
     )
 
     pending = pipeline.process(_observation("80,20 мм", confidence=0.99))
@@ -259,11 +276,11 @@ def test_angle_pipeline_uses_deg_candidate_unit() -> None:
     pipeline = OcrMeasurementPipeline(
         reader=OcrMeasurementReader(),
         controller=controller,
-        expected_unit="deg",
     )
 
     result = pipeline.process(_observation("45 град"))
 
+    assert pipeline.expected_unit == "deg"
     assert result.transition is not None
     measurement = result.transition.measurement
     assert measurement is not None
