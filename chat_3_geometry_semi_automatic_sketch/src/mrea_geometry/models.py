@@ -5,12 +5,15 @@ from typing import Literal, Union
 
 PrimitiveKind = Literal["POINT", "LINE", "CIRCLE", "ARC"]
 ConstraintKind = Literal[
+    "COINCIDENT",
     "HORIZONTAL",
     "VERTICAL",
     "PARALLEL",
     "PERPENDICULAR",
+    "TANGENT",
     "CONCENTRIC",
     "EQUAL",
+    "SYMMETRIC",
 ]
 
 

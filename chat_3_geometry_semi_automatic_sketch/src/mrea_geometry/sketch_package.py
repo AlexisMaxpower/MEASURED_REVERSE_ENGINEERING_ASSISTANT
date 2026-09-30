@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from math import atan2, pi
 
+from .constraints import ConstraintResolution
 from .contracts import CanonicalGeometryInput
 from .models import Arc, Circle, DimensionBinding, GeometryDraft, Line, PointEntity
 
@@ -15,6 +16,7 @@ class SketchPackageBuilder:
         context: CanonicalGeometryInput,
         *,
         sketch_package_id: str,
+        constraint_resolution: ConstraintResolution | None = None,
     ) -> dict:
         entities = self._ordered_entities(draft)
         dimension_records = [
@@ -48,6 +50,13 @@ class SketchPackageBuilder:
             for item in sorted(draft.conflicts, key=lambda value: value.conflict_id)
         )
 
+        constraints = []
+        if constraint_resolution is not None:
+            constraints = [item.to_canonical() for item in constraint_resolution.constraints]
+            unresolved.extend(item.to_canonical() for item in constraint_resolution.issues)
+
+        unresolved.sort(key=lambda item: item["unresolved_id"])
+
         return {
             "schema_version": "mrea.sketch-package.v1",
             "sketch_package_id": sketch_package_id,
@@ -56,9 +65,7 @@ class SketchPackageBuilder:
             "view_id": context.view_id,
             "coordinate_system": context.coordinate_system,
             "entities": entities,
-            # Phase 2 publishes no purely inferred constraints. They remain internal
-            # candidates until a later acceptance rule promotes them.
-            "constraints": [],
+            "constraints": constraints,
             "dimensions": dimensions,
             "unresolved": unresolved,
             "source_view_ids": list(context.source_view_ids),

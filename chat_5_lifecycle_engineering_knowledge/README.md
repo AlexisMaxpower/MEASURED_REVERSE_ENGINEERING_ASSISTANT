@@ -1,14 +1,15 @@
 # Chat 5 — Lifecycle & Engineering Knowledge
 
-Статус: **Pass 3 physical part instance lifecycle implemented**  
+Статус: **Pass 8 snapshot-bound engineering knowledge pagination implemented**  
 Проект: **MREA — Measured Reverse Engineering Assistant**  
 Источник истины: **MREA SSOT v0.1 + orchestration addendum v0.2**  
-Текущая директива: **OD-2026-09-29-003**  
-Рабочая ветка: `chat-5/pass-3`
+Запуск Pass 8: **direct user instruction; newer Chat-5-specific directive was absent on `main`**  
+Рабочая ветка: `chat-5/pass-8`  
+База ветки: `d9bed012eb8bbcea338522847a46572bb5415026` (frozen Pass 7 handoff)
 
 ## Назначение области
 
-Chat 5 хранит как инженерную историю ревизии, так и фактическую жизнь конкретно изготовленного экземпляра:
+Chat 5 ведёт инженерную историю ревизии и фактическую жизнь конкретного изготовленного экземпляра:
 
 ```text
 Revision
@@ -20,101 +21,116 @@ Revision
 → Failed
 → Removed
 → Superseded by replacement
+→ deterministic engineering knowledge queries
+→ bounded snapshot-consistent pages
 ```
 
 ## Реализовано
 
-### Pass 1
+### Pass 1–3
 
 - Revision / Manufacturing / Installation / Test / Failure domain;
-- revision-level timeline, registry and projections;
-- deterministic knowledge queries;
-- canonical `LifecycleEvent v1` outbound adapter.
+- canonical LifecycleEvent v1 adapter;
+- CAD verification → manufacturing gate;
+- PhysicalPartInstance identity/state machine;
+- exact installation/test/failure evidence linkage;
+- removal/replacement/supersession.
 
-### Pass 2
+### Pass 4–6
 
-- canonical `CADPackage + CADVerificationReport` → lifecycle Revision;
-- CAD traceability retention;
-- `VERIFIED` manufacturing eligibility gate;
-- failed/unverified CAD transfer cannot enter manufacturing.
+- LifecycleRepository + LifecycleUnitOfWork;
+- SQLite durable snapshot and atomic rollback;
+- stale-writer protection;
+- normalized relational schema and migration/backfill;
+- SQL-native lifecycle queries;
+- verified backup/restore;
+- read-only SQLite session.
 
-### Pass 3
+### Pass 7
 
-Добавлен отдельный internal physical-instance layer:
+- deterministic revision lineage;
+- factual revision outcome summaries;
+- equipment/position history;
+- exact recurring failure-pattern groups;
+- explicit replacement chains;
+- fail-closed graph integrity checks.
 
-- `PhysicalPartInstance`;
-- `PhysicalPartState`;
-- `PhysicalLifecycleEvent`;
-- `PhysicalPartLifecycleService`;
-- `PhysicalPartTimeline`;
-- `PhysicalPartStateProjection`;
-- `PhysicalEquipmentRegistry`;
-- exact instance linkage on Installation/Test/Failure records;
-- explicit `PASSED` test gate before activation;
-- removal and replacement/supersession traceability;
-- occupied equipment/position protection;
-- monotonic instance chronology;
-- fail-closed invalid-transition rejection.
+### Pass 8
 
-## Physical state machine
+Added opaque snapshot-bound knowledge pagination:
 
-Normal path:
+```python
+page = session.knowledge.revision_outcomes_page(
+    "PART-0042",
+    limit=100,
+)
 
-```text
-MANUFACTURED
-→ INSTALLED
-→ TESTED
-→ ACTIVE
+while page.next_cursor is not None:
+    page = session.knowledge.revision_outcomes_page(
+        "PART-0042",
+        limit=100,
+        cursor=page.next_cursor,
+    )
 ```
 
-Service exit paths:
+Cursor guarantees:
 
 ```text
-INSTALLED / TESTED / ACTIVE
-→ FAILED
-→ REMOVED
-→ SUPERSEDED
-
-INSTALLED / TESTED / ACTIVE
-→ REMOVED
-→ SUPERSEDED
+format = mrea.knowledge-cursor.v1
+query/filter fingerprint must match
+cursor snapshot_version must equal current read-only snapshot
+checksum must match
+limit must be 1..500
 ```
 
-`SUPERSEDED` requires a different physical instance of the same part to be installed/in service at the same equipment/position.
+Paginated surfaces:
 
-## Shared-contract boundary
+- `revision_outcomes_page()`;
+- `equipment_position_history_page()`;
+- `failure_patterns_page()`.
 
-Physical-instance events are intentionally internal in Pass 3.
+Equipment history pagination also supports exact filters for:
 
-Canonical `mrea.lifecycle-event.v1` remains unchanged and still exports only:
+- position;
+- event type;
+- revision ID;
+- physical instance ID.
 
-- `REVISION_CREATED`;
-- `MANUFACTURED`;
-- `INSTALLED`;
-- `TESTED`;
-- `FAILED`.
+`revision_lineage()` and `replacement_chain()` deliberately remain whole-graph/whole-chain integrity operations instead of being split into unsafe partial traversals.
 
-`ACTIVE`, `REMOVED` and `SUPERSEDED` do not leak into the shared v1 contract.
+## Backward compatibility
 
-## Verification target
+All Pass-7 tuple-returning knowledge queries remain unchanged.
 
-Pass 3 must keep green:
+No SQLite migration or shared MREA contract change was needed.
 
-- `Chat 5 / Lifecycle`;
-- `Integration / Chat 4 -> Chat 5`;
-- canonical contract checks;
-- new deterministic physical lifecycle tests.
+## Verification
+
+Independent GitHub-hosted Chat 5 CI on implementation SHA `1a6803bff00eeaa43ffb18fb18c86695c59403d2`:
+
+```text
+40 passed in 1.51s
+```
+
+Required canonical contract and `Integration / Chat 4 -> Chat 5` gates are rechecked on the final documented pre-handoff state before branch freeze.
 
 ## Documentation
 
 - `docs/PASS_3_PHYSICAL_PART_INSTANCE_LIFECYCLE.md`
+- `docs/PASS_4_PERSISTENCE_UOW.md`
+- `docs/PASS_5_RELATIONAL_READ_MODEL.md`
+- `docs/PASS_6_BACKUP_RESTORE_READ_ONLY.md`
+- `docs/PASS_7_ENGINEERING_KNOWLEDGE_QUERIES.md`
+- `docs/PASS_8_KNOWLEDGE_PAGINATION.md`
 - `docs/IMPLEMENTATION_STATE.md`
 - `ORCHESTRATOR_HANDOFF.md`
 
 ## Still intentionally out of scope
 
-- AI / semantic failure analysis;
-- production persistence;
-- REST/API;
-- concurrency/versioning;
-- shared contract expansion for physical events.
+- REST/API transport;
+- cryptographically authenticated cursors across an external trust boundary;
+- keyset pagination for very large datasets;
+- materialized analytical aggregates;
+- AI / semantic interpretation;
+- field-device synchronization;
+- shared contract expansion for physical-only events.

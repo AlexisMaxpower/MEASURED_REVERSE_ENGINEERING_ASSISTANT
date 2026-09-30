@@ -5,10 +5,10 @@ from typing import Protocol
 from uuid import UUID
 
 from .artifacts import ArtifactStore
+from .lineage import active_clean_reference, calibration_for_active_reference
 from .models import (
     CalibrationResult,
     CaptureViewType,
-    FrameKind,
     MeasurementMatProfile,
     RectifiedReferenceRecord,
 )
@@ -130,26 +130,24 @@ class RectificationService:
         pixels_per_mm: float = 10.0,
     ) -> RectifiedReferenceRecord:
         session = self._repository.get(session_id)
-        if any(item.view is view for item in session.rectified_references):
-            raise RectificationError(f"rectified reference already exists for view {view.value}")
-
-        clean_frames = [
-            frame
-            for frame in session.frames
-            if frame.view is view and frame.kind is FrameKind.CLEAN_REFERENCE
-        ]
-        if len(clean_frames) != 1:
+        clean = active_clean_reference(session, view)
+        if clean is None:
             raise RectificationError(
-                f"view {view.value} requires exactly one clean reference frame"
+                f"view {view.value} requires an active clean reference frame"
             )
-        clean = clean_frames[0]
-
-        calibrations = [item for item in session.calibrations if item.view is view]
-        if len(calibrations) != 1:
+        if any(
+            item.source_frame_id == clean.frame_id
+            for item in session.rectified_references
+        ):
             raise RectificationError(
-                f"view {view.value} requires exactly one calibration result"
+                f"rectified reference already exists for active clean reference {clean.frame_id}"
             )
-        calibration = calibrations[0]
+
+        calibration = calibration_for_active_reference(session, view)
+        if calibration is None:
+            raise RectificationError(
+                f"view {view.value} requires calibration for the active clean reference"
+            )
         if calibration.source_frame_id != clean.frame_id:
             raise RectificationError("calibration does not reference the clean source frame")
         if calibration.mat_id != profile.mat_id:

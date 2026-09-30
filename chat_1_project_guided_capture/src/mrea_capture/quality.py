@@ -6,6 +6,7 @@ from uuid import NAMESPACE_URL, UUID, uuid5
 from pydantic import Field, model_validator
 
 from .artifacts import ArtifactStore
+from .lineage import active_clean_reference, calibration_for_active_reference
 from .models import (
     CalibrationResult,
     CaptureQualityFinding,
@@ -13,7 +14,6 @@ from .models import (
     CaptureQualityResult,
     CaptureQualityVerdict,
     CaptureViewType,
-    FrameKind,
     MeasurementMatProfile,
     QualityReasonCode,
     QualitySeverity,
@@ -240,11 +240,12 @@ class CaptureQualityService:
         mat_profile: MeasurementMatProfile | None = None,
     ) -> CaptureQualityResult:
         session = self._repository.get(session_id)
-        clean = [frame for frame in session.frames if frame.view is view and frame.kind is FrameKind.CLEAN_REFERENCE]
-        if len(clean) != 1:
-            raise CaptureQualityError(f"view {view.value} requires exactly one clean reference frame")
-        source = clean[0]
-        calibration = next((item for item in session.calibrations if item.view is view), None)
+        source = active_clean_reference(session, view)
+        if source is None:
+            raise CaptureQualityError(
+                f"view {view.value} requires an active clean reference frame"
+            )
+        calibration = calibration_for_active_reference(session, view)
         existing = next((item for item in session.quality_analyses if item.source_frame_id == source.frame_id), None)
         requested_calibration_id = calibration.calibration_id if calibration else None
         requested_mat_id = mat_profile.mat_id if mat_profile else calibration.mat_id if calibration else None

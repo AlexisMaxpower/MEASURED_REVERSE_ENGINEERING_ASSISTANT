@@ -95,6 +95,19 @@ def ok_response():
     }
 
 
+def angle_dimension(value=90.0, unit="deg", entity_ids=None):
+    return {
+        "dimension_id": "D-ANGLE",
+        "measurement_id": "M-ANGLE",
+        "type": "ANGLE",
+        "value": value,
+        "unit": unit,
+        "entity_ids": entity_ids or ["L-BOTTOM", "L-RIGHT"],
+        "verified": True,
+        "provenance": "MANUAL_MEASURED",
+    }
+
+
 class SolidWorksAgentBoundaryTests(unittest.TestCase):
     def setUp(self):
         self.config = SolidWorksAgentConfig(
@@ -114,6 +127,69 @@ class SolidWorksAgentBoundaryTests(unittest.TestCase):
         self.assertEqual(request["dimensions"][0]["measurement_id"], "M-WIDTH")
         self.assertEqual(request["dimensions"][0]["value"], 80.2)
         self.assertEqual(request["dimensions"][0]["unit"], "mm")
+
+    def test_point_and_arc_are_preserved_for_vendor_worker(self):
+        package = copy.deepcopy(GOLDEN)
+        package["entities"].extend(
+            [
+                {
+                    "entity_id": "P-DATUM",
+                    "type": "POINT",
+                    "point": {"x": 12.5, "y": 8.25},
+                    "provenance": "GEOMETRY_DERIVED",
+                    "confidence": 1.0,
+                },
+                {
+                    "entity_id": "A-EDGE",
+                    "type": "ARC",
+                    "center": {"x": 40.1, "y": 21.05},
+                    "radius": 10.0,
+                    "start_angle_deg": -45.0,
+                    "end_angle_deg": 135.0,
+                    "provenance": "GEOMETRY_DERIVED",
+                    "confidence": 1.0,
+                },
+            ]
+        )
+        request = build_solidworks_agent_request(self.mapped(package), self.config)
+        by_id = {item["entity_id"]: item for item in request["entities"]}
+        self.assertEqual(by_id["P-DATUM"]["point"], {"x": 12.5, "y": 8.25})
+        self.assertEqual(by_id["A-EDGE"]["center"], {"x": 40.1, "y": 21.05})
+        self.assertEqual(by_id["A-EDGE"]["radius"], 10.0)
+        self.assertEqual(by_id["A-EDGE"]["start_angle_deg"], -45.0)
+        self.assertEqual(by_id["A-EDGE"]["end_angle_deg"], 135.0)
+
+    def test_angle_dimension_between_two_lines_is_accepted_in_degrees(self):
+        package = copy.deepcopy(GOLDEN)
+        package["dimensions"].append(angle_dimension())
+        request = build_solidworks_agent_request(self.mapped(package), self.config)
+        by_id = {item["dimension_id"]: item for item in request["dimensions"]}
+        self.assertEqual(by_id["D-ANGLE"]["type"], "ANGLE")
+        self.assertEqual(by_id["D-ANGLE"]["unit"], "deg")
+        self.assertEqual(by_id["D-ANGLE"]["value"], 90.0)
+        self.assertEqual(by_id["D-ANGLE"]["entity_ids"], ["L-BOTTOM", "L-RIGHT"])
+
+    def test_angle_dimension_requires_deg(self):
+        package = copy.deepcopy(GOLDEN)
+        package["dimensions"].append(angle_dimension(unit="mm"))
+        with self.assertRaises(CadAdapterError):
+            build_solidworks_agent_request(self.mapped(package), self.config)
+
+    def test_angle_dimension_requires_two_lines(self):
+        package = copy.deepcopy(GOLDEN)
+        package["dimensions"].append(
+            angle_dimension(entity_ids=["L-BOTTOM", "C-HOLE-1"])
+        )
+        with self.assertRaises(CadAdapterError):
+            build_solidworks_agent_request(self.mapped(package), self.config)
+
+    def test_angle_dimension_rejects_zero_or_straight_angle(self):
+        for value in (0.0, 180.0):
+            with self.subTest(value=value):
+                package = copy.deepcopy(GOLDEN)
+                package["dimensions"].append(angle_dimension(value=value))
+                with self.assertRaises(CadAdapterError):
+                    build_solidworks_agent_request(self.mapped(package), self.config)
 
     def test_adapter_maps_agent_response_to_vendor_neutral_result(self):
         runner = FakeRunner(ok_response())
@@ -151,7 +227,7 @@ class SolidWorksAgentBoundaryTests(unittest.TestCase):
         with self.assertRaises(CadAdapterError):
             build_solidworks_agent_request(self.mapped(package), self.config)
 
-    def test_nonempty_constraints_fail_explicitly_in_pass2_slice(self):
+    def test_nonempty_constraints_fail_explicitly(self):
         package = copy.deepcopy(GOLDEN)
         package["constraints"] = [
             {
@@ -161,19 +237,6 @@ class SolidWorksAgentBoundaryTests(unittest.TestCase):
                 "status": "VERIFIED",
             }
         ]
-        with self.assertRaises(CadAdapterError):
-            build_solidworks_agent_request(self.mapped(package), self.config)
-
-    def test_unsupported_geometry_is_not_silently_dropped(self):
-        package = copy.deepcopy(GOLDEN)
-        package["entities"].append(
-            {
-                "entity_id": "P1",
-                "type": "POINT",
-                "point": {"x": 1.0, "y": 1.0},
-                "provenance": "GEOMETRY_DERIVED",
-            }
-        )
         with self.assertRaises(CadAdapterError):
             build_solidworks_agent_request(self.mapped(package), self.config)
 
