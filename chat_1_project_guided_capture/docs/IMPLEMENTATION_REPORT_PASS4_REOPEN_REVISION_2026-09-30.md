@@ -66,7 +66,7 @@ Added `tests/test_reopen.py` covering:
 Schema-independent regression including quality:
 
 ```text
-33 passed in 0.32s
+33 passed
 ```
 
 ## Ownership
