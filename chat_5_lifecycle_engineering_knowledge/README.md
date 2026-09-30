@@ -1,11 +1,11 @@
 # Chat 5 — Lifecycle & Engineering Knowledge
 
-Статус: **Pass 10 authenticated HTTP cursors implemented**  
+Статус: **Pass 10.1 keyset pagination implemented**  
 Проект: **MREA — Measured Reverse Engineering Assistant**  
 Источник истины: **MREA SSOT v0.1 + orchestration addendum v0.2**  
-Запуск Pass 10: **direct user instruction; newer Chat-5-specific directive was absent on `main`**  
-Рабочая ветка: `chat-5/pass-10`  
-База ветки: `07b9b768404436707575869e7188e0392a021ba5` (frozen Pass 9 handoff)
+Запуск Pass 10.1: **direct user instruction; central OD-004 currently selects Pass 8 for Round-4 review**  
+Рабочая ветка: `chat-5/pass-10.1`  
+База ветки: `8044451abd050f69556c9274aec1a83caefad408` (frozen Pass 10 handoff)
 
 ## Назначение области
 
@@ -21,6 +21,7 @@ Revision
 → snapshot-bound pagination
 → local/internal read-only HTTP transport
 → optional authenticated HTTP cursor boundary
+→ keyset continuation for large row histories
 ```
 
 ## Реализовано
@@ -51,66 +52,67 @@ Revision
 - recurring exact failure-pattern groups;
 - replacement chains;
 - fail-closed graph integrity checks;
-- opaque `mrea.knowledge-cursor.v1` pagination bound to query filters and committed snapshot version.
+- snapshot-bound knowledge pagination.
 
-### Pass 9
+### Pass 9–10
 
-Added dependency-free GET-only WSGI transport with:
+- dependency-free GET-only WSGI transport;
+- strict request validation and deterministic JSON;
+- optional HMAC-SHA256 cursor authentication;
+- key IDs and previous-key verification for rotation;
+- query/snapshot binding preserved inside authenticated HTTP cursor.
 
-- verified `SQLiteLifecycleReadOnlySession` per successful request;
-- strict route/query validation;
-- deterministic JSON;
-- stale read model → `409`;
-- unavailable/invalid database → `503`;
-- no writable endpoints.
+### Pass 10.1
 
-HTTP API schema:
-
-```text
-mrea.lifecycle-http.v1
-```
-
-### Pass 10
-
-Added optional HMAC-SHA256 authentication for pagination cursors crossing the HTTP boundary.
-
-Authenticated cursor format:
+New keyset cursor format:
 
 ```text
-mrea.http-cursor.v1
+mrea.knowledge-cursor.v2
 ```
 
-Configuration example:
+New traversals for high-cardinality row histories use ordered continuation keys instead of OFFSET:
 
-```python
-from mrea_lifecycle import build_read_only_lifecycle_http_app
+```text
+revision outcomes:
+(created_at, revision_id)
 
-app = build_read_only_lifecycle_http_app(
-    "lifecycle.db",
-    cursor_signing_key=secret_key,
-    cursor_key_id="2026-09-primary",
-)
+equipment history:
+(occurred_at, sequence, event_id)
 ```
 
 Guarantees:
 
-- minimum 32-byte binary signing key;
-- HMAC-SHA256;
-- constant-time MAC comparison;
-- key identifiers;
-- previous-key verification during rotation;
-- newly emitted cursors always use the active key;
-- tampered, malformed, unknown-key and wrong-key cursors fail closed;
-- underlying Pass-8 query/snapshot binding is preserved;
-- unsigned Pass-9 mode remains available when no signing key is configured.
+- `LIMIT` + key predicates on v2 continuation;
+- no OFFSET for migrated v2 queries;
+- deterministic tie-breaking;
+- query/filter fingerprint preserved;
+- committed snapshot binding preserved;
+- Pass-10 HMAC wrapper works unchanged around v2;
+- valid `mrea.knowledge-cursor.v1` cursors remain accepted for legacy traversal continuation.
 
-`GET /health` reports only cursor mode and active key ID, never key material.
+Runtime integration is additive through `SQLiteKeysetEngineeringKnowledgeRepository`; existing factual knowledge semantics are inherited rather than duplicated.
+
+`failure_patterns_page()` remains v1 offset pagination because it is a grouped aggregate query and requires a separate aggregate-keyset design.
+
+## Orchestration truth
+
+Current `main` directive is `OD-2026-09-30-004` and centrally selects **Pass 8** for Round-4 review. Pass 10.1 is a user-authorized worker continuation; it is **not** claimed as centrally accepted or merged to `main`.
 
 ## Verification
 
-Pass 10 adds `tests/test_http_cursor_auth.py` for primitive, HTTP integration, tampering, wrong-key handling, key rotation, query binding, snapshot binding and backward compatibility.
+GitHub-hosted implementation run on SHA:
 
-GitHub-hosted implementation and cross-slice gates are checked on the current Pass-10 branch before final handoff.
+```text
+e1265ad57bf602b0acd44ed029ed1b6e6ccd6666
+```
+
+Result:
+
+```text
+57 passed in 1.96s
+```
+
+Required canonical contract and `Integration / Chat 4 -> Chat 5` gates are rechecked on the documented pre-handoff state before final branch freeze.
 
 ## Documentation
 
@@ -122,19 +124,18 @@ GitHub-hosted implementation and cross-slice gates are checked on the current Pa
 - `docs/PASS_8_KNOWLEDGE_PAGINATION.md`
 - `docs/PASS_9_READ_ONLY_HTTP_API.md`
 - `docs/PASS_10_AUTHENTICATED_HTTP_CURSORS.md`
+- `docs/PASS_10_1_KEYSET_PAGINATION.md`
 - `docs/IMPLEMENTATION_STATE.md`
 - `ORCHESTRATOR_HANDOFF.md`
 
 ## Still intentionally out of scope
 
+- aggregate keyset pagination for grouped failure patterns;
 - client authentication and authorization;
 - TLS / reverse-proxy / CORS / rate-limiting policy;
 - secret provisioning/storage policy;
 - framework-specific application shell;
-- keyset pagination for very large datasets;
 - materialized analytical aggregates;
 - AI / semantic interpretation;
 - field-device synchronization;
 - shared contract expansion for physical-only events.
-
-Pass 10 authenticates pagination cursors only; it does not by itself make the API an Internet-facing security boundary.
