@@ -47,3 +47,9 @@ The branch also closes the rejected-capture recovery gap:
 - legacy single-clean persisted sessions migrate deterministically.
 
 No shared contract or Chat 2–5 file is modified. This delta remains provisional until the official next Chat 1 directive.
+
+## Additional isolated delta — explicit accepted-view revision
+
+The branch also contains an audited reopen path for an already accepted view. A reopen records reason/timestamps/source clean provenance, resets completion, and requires a fresh clean reference before the view can be accepted again. This closes the safety gap identified by immutable recapture: accepted evidence cannot be silently replaced, but an intentional revision now has an explicit controlled path.
+
+Local schema-independent regression including quality: `33 passed in 0.32s`.
