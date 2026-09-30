@@ -180,5 +180,5 @@ class CanonicalMeasurementAdapter:
             "coordinate_space": "IMAGE_PX",
             "x": float(anchor.x_px),
             "y": float(anchor.y_px),
-            "feature_id": None,
+            "feature_id": anchor.feature_id,
         }
