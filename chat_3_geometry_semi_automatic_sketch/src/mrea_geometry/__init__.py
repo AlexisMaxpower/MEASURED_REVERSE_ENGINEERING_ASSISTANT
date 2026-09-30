@@ -2,6 +2,7 @@
 
 from .constraint_confidence import ConstraintConfidence, ConstraintConfidenceModel
 from .constraint_satisfaction import ConstraintSatisfaction, ConstraintSatisfactionAnalyzer
+from .constraint_system import ConstraintSystemAnalysis, ConstraintSystemAnalyzer
 from .constraints import ConstraintIssue, ConstraintResolution, ConstraintResolver, ResolvedConstraint
 from .contracts import CanonicalGeometryInput, CanonicalInputAdapter
 from .dimensioned_view import DimensionedViewArtifact, DimensionedViewRenderer, ReferenceImageLayer
@@ -48,6 +49,8 @@ __all__ = [
     "ConstraintResolver",
     "ConstraintSatisfaction",
     "ConstraintSatisfactionAnalyzer",
+    "ConstraintSystemAnalysis",
+    "ConstraintSystemAnalyzer",
     "DimensionBinder",
     "DimensionedViewArtifact",
     "DimensionedViewRenderer",
