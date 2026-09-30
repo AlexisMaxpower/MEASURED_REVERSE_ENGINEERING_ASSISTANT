@@ -55,7 +55,7 @@ Each attempt contains:
 
 Lineage order is derived from explicit supersession links, not timestamps.
 
-The persisted `CaptureSession` validator is strengthened so one view cannot silently contain multiple clean-reference roots or disconnected lineage components. History projection also fails closed on missing predecessors, branching, cycles or disconnected chains.
+The history projection fails closed on multiple roots, missing predecessors, branching, cycles or disconnected chains instead of guessing an attempt order. Persisted session semantics are not changed by this projection.
 
 ## Truth boundary
 
