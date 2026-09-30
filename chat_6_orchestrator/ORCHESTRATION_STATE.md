@@ -3,7 +3,7 @@
 **Owner:** Chat 6 — Orchestrator / Repository Integrator  
 **Directive revision:** `OD-2026-09-30-004`  
 **Contract baseline:** `mrea.contracts.v1`  
-**Status:** Round 3 CLOSED — Round 4 Stage 1 COMPLETE — READY FOR DEPUTY 1
+**Status:** Round 3 CLOSED — Round 4 Stage 2 ACCEPTED — READY FOR CHAT 8 FINAL REVIEW
 
 ## Round 3 closure
 
@@ -13,60 +13,27 @@ Accepted Round-3 software baseline:
 
 Post-merge CI `36651010221` — `SUCCESS`.
 
-External SOLIDWORKS host validation remains separate and `UNVERIFIED`.
-
-## Round 4 Stage-1 source documents
+## Round 4 authoritative review documents
 
 - `PASS_4_PLAN_2026-09-30.md`
-- `ROUND_4_WORKER_INTAKE_2026-09-30.md`
-- `ROUND_4_STAGE0_STATE_RESET.md`
-- `ROUND_4_STAGE1_PARTIAL_REVIEW_2026-09-30.md`
-- `ROUND_4_STAGE1_RECHECK_2026-09-30.md`
-- `ROUND_4_STAGE1_RECHECK_2_2026-09-30.md`
 - `ROUND_4_STAGE1_FINAL_REVIEW_2026-09-30.md`
 - `ROUND_4_REPLAY_MANIFEST_2026-09-30.md`
+- `ROUND_4_STAGE2_REVIEW_2026-09-30.md`
+- `ROUND_4_FINAL_REVIEW_HANDOFF_2026-09-30.md`
 
-## Accepted Stage-1 worker cuts
+## Frozen Round-4 worker provenance
 
 ```text
-Chat 1
-  branch: chat-1/pass-4
-  implementation: 1bd52e0a6c339e8f68fbae4d9005c8df86824e31
-  frozen handoff head: a7d607f8cdd281749ae40529de15c2d84dfda78e
-  -> ACCEPTED_FOR_DEPUTY1_REPLAY
-
-Chat 2
-  branch: chat-2/pass-6
-  implementation: b5f7a85c66a0c72aa41edd1b045fa5a9f474b9e7
-  frozen handoff head: 539d58567046fd29ccf2d42b629227ffe8da6546
-  -> ACCEPTED_FOR_DEPUTY1_REPLAY
-
-Chat 3
-  branch: chat-3/pass-8
-  replay implementation: 1a6b58e6e87786b8e67e6f8525ece98e588dfad3
-  frozen handoff head: d786e1d49b5c8f2837a3ce936f7f1c0d93336d49
-  -> ACCEPTED_FOR_DEPUTY1_REPLAY
-
-Chat 4
-  branch: chat-4/pass-7
-  cumulative implementation: d9633e3b8e95158d359e502e9797d4876384cd09
-  frozen handoff head: 61f37a4dd46921b7fe9145bcbe5242bc3f6417b3
-  -> ACCEPTED_FOR_DEPUTY1_REPLAY
-
-Chat 5
-  branch: chat-5/pass-8
-  implementation: 1b45f9a2b815ff4a150dd9a49d21dde4abdde9df
-  frozen handoff head: 82e2203aaeb69ee1fe9f89fd42d0aea451b8690f
-  -> ACCEPTED_FOR_DEPUTY1_REPLAY
+Chat 1  chat-1/pass-4 @ a7d607f8cdd281749ae40529de15c2d84dfda78e
+Chat 2  chat-2/pass-6 @ 539d58567046fd29ccf2d42b629227ffe8da6546
+Chat 3  chat-3/pass-8 @ d786e1d49b5c8f2837a3ce936f7f1c0d93336d49
+Chat 4  chat-4/pass-7 @ 61f37a4dd46921b7fe9145bcbe5242bc3f6417b3
+Chat 5  chat-5/pass-8 @ 82e2203aaeb69ee1fe9f89fd42d0aea451b8690f
 ```
 
-Worker-local pass numbers are cumulative worker cuts, not central-round numbers.
+These exact selected cuts were independently rechecked during Stage 2 and remain unchanged. Newer worker pass branches are outside this Round-4 candidate unless explicitly selected by a later central round.
 
-## Stage-1 replay validation
-
-Chat 6 did not merge diverged worker histories.
-
-A validation composition was constructed over current accepted `main` while preserving Chat-6-owned/shared infrastructure.
+## Stage-1 validation evidence
 
 Validation branch:
 
@@ -76,15 +43,48 @@ Validation commit:
 
 `0a46ebb27abd3267e46afaf86b50383ab6b7d5a0`
 
-Validation tree:
-
-`d1fd50f49dd041e4b2be383be330f9a30255b43a`
-
-GitHub Actions:
+Validation CI:
 
 `36726156911` — `SUCCESS`
 
-Actually executed + successful:
+Stage 1 proved the accepted worker-owned replay composition against current shared infrastructure.
+
+## Stage-2 official candidate
+
+Base `main` used by Deputy 1:
+
+`11975decc69caf80952942c58377f9d896d70303`
+
+Official candidate:
+
+```text
+branch: integration/pass-4-candidate
+SHA:    05f999e1cc24307cfb4842d19bc5d42a1f1c9721
+tree:   fa751dce49166023741324c338f1dd587b24cc49
+PR:     #38
+```
+
+The candidate is exactly one commit ahead of that base SHA.
+
+Chat 6 independently verified that:
+
+- all worker-owned replay surfaces match `ROUND_4_REPLAY_MANIFEST_2026-09-30.md` by blob/tree SHA;
+- candidate shared `.github`, `core`, root `tests`, Chat 6 and Chat 8 trees are identical to the base `main` trees;
+- the changed-file set contains only accepted Chat 1–5 worker-owned content;
+- worker directives/handoffs were not replaced;
+- no blind worker-history merge is present.
+
+## Stage-2 CI
+
+Push run:
+
+`36728546973` — `SUCCESS`
+
+PR run:
+
+`36728980497` — `SUCCESS`
+
+On exact candidate SHA `05f999e1...`, the PR run actually executed and passed:
 
 - Contracts / canonical fixtures;
 - all five slice jobs;
@@ -92,29 +92,24 @@ Actually executed + successful:
 - Chat 2 -> Chat 3;
 - Chat 3 -> Chat 4;
 - Chat 4 -> Chat 5;
-- golden path.
+- Round-3 golden path.
 
-The previously known Chat-3 stale shared-test problem is closed for Stage 1 because the current-main replay passes Chat3->Chat4 on current shared infrastructure.
+No skipped required job is counted as PASS.
 
-## Integration policy for Deputy 1
+## Deputy-1 documentation defect
 
-Deputy 1 is now authorized to create the official:
+The Stage-2 directive required repository files:
 
-`integration/pass-4-candidate`
+- `ROUND_4_DEPUTY1_AUDIT.md`
+- `ROUND_4_INTEGRATION_CANDIDATE_REPORT.md`
 
-from the then-current `main`.
+Those files were not found. PR #38 contains the Deputy-1 candidate summary, and Chat 6 independently reconstructed and verified the required evidence in `ROUND_4_STAGE2_REVIEW_2026-09-30.md`.
 
-Deputy 1 must:
+Therefore:
 
-1. independently audit Chat-6 Stage-1 conclusions and replay manifest;
-2. preserve current `.github/workflows`, `core/contracts`, canonical fixtures and Chat-6-owned integration tests;
-3. integrate only accepted worker-owned Round-4 content;
-4. avoid blind worker-history merges;
-5. obtain full candidate CI with all slice jobs, contracts, all four boundary jobs and golden path actually executed + SUCCESS;
-6. publish Stage-2 audit/candidate evidence;
-7. return the candidate to Chat 8 without merging to `main`.
+`ROUND_4_STAGE2 = ACCEPTED_WITH_DOCUMENTATION_PROCESS_DEFECT`
 
-The Chat-6 validation branch is evidence only and is not the final Deputy-1 candidate.
+This omission must not be described later as if the missing Deputy-1 files existed.
 
 ## External environment truth
 
@@ -124,7 +119,7 @@ PRODUCTION_CSHARP_INTEROP_BUILD = UNVERIFIED
 NATIVE_SLDPRT_GENERATION_READBACK = UNVERIFIED
 ```
 
-No GitHub-hosted/mock evidence may promote these states.
+GitHub-hosted generic/test-double evidence cannot promote these states.
 
 ## Current state machine
 
@@ -133,6 +128,10 @@ ROUND_3_CLOSED
     -> ROUND_4_STAGE0_COMPLETE
     -> ROUND_4_STAGE1_COMPLETE
     -> STAGE1_REPLAY_VALIDATED_GREEN
-    -> READY_FOR_DEPUTY1
-    -> INTEGRATION_PASS_4_CANDIDATE_PENDING
+    -> ROUND_4_STAGE2_CANDIDATE_VERIFIED
+    -> STAGE2_ACCEPTED_WITH_DOCUMENTATION_PROCESS_DEFECT
+    -> CHAT8_FINAL_REVIEW_AUTHORIZED
+    -> MERGE_TO_MAIN_NOT_YET_AUTHORIZED
 ```
+
+Chat 8 must independently review exact candidate SHA `05f999e1cc24307cfb4842d19bc5d42a1f1c9721` and issue an exact-SHA final verdict before any merge to `main`.
