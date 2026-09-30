@@ -165,6 +165,12 @@ class HandsFreeMeasurementController:
     def state(self) -> HandsFreeMeasurementState:
         return self._state
 
+    @property
+    def context(self) -> MeasurementCandidateContext:
+        """Immutable candidate context exposed to provider-neutral adapters."""
+
+        return self._context
+
     def process_voice_command(self, text: str) -> HandsFreeTransition:
         command = self._parser.parse(text)
         if command.intent is MeasurementCommandIntent.TRIGGER:
