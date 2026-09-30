@@ -3,12 +3,12 @@
 ## Snapshot
 
 - Date: **2026-09-30**
-- Branch: `chat-5/pass-7`
+- Branch: `chat-5/pass-8`
 - Slice: **Lifecycle & Engineering Knowledge**
 - SSOT: **MREA v0.1 + orchestration addendum v0.2**
-- Pass 7 authorization: **direct user instruction; no newer Chat-5-specific directive present on `main` at branch start**
-- Base SHA: `68791080a5440c6426ef28329302c99a323344b0` (frozen Chat 5 Pass 6)
-- State: **deterministic engineering knowledge query layer implemented; required pre-handoff gates green; handoff published and branch ready for final freeze commit**
+- Pass 8 authorization: **direct user instruction; no newer Chat-5-specific directive present on `main` at branch start**
+- Base SHA: `d9bed012eb8bbcea338522847a46572bb5415026` (frozen Chat 5 Pass 7)
+- State: **snapshot-bound knowledge pagination implemented; final handoff pending required gates**
 
 ## Preserved baseline
 
@@ -27,156 +27,165 @@ Still active and unchanged:
 - normalized relational read model and migrations;
 - SQL-native lifecycle queries;
 - verified backup/restore;
-- read-only SQLite query session.
+- read-only SQLite query session;
+- deterministic engineering knowledge queries from Pass 7.
 
 No shared contract, canonical fixture, CI workflow, integration test, SQLite migration, or other chat-owned file was changed.
 
-## Pass 7 additions
+## Pass 8 additions
 
-### SQLiteEngineeringKnowledgeRepository
+### Cursor primitive
 
-Added a deterministic factual knowledge-query layer over the existing normalized relational facts.
+Added `knowledge_paging.py` with:
 
-Public read-only access:
+- `KNOWLEDGE_CURSOR_FORMAT_VERSION = mrea.knowledge-cursor.v1`;
+- `KnowledgePage[T]`;
+- `LifecycleKnowledgeCursorError`;
+- `DEFAULT_KNOWLEDGE_PAGE_LIMIT = 100`;
+- `MAX_KNOWLEDGE_PAGE_LIMIT = 500`;
+- deterministic query fingerprinting;
+- URL-safe cursor encoding/decoding;
+- cursor checksum validation;
+- snapshot-version validation;
+- page-limit validation.
+
+### Query-bound cursors
+
+Every cursor includes a fingerprint of:
+
+```text
+query name + normalized filter set
+```
+
+A cursor therefore fails closed when reused for a different equipment, position, event type, revision, instance, part, or other filter state.
+
+Page size is intentionally not part of query identity so callers may change page size while continuing the same deterministic snapshot traversal.
+
+### Snapshot binding
+
+`SQLiteLifecycleReadOnlySession` now passes its verified committed `snapshot_version` into `SQLiteEngineeringKnowledgeRepository`.
+
+Each cursor records that version.
+
+If the database advances from snapshot N to N+1, a new read-only session refuses to continue an N cursor and raises `LifecycleKnowledgeCursorError`.
+
+This prevents mixed-version traversal.
+
+### Paginated revision outcomes
+
+Added:
 
 ```python
-with SQLiteLifecycleReadOnlySession("lifecycle.db") as session:
-    session.knowledge.revision_lineage("PART-0042")
+revision_outcomes_page(part_id, *, limit=100, cursor=None)
 ```
 
-The same read-only connection is reused, preserving:
+Ordering remains deterministic by revision creation time and revision ID.
+
+### Paginated equipment/position history
+
+Added:
+
+```python
+equipment_position_history_page(
+    *,
+    equipment_id,
+    position=None,
+    event_type=None,
+    revision_id=None,
+    instance_id=None,
+    limit=100,
+    cursor=None,
+)
+```
+
+Ordering remains:
 
 ```text
-mode=ro
-query_only=ON
-snapshot_version == read_model_version
+occurred_at, sequence, event_id
 ```
 
-### Revision lineage
+### Paginated failure patterns
 
-`revision_lineage(part_id)` returns:
+Added:
 
-- revision_id;
-- revision_code;
-- parent_revision_id;
-- created_at;
-- deterministic lineage depth.
-
-It rejects missing-parent and cyclic ancestry with `LifecycleKnowledgeIntegrityError`.
-
-### Revision outcomes
-
-`revision_outcomes(part_id)` returns distinct factual counts per revision:
-
-- manufacturing records;
-- physical instances;
-- activated instances;
-- failed instances;
-- removed instances;
-- superseded instances;
-- failure records.
-
-No effectiveness score or better/worse ranking is generated.
-
-### Equipment history
-
-`equipment_position_history(equipment_id, position=None)` returns all recorded physical lifecycle events at the requested equipment location, including removed and superseded history.
-
-Ordering is deterministic by timestamp, sequence and event ID.
-
-### Failure patterns
-
-`failure_patterns(part_id=None, revision_id=None)` groups only exact stored facts by:
-
-```text
-failure_type + damage_location + confirmed_cause
+```python
+failure_patterns_page(
+    *,
+    part_id=None,
+    revision_id=None,
+    limit=100,
+    cursor=None,
+)
 ```
 
-It reports occurrence count, distinct revision/instance counts and first/last failure timestamps.
+Ordering remains the exact factual Pass-7 grouping order.
 
-Estimated cause is never promoted to confirmed cause.
+### Integrity-preserving non-paged operations
 
-### Replacement chains
+`revision_lineage()` remains whole-graph because missing-parent/cycle validation requires the complete ancestry graph.
 
-`replacement_chain(instance_id)` follows explicit `SUPERSEDED.replacement_instance_id` relationships and returns exact instance/revision/manufacturing identity plus latest state.
+`replacement_chain()` remains whole-chain because every replacement link must be checked for cycles, missing instances and valid physical state.
 
-It rejects cycles, missing replacement instances and invalid state histories.
+Pass 8 does not weaken those fail-closed guarantees merely to expose a page boundary.
 
-## Schema decision
+## Backward compatibility
+
+Existing Pass-7 knowledge methods remain unchanged:
+
+- `revision_lineage()`;
+- `revision_outcomes()`;
+- `equipment_position_history()`;
+- `failure_patterns()`;
+- `replacement_chain()`.
+
+Pagination is additive.
 
 No schema migration was added.
 
-Pass 5 already persists all facts needed by Pass 7. The knowledge layer therefore remains a query/projection surface instead of introducing duplicate derived tables.
-
 ## Verification
 
-### Acceptance dataset
+### New tests
 
-`tests/test_engineering_knowledge.py` creates facts only through existing domain services and Unit of Work:
+`tests/test_engineering_knowledge_paging.py` verifies:
 
-```text
-R1 -> R2 -> R3
-PI-1 (R1) -> active -> failed -> removed
-PI-2 (R2) -> same equipment/position -> active
-PI-1 -> superseded by PI-2
-PI-3 (R1) -> second equipment -> same recorded failure pattern -> removed
-```
+1. five revision outcomes traverse limit-2 pages with no duplicates or omissions;
+2. every page carries the active read-only snapshot version;
+3. equipment history continues deterministically across pages;
+4. a cursor fails when filter identity changes;
+5. a cursor fails after a writer advances the committed snapshot;
+6. a modified cursor fails integrity validation;
+7. page limits below 1 or above 500 fail closed;
+8. two failure-pattern groups traverse page size one exactly;
+9. paginated failure-pattern output equals the legacy tuple query;
+10. legacy revision outcome ordering remains unchanged.
 
-Coverage includes:
-
-1. deterministic revision lineage/depth;
-2. distinct per-revision factual outcome counts;
-3. full equipment-position history;
-4. explicit replacement chain;
-5. exact repeated failure grouping across physical instances;
-6. empty no-match failure pattern;
-7. cyclic lineage fail-closed behavior.
-
-### GitHub-hosted Chat 5 suite
+### GitHub-hosted implementation run
 
 Implementation SHA:
 
 ```text
-adca8d3dd60b2c727689c9969d4d0ba0d8178384
+1a6803bff00eeaa43ffb18fb18c86695c59403d2
 ```
 
-Exact result:
+Exact Chat 5 result:
 
 ```text
-35 passed in 1.32s
+40 passed in 1.51s
 ```
 
 Status: **SUCCESS**.
 
-### Pre-handoff required gates
+Contracts also passed on that workflow run. Required final gates are rechecked on the documented pre-handoff SHA before publishing `ORCHESTRATOR_HANDOFF.md`.
 
-SHA:
+## Files added in Pass 8
 
-```text
-f61ec8a880624f40e1b4e6c7b5042fd9135f7195
-```
+- `src/mrea_lifecycle/knowledge_paging.py`;
+- `tests/test_engineering_knowledge_paging.py`;
+- `docs/PASS_8_KNOWLEDGE_PAGINATION.md`.
 
-Workflow run:
-
-```text
-36645177818
-```
-
-Results:
-
-- `Chat 5 / Lifecycle` — **SUCCESS**;
-- `Contracts / canonical fixtures` — **SUCCESS**;
-- `Chat 4 / Generic CAD gate` — **SUCCESS**;
-- `Integration / Chat 4 -> Chat 5` — **SUCCESS**.
-
-## Files added in Pass 7
+## Files modified in Pass 8
 
 - `src/mrea_lifecycle/engineering_knowledge.py`;
-- `tests/test_engineering_knowledge.py`;
-- `docs/PASS_7_ENGINEERING_KNOWLEDGE_QUERIES.md`.
-
-## Files modified in Pass 7
-
 - `src/mrea_lifecycle/read_only.py`;
 - `src/mrea_lifecycle/__init__.py`;
 - `README.md`;
@@ -187,13 +196,15 @@ Results:
 
 Still open:
 
-- AI/semantic interpretation of factual patterns;
-- design-change recommendations;
-- evidence/confidence scoring for inferred conclusions;
-- REST/API;
-- pagination/materialized aggregates for large histories;
+- REST/API transport;
+- authenticated cursor signing if cursors cross an untrusted external boundary;
+- keyset pagination for very large tables;
+- materialized analytical aggregates;
+- semantic/AI interpretation;
 - field-device synchronization.
+
+The current offset cursor is safe against mixed snapshots because it is snapshot-bound. Keyset pagination is a later performance optimization, not a correctness requirement for this pass.
 
 ## Handoff rule
 
-`ORCHESTRATOR_HANDOFF.md` is the final worker commit after this state reconciliation. `chat-5/pass-7` is frozen after that commit. No later commit is allowed unless final verification finds a real missing/incorrect GitHub file or Chat 6 explicitly requests a correction.
+After `ORCHESTRATOR_HANDOFF.md` is published as the final worker commit, `chat-5/pass-8` is frozen. No later commit is allowed unless final verification finds a real missing/incorrect GitHub file or Chat 6 explicitly requests a correction.
