@@ -52,18 +52,14 @@ def decimal_value(value: Decimal | int | float | str, field_name: str = "value")
 
 @dataclass(frozen=True, slots=True)
 class FeatureAnchor:
-    """Manual point selected on a reference frame.
-
-    Pixel coordinates are intentionally internal to Chat 2. They are not a shared
-    contract and can later be mapped to whatever canonical anchor representation
-    Integrator approves.
-    """
+    """Point selected on a reference frame, optionally linked to a detected feature."""
 
     anchor_id: str
     view_id: str
     reference_frame_id: str
     x_px: float
     y_px: float
+    feature_id: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "anchor_id", _non_empty(self.anchor_id, "anchor_id"))
@@ -73,23 +69,23 @@ class FeatureAnchor:
             "reference_frame_id",
             _non_empty(self.reference_frame_id, "reference_frame_id"),
         )
+        if self.feature_id is not None:
+            object.__setattr__(self, "feature_id", _non_empty(self.feature_id, "feature_id"))
         if self.x_px < 0 or self.y_px < 0:
             raise ValueError("anchor pixel coordinates must be >= 0")
+
+    def snap_to(self, *, feature_id: str, x_px: float, y_px: float) -> "FeatureAnchor":
+        return replace(
+            self,
+            feature_id=feature_id,
+            x_px=x_px,
+            y_px=y_px,
+        )
 
 
 @dataclass(frozen=True, slots=True)
 class PhysicalMeasurement:
-    """Internal physical measurement aligned with canonical 1..3 anchor cardinality.
-
-    ``anchor_a`` remains required for backward compatibility. ``anchor_b`` and
-    ``anchor_c`` are optional ordered slots. The :attr:`anchors` property exposes
-    the canonical ordered tuple without forcing existing two-anchor callers to
-    migrate.
-
-    ``uncertainty`` is expressed in the measurement's own ``unit``. The legacy
-    ``uncertainty_mm`` field remains temporarily available only as a compatibility
-    bridge for millimetre measurements created by older Chat 2 callers.
-    """
+    """Internal physical measurement aligned with canonical 1..3 anchor cardinality."""
 
     measurement_id: str
     measurement_type: MeasurementType
@@ -182,8 +178,6 @@ class PhysicalMeasurement:
 
     @property
     def anchors(self) -> tuple[FeatureAnchor, ...]:
-        """Ordered 1..3 anchor view matching canonical ``PhysicalMeasurement``."""
-
         return tuple(
             anchor
             for anchor in (self.anchor_a, self.anchor_b, self.anchor_c)
@@ -193,6 +187,15 @@ class PhysicalMeasurement:
     @property
     def is_verified(self) -> bool:
         return self.confirmed
+
+    def replace_anchor(self, updated: FeatureAnchor) -> "PhysicalMeasurement":
+        if updated.anchor_id == self.anchor_a.anchor_id:
+            return replace(self, anchor_a=updated)
+        if self.anchor_b is not None and updated.anchor_id == self.anchor_b.anchor_id:
+            return replace(self, anchor_b=updated)
+        if self.anchor_c is not None and updated.anchor_id == self.anchor_c.anchor_id:
+            return replace(self, anchor_c=updated)
+        raise KeyError(updated.anchor_id)
 
     def confirm_by_user(self, *, at: datetime | None = None) -> "PhysicalMeasurement":
         return replace(
