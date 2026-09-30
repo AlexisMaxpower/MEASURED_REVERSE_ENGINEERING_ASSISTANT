@@ -159,3 +159,28 @@ Added `guidance.py` with versioned deterministic readiness orchestration over ex
 This layer is pure/read-only and does not change `CapturePackage v1`, physical measurements, geometry, or persisted evidence.
 
 Local schema-independent regression: `24 passed`. Full repository CI is required after upload.
+
+
+## Isolated Pass 4 extension — immutable recapture / supersession lineage
+
+The readiness flow previously had a dead-end after `QUALITY_REJECTED`: evidence was immutable, while the session allowed only one clean reference per view. The isolated branch now resolves that gap without deleting history.
+
+Added lineage fields:
+
+- `CaptureViewProgress.active_clean_reference_frame_id`;
+- `FrameRecord.supersedes_frame_id` for clean-reference recapture chains;
+- `FrameRecord.source_clean_reference_frame_id` for measurement-frame provenance.
+
+Added `CaptureSessionService.recapture_clean_reference(...)`. It creates a new content-addressed clean artifact, links it to the previous active clean frame, updates only the active pointer, and preserves all previous evidence.
+
+Calibration, rectification, quality, guided readiness and canonical serialization now resolve the active clean attempt by exact `source_frame_id`. Historical evidence remains persisted but is excluded from the active canonical package.
+
+Backward compatibility:
+
+- legacy sessions with one clean reference per view backfill `active_clean_reference_frame_id`;
+- legacy measurement frames backfill their clean-reference provenance when it is unambiguous;
+- existing canonical contracts remain unchanged.
+
+Guided `QUALITY_REJECTED` / strict-WARN handling now returns the executable `RECAPTURE_CLEAN_REFERENCE` action.
+
+Local schema-independent regression after this extension: `28 passed`. The remaining three full-suite failures in the patch workspace are only missing root-schema file loads; calibration/rectification/canonical behavior reaches those final validation calls successfully.
