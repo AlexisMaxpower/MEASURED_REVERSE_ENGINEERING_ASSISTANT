@@ -111,7 +111,10 @@ class SQLiteLifecycleReadOnlySession:
 
         self._connection = connection
         self._queries = SQLiteLifecycleQueryRepository(connection)
-        self._knowledge = SQLiteEngineeringKnowledgeRepository(connection)
+        self._knowledge = SQLiteEngineeringKnowledgeRepository(
+            connection,
+            snapshot_version=snapshot_version,
+        )
         self._snapshot_version = snapshot_version
         self._read_model_version = read_model_version
         self._relational_schema_version = relational_schema_version
