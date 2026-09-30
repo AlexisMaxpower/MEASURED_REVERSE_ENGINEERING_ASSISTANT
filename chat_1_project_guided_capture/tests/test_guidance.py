@@ -174,7 +174,7 @@ def test_rejected_quality_blocks_progression(tmp_path: Path) -> None:
     repo.save(stored)
 
     result = GuidedCaptureReadinessService().evaluate(capture.get(session.session_id))
-    assert result.next_action is GuidedCaptureAction.RESOLVE_QUALITY
+    assert result.next_action is GuidedCaptureAction.RECAPTURE_CLEAN_REFERENCE
     assert result.views[0].blockers == [GuidedCaptureBlockerCode.QUALITY_REJECTED]
     assert result.views[0].ready_for_acceptance is False
 
@@ -198,7 +198,7 @@ def test_quality_warning_policy_is_explicit(tmp_path: Path) -> None:
     ).evaluate(capture.get(session.session_id))
 
     assert permissive.next_action is GuidedCaptureAction.CAPTURE_MEASUREMENT_FRAME
-    assert strict.next_action is GuidedCaptureAction.RESOLVE_QUALITY
+    assert strict.next_action is GuidedCaptureAction.RECAPTURE_CLEAN_REFERENCE
     assert strict.views[0].blockers == [GuidedCaptureBlockerCode.QUALITY_WARNING_REVIEW_REQUIRED]
 
 
