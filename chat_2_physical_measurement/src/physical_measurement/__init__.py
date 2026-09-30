@@ -16,6 +16,15 @@ from .hands_free import (
     normalize_measurement_number,
 )
 from .models import FeatureAnchor, MeasurementSession, MeasurementType, PhysicalMeasurement, ProvenanceSource
+from .ocr import (
+    OcrMeasurementPipeline,
+    OcrMeasurementProposal,
+    OcrMeasurementReader,
+    OcrObservation,
+    OcrPipelineResult,
+    OcrReadResult,
+    OcrReadStatus,
+)
 from .repository import InMemoryMeasurementSessionRepository
 from .service import MeasurementSessionService
 from .snapping import (
@@ -50,6 +59,13 @@ __all__ = [
     "MeasurementType",
     "MeasurementTypeRegistry",
     "MeasurementTypeSemantics",
+    "OcrMeasurementPipeline",
+    "OcrMeasurementProposal",
+    "OcrMeasurementReader",
+    "OcrObservation",
+    "OcrPipelineResult",
+    "OcrReadResult",
+    "OcrReadStatus",
     "ParsedMeasurementCommand",
     "PhysicalMeasurement",
     "ProvenanceSource",
