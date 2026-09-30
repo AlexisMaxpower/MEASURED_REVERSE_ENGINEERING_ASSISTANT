@@ -12,6 +12,7 @@ from .models import (
     CapturePlanItem,
     CaptureSession,
     CaptureViewProgress,
+    CaptureViewRevisionEvent,
     CaptureViewStatus,
     CaptureViewType,
     FrameKind,
@@ -222,6 +223,7 @@ class CaptureSessionService:
         progress.started_at = progress.started_at or timestamp
         progress.captured_at = timestamp
         progress.accepted_at = None
+        progress.recapture_required = False
         return frame
 
     def capture_measurement_frame(
@@ -262,6 +264,49 @@ class CaptureSessionService:
         self._repository.save(session)
         return frame
 
+    def reopen_view(
+        self,
+        session_id: UUID,
+        *,
+        view: CaptureViewType,
+        reason: str,
+        reopened_at: datetime | None = None,
+    ) -> CaptureSession:
+        """Explicitly reopen an accepted view and require a fresh clean-reference attempt."""
+
+        session = self._repository.get(session_id)
+        progress = self._progress_for(session, view)
+        if progress.status is not CaptureViewStatus.ACCEPTED or progress.accepted_at is None:
+            raise CaptureWorkflowError(f"view {view.value} is not accepted and cannot be reopened")
+        clean = active_clean_reference(session, view)
+        if clean is None:
+            raise CaptureWorkflowError(f"accepted view {view.value} has no active clean reference")
+        normalized_reason = reason.strip()
+        if not normalized_reason:
+            raise CaptureWorkflowError("reopen reason must be non-empty")
+
+        timestamp = reopened_at or utc_now()
+        if timestamp.tzinfo is None:
+            raise CaptureWorkflowError("reopened_at must be timezone-aware")
+        if timestamp < progress.accepted_at:
+            raise CaptureWorkflowError("reopened_at cannot be earlier than accepted_at")
+
+        session.revision_events.append(
+            CaptureViewRevisionEvent(
+                view=view,
+                reason=normalized_reason,
+                reopened_at=timestamp,
+                previous_accepted_at=progress.accepted_at,
+                active_clean_reference_frame_id=clean.frame_id,
+            )
+        )
+        progress.status = CaptureViewStatus.CAPTURED
+        progress.accepted_at = None
+        progress.recapture_required = True
+        session.completed_at = None
+        self._repository.save(session)
+        return session
+
     def accept_view(
         self,
         session_id: UUID,
@@ -273,6 +318,10 @@ class CaptureSessionService:
         progress = self._progress_for(session, view)
         if active_clean_reference(session, view) is None:
             raise CaptureWorkflowError(f"cannot accept {view.value} without active clean reference")
+        if progress.recapture_required:
+            raise CaptureWorkflowError(
+                f"cannot accept reopened view {view.value} before a new clean reference is captured"
+            )
 
         timestamp = accepted_at or utc_now()
         progress.status = CaptureViewStatus.ACCEPTED
