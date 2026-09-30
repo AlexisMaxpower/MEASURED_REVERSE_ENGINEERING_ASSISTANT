@@ -2,20 +2,30 @@
 
 **Date:** 2026-09-30  
 **Repository:** `AlexisMaxpower/MEASURED_REVERSE_ENGINEERING_ASSISTANT`  
-**Active branch:** `chat-3/pass-10`  
+**Worker branch:** `chat-3/pass-10.1`  
 **Role:** Chat 3 — Geometry & Semi-Automatic Sketch  
-**Ring:** 10  
-**Authorization:** explicit user-requested continuation; no newer Chat 3 worker directive than OD-2026-09-29-003 was present when Ring 10 started.
+**Worker pass:** 10.1  
+**Current orchestrator directive:** `OD-2026-09-30-004`
 
-## Baseline
+## Central Round-4 truth
 
-Ring 10 branches from frozen Ring 9 head:
+Chat 6 has selected this cumulative worker cut for Round-4 Stage-1 review:
 
-`0b657c07cc6d325be8e813c565fe5ca6bcad309a`
+`chat-3/pass-8` @ `d786e1d49b5c8f2837a3ce936f7f1c0d93336d49`
 
-## Capabilities through Ring 9
+OD-004 explicitly states:
 
-Chat 3 already provides:
+- Pass 8 is frozen and selected for Stage-1 review;
+- no new normal Chat 3 worker implementation is requested now;
+- Pass 9 work must not be pushed onto the selected cut;
+- central replay must start from current `main` and import only accepted Chat-3-owned changes;
+- stale shared worker ancestry must not overwrite current shared infrastructure.
+
+Therefore this file distinguishes **worker-local cumulative capability** from **centrally selected capability**.
+
+## Centrally selected capability through Pass 8
+
+The selected Pass 8 cut includes:
 
 - canonical CapturePackage / MeasurementPackage adapter;
 - IMAGE_PX -> MAT_XY_MM normalization;
@@ -23,129 +33,129 @@ Chat 3 already provides:
 - deterministic GeometryGraph;
 - measurement binding and verified-vs-derived conflict visibility;
 - deterministic SketchPackage v1 generation;
-- OpenCV LINE/CIRCLE/ARC extraction with VISION_DETECTED provenance;
+- OpenCV LINE/CIRCLE/ARC extraction with `VISION_DETECTED` provenance;
 - fail-closed ambiguous geometry handling;
-- all canonical v1 constraint candidate families;
+- canonical v1 constraint candidate families;
 - ConstraintResolver with verified-measurement, confidence and redundancy gates;
 - ConstraintSatisfactionAnalyzer with explicit residuals;
 - residual-aware ConstraintConfidenceModel;
-- global ConstraintSystemAnalyzer for proven orientation conflicts and safe transitive reduction;
 - deterministic SVG Dimensioned View.
 
-## Ring 10 — Structural DOF Audit
+This is the current Round-4 Chat 3 review target.
 
-New module:
+## Deferred worker-local continuation after selected Pass 8
 
-`src/mrea_geometry/dof_audit.py`
+### Pass 9 — Global Constraint-Set Diagnostics
 
-Public API:
+Frozen worker head:
 
-- `StructuralDofAudit`;
-- `StructuralDofAnalyzer`.
+`0b657c07cc6d325be8e813c565fe5ca6bcad309a`
 
-### Safe semantics
+Adds worker-local:
 
-The analyzer counts exact primitive parameters and a conservative upper bound on scalar equations supplied by retained constraints plus bound dimensions.
+- `ConstraintSystemAnalyzer`;
+- deterministic orientation parity diagnostics;
+- explicit `OVERCONSTRAINED_ORIENTATION_CONFLICT`;
+- safe transitive reduction for `PARALLEL / EQUAL / CONCENTRIC`;
+- pipeline integration after `ConstraintResolver`.
 
-Primitive parameter counts:
+Status under OD-004:
 
-- POINT: 2;
-- LINE: 4;
-- CIRCLE: 3;
-- ARC: 5.
+`DEFERRED_POST_SELECTED_CUT_WORK`
 
-If:
+### Pass 10 — Structural DOF Audit
+
+Frozen worker head:
+
+`01df10c2fff8d00ae1490405961773dd4e543b5a`
+
+Adds worker-local:
+
+- `StructuralDofAnalyzer`;
+- exact primitive parameter counting;
+- conservative scalar-equation upper bounds;
+- `DEFINITELY_UNDERCONSTRAINED` proof when possible;
+- `NOT_PROVEN_UNDERCONSTRAINED` rather than a false fully-constrained claim;
+- additive `VisionGeometryPipeline.audit_structural_dof(...)`.
+
+Status under OD-004:
+
+`DEFERRED_POST_SELECTED_CUT_WORK`
+
+## Pass 10.1 — OD-004 Reconciliation
+
+Pass 10.1 introduces **no runtime implementation**.
+
+Purpose:
+
+- reconcile Passes 9/10 with the newly published OD-004;
+- enumerate the exact Pass 8 -> Pass 10 post-selected-cut delta;
+- record dependency/replay order for a future Chat 6 decision;
+- prevent worker-local continuation from being mistaken for central acceptance.
+
+Pass 8 -> Pass 10 GitHub compare:
+
+- 19 commits ahead;
+- 13 changed paths;
+- no post-cut shared contract, CI or shared integration-test modifications.
+
+Functional dependency order if later authorized:
 
 ```text
-parameter_count > total_equation_upper_bound
+Pass 8 selected semantics
+-> Pass 9 ConstraintSystemAnalyzer
+-> Pass 10 StructuralDofAnalyzer
 ```
 
-then the sketch is classified:
+## Worker-local verification evidence
 
-`DEFINITELY_UNDERCONSTRAINED`
+Pass 9 worker evidence:
 
-and the positive difference is a proven lower bound on remaining DOF.
+- Chat 3: 73 passed;
+- Chat2->Chat3: SUCCESS.
 
-If the equation budget reaches or exceeds the parameter count, the result is only:
+Pass 10 worker evidence:
 
-`NOT_PROVEN_UNDERCONSTRAINED`
+- authoritative code/test head: `77ca90a17b8b9bdc60c5cbade996b5bd412364a9`;
+- Chat 3: 81 passed in 0.50s;
+- Contracts: SUCCESS;
+- Chat2->Chat3: SUCCESS;
+- Chat4 generic CAD: SUCCESS.
 
-Ring 10 deliberately does not claim `FULLY_CONSTRAINED` without a future numerical rank/solver proof.
+Known worker-ancestry Chat3->Chat4 failure remained the obsolete shared `cad_verification_report["dimensions"]` lookup; current `main` uses canonical `items`. This stale shared file is not part of the Chat-3-owned Pass 8 -> Pass 10 delta.
 
-Unknown future constraint arity yields:
-
-`INDETERMINATE_UNKNOWN_CONSTRAINT_ARITY`
-
-with no asserted DOF lower bound.
-
-### Pipeline API
-
-`VisionGeometryPipeline.audit_structural_dof(...)` performs:
-
-```text
-GeometryPipeline
--> ConstraintResolver
--> ConstraintSystemAnalyzer
--> StructuralDofAnalyzer
-```
-
-The canonical SketchPackage output remains unchanged.
+Worker-local green evidence does **not** override the central Pass-8 selection.
 
 ## Runtime / dependencies
 
-Package version:
-
-`0.10.0`
-
-New Ring 10 dependencies: **none**.
-
-## Verification
-
-Authoritative code/test head:
-
-`77ca90a17b8b9bdc60c5cbade996b5bd412364a9`
-
-GitHub Actions run:
-
-`36659318018`
-
-Observed:
-
-- Chat 3 / Geometry: **81 passed in 0.50s**;
-- Contracts: SUCCESS;
-- Chat 1: SUCCESS;
-- Chat 2: SUCCESS;
-- Chat 4 generic CAD: SUCCESS;
-- Chat 5: SUCCESS;
-- Chat 2 -> Chat 3: SUCCESS.
-
-The inherited worker Chat 3 -> Chat 4 test still fails only on old `cad_verification_report["dimensions"]`; current `main` uses canonical `items`. Ring 10 does not modify shared integration infrastructure.
+Pass 10.1 runtime changes: **none**.  
+Pass 10.1 dependency changes: **none**.  
+Worker package remains `0.10.0` on the cumulative branch because Pass 10 remains in its ancestry.
 
 ## Shared ownership
 
-Ring 10 modifies no:
+Pass 10.1 modifies no:
 
 - shared contracts;
-- shared canonical fixtures;
+- canonical shared fixtures;
 - repository integration tests;
 - CI workflow;
-- other chat directories.
+- other chat runtime directories;
+- Chat-6-owned `ORCHESTRATOR_DIRECTIVE.md`.
 
-## Deferred Chat 3 work
+## Documents
 
-- numerical Jacobian-rank DOF proof;
-- numerical constraint solving / entity movement;
-- nonlinear/global geometric consistency beyond the proven graph subset;
-- uncertainty propagation from calibration/vision into tolerance selection;
-- multi-view geometry relationships;
-- CAD-native logic.
+- `PASS10_1_OD004_RECONCILIATION_2026-09-30.md`;
+- `PASS10_1_POST_SELECTED_CUT_MANIFEST_2026-09-30.md`;
+- this `IMPLEMENTATION_STATE.md`;
+- `ORCHESTRATOR_HANDOFF.md`.
 
 ## Current status
 
-`READY_FOR_RING10_INTEGRATOR_REVIEW`
-
-## Ring 10 documents
-
-- `BUILD_REUSE_CHECK_RING10_STRUCTURAL_DOF_AUDIT.md`;
-- `IMPLEMENTATION_REPORT_RING10_STRUCTURAL_DOF_AUDIT_2026-09-30.md`;
-- `ORCHESTRATOR_HANDOFF.md`.
+```text
+CHAT3_ROUND4_SELECTED_CUT = PASS_8
+PASS_9 = DEFERRED_POST_SELECTED_CUT_WORK
+PASS_10 = DEFERRED_POST_SELECTED_CUT_WORK
+PASS_10_1 = READY_FOR_RECONCILIATION_HANDOFF
+NEW_RUNTIME_IMPLEMENTATION = NONE
+```
