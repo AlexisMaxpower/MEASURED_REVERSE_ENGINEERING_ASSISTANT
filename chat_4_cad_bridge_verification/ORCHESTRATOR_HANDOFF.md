@@ -1,163 +1,228 @@
-# ORCHESTRATOR HANDOFF — Chat 4 / Pass 3 FINAL
+# ORCHESTRATOR HANDOFF — Chat 4 / Pass 7 FINAL
 
 **From:** Chat 4 — CAD Bridge & Verification  
 **To:** Chat 6 — Orchestrator / Repository Integrator  
-**Directive:** `OD-2026-09-29-003` + `ORCHESTRATOR_FIX_REQUIRED_PASS3.md`  
-**Pass:** 3  
-**Branch:** `chat-4/pass-3`  
-**Implementation SHA before handoff freeze:** `f1c49fb9d85793b614403f758503878795c32c45`  
+**Directive:** `OD-2026-09-30-004`  
+**Central round:** 4  
+**Worker pass:** 7  
+**Branch:** `chat-4/pass-7`  
+**Selected cumulative implementation SHA:** `d9633e3b8e95158d359e502e9797d4876384cd09`  
+**Pre-handoff branch HEAD after OD-004 delivery:** `2b4b34fe4d5053b189bc65172e04150eda4e29b7`  
+**Certified Round-3 central baseline:** `bffc1dec2fe63c12b69a50c4bf348ef7df4cf662`  
 **Date:** 2026-09-30
 
-## Final status
+## Final worker status
 
-`READY_FOR_INTEGRATOR_PASS3_REVIEW`
+`CHAT_4_PASS_7 = HANDOFF_PUBLISHED_AND_FROZEN`
+
+`ROUND_4_STAGE1_ACCEPTANCE = PENDING_CHAT6`
+
+Environment truth remains:
 
 ```text
 REAL_HOST = UNVERIFIED
-C#/.NET Framework production build on Windows/SOLIDWORKS host = UNVERIFIED
+C# PRODUCTION BUILD = UNVERIFIED
+NATIVE SLDPRT GENERATION/READBACK = UNVERIFIED
 ```
 
-No real Windows 11 x64 + installed SOLIDWORKS 2026 x64 execution occurred during this integration. No real-host success is inferred from pure tests.
+No controlled Windows 11 x64 + installed SOLIDWORKS 2026 x64 execution was performed for this cumulative cut. No static, unit, test-double, Linux CI, or synthetic runtime-evidence result is promoted to real-host success.
 
-## Exact reconciliation SHAs
+## Baseline / ownership audit
 
-- Chat 6 shared-baseline fix origin: `1a54ef40f84119d7482d971deb1e58749bf657b0`;
-- current shared baseline brought from `main`: `4efc074ab67d106adce6c79d9665420b07c9eb7b`;
-- shared-baseline sync merge into Pass 3: `39c7196432862dd04f91220f0b282ef9657fbdee`;
-- Side 4B FIX_REQUIRED baseline: `8b2c358de3b7d4360abbbbb5abf8ddc1a5de69b3`;
-- Side 4B frozen result HEAD: `9b37d023ea7b6355c752982e36b774c2fd96e358`;
-- exact Side 4B reconcile merge into Primary: `a3d4d1eb40a7395ae1e743c0d4c70da0d506f196`;
-- Primary runtime-input bridge implementation HEAD: `f1c49fb9d85793b614403f758503878795c32c45`.
+OD-004 selects cumulative Chat-4 Pass 7 for Stage-1 review.
 
-The Side branch was **not blindly merged**. Primary took the exact file diff `8b2c358d..9b37d023`, rebuilt a tree from the Primary/shared baseline plus only Side-owned blobs, and merged that reconcile tree.
+Certified Round-3 baseline from the central Round-4 plan:
 
-## Integrated Side 4B files
+- `main`: `bffc1dec2fe63c12b69a50c4bf348ef7df4cf662`;
+- baseline tree: `435dda140d3980256ca32c42bd07d81b15c4328c`;
+- Round-3 post-merge CI: `36651010221` — `SUCCESS`.
 
-Exactly 13 Side-owned files were reconciled:
+The current central `main` later advanced to `0480787951938e5ca4c24f569beae204c1aae432`, but the changes after the certified Round-3 baseline are orchestration/state documents. `core/contracts`, canonical fixtures, shared integration tests, and `.github/workflows` were not changed by that central advance.
 
-1. `SOLIDWORKS_SIDE_HANDOFF.md` — blob `ed884e1a870e488aa62f7f0cce369838ac2ad36e`
-2. `docs/BUILD_REUSE_CHECK_SOLIDWORKS_HOST_READINESS_PASS3.md` — `69f7a560a29aa9cdcd07699d3fadc914842c2620`
-3. `docs/SOLIDWORKS_HOST_READINESS_PASS_3.md` — `f2db2dd1277a46e3fee1d02ebd232869a67e97a9`
-4. `scripts/build_solidworks_agent.ps1` — `b3e8884d900cb0853de08568c69ac26decda0033`
-5. `scripts/run_solidworks_golden.py` — `01450486105b01a77780c2c8cbd87b8c1883d8bd`
-6. `scripts/run_solidworks_host_validation.py` — `05d0dcf5737df7c82e92d160be8aac103b3690a1`
-7. `scripts/run_solidworks_pass3_host_validation.ps1` — `4bfdcfb979701e69d4bc1b3e83ad6a136a58048a`
-8. `scripts/test_solidworks_host_readiness.ps1` — `9db6d048b67e6f197b8fdc234c7d554edbbb9329`
-9. `solidworks_agent/Program.cs` — `b57106ac811d55d1aacbcea1aa903db61fc9ce8a`
-10. `solidworks_agent/ProtocolModels.cs` — `216714f0c7446a8f3e91794e66bc6181e418060b`
-11. `solidworks_agent/README.md` — `0e77a0c71b34095bf57541072dae05a565481cd6`
-12. `solidworks_agent/SolidWorksSession.cs` — `a61764214e89c7fd73a14fa8b0de7fa3a965a34f`
-13. `tests/test_solidworks_runtime_inputs.py` — `5097ced85c8c622f9e8a8d530cc10cd7df212851`
+The worker branch history diverges from current `main`, so this handoff does **not** request a blind branch merge. Chat 6 should follow the Round-4 plan and replay only accepted Chat-4-owned deltas onto current `main` while preserving Chat-6-owned `ORCHESTRATOR_DIRECTIVE.md` and shared infrastructure.
 
-## Side host-readiness/runtime result integrated
+Direct file/blob inspection against the certified Round-3 baseline confirms that cumulative Pass-7 implementation changes are confined to Chat-4-owned implementation/tests/docs. No canonical/shared contract change is requested.
 
-Side 4B now provides:
+## Cumulative scope through Pass 7
 
-- Windows 11/x64 probe;
-- x64 process check;
-- .NET Framework 4.8 check;
-- agent executable check;
-- SOLIDWORKS COM registration check;
-- actual SOLIDWORKS version/revision check for 2026;
-- SOLIDWORKS interop availability check;
-- writable output path check;
-- part-template availability check;
-- conditional MSBuild availability check;
-- stable host/agent exit classes;
-- native artifact SHA-256 re-check;
-- one-command Pass-3 host validation procedure;
-- slice-local producer bundle `mrea.solidworks-runtime-inputs.v1`.
+### Accepted Pass-3 foundation retained
 
-The side bundle intentionally does **not** own final runtime verification status.
+The accepted Round-3 Chat-4 foundation remains intact:
 
-## Primary bridge / ownership reconciliation
+- vendor-neutral canonical CAD transfer and verification;
+- Primary-owned `runtime_evidence.py` semantics;
+- fail-closed host-readiness/runtime diagnostics;
+- Side-4B runtime-input bridge with replay through Primary canonical verification;
+- native artifact identity/SHA evidence model;
+- canonical `CADVerificationReport.items` semantics;
+- generic/test-double CAD path independent of installed SOLIDWORKS;
+- `REAL_HOST` remains external evidence only.
 
-Primary added:
+### Pass 4 — runtime validation hardening
 
-- `src/mrea_cad_bridge/solidworks_runtime_inputs.py`;
-- `tests/test_solidworks_runtime_inputs_bridge.py`;
-- public exports in `src/mrea_cad_bridge/__init__.py`.
+Cumulative Pass 7 includes the reconciled Pass-4 runtime-validation layer:
 
-The bridge:
+- `execute_cad_runtime_validation_v1(...)`;
+- fail-closed readiness checks before real-host adapter execution;
+- host-readiness/adapter identity enforcement;
+- explicit SOLIDWORKS version requirement;
+- Side runtime-input replay through the direct Primary runtime-validation path;
+- equality check between direct Primary runtime evidence and the Side-input bridge;
+- SOLIDWORKS 2026 revision-major baseline `34` enforcement;
+- host/worker version cross-evidence consistency checks;
+- raw `constraint_conflicts` shape validation before parsing/coercion.
 
-1. accepts only `mrea.solidworks-runtime-inputs.v1` from `SIDE_CHAT_4B`;
-2. rejects any Side-supplied final `status`;
-3. re-parses host readiness with Primary `parse_host_readiness_report`;
-4. requires all nine mandatory Side readiness checks and forbids marking them optional;
-5. validates adapter/SketchPackage identity and stable agent exit class;
-6. reconstructs vendor-neutral `CadAdapterResult` from Side bindings/read-back/artifacts;
-7. replays `execute_cad_transfer_v1` through Primary canonical verification;
-8. requires the replayed `CADVerificationReport` to match the Side-provided canonical report exactly;
-9. sends the verified facts into Primary-owned `build_runtime_evidence`;
-10. leaves final `VERIFIED / FAILED / UNVERIFIED` semantics exclusively in Primary `runtime_evidence.py`.
+### Pass 5 — deterministic runtime receipt
 
-`mrea.solidworks-runtime-inputs.v1` remains a **slice-local adapter contract**. It is not a shared canonical schema.
+Cumulative Pass 7 includes slice-local schema `mrea.cad-runtime-receipt.v1`:
 
-## Preserved Primary/shared ownership
+- deterministic canonical JSON encoding;
+- SHA-256 binding of SketchPackage and runtime evidence;
+- optional binding of CADPackage, CADVerificationReport and Side runtime-input bundle;
+- normalized native artifact identity/hash list;
+- receipt self-hash;
+- fail-closed cross-identity and tamper verification;
+- rejection of malformed hashes and non-finite JSON.
 
-Primary-owned canonical/runtime semantics were preserved:
+This receipt is slice-local audit evidence, not a shared canonical contract.
 
-- `src/mrea_cad_bridge/runtime_evidence.py` remains Primary-owned;
-- `tests/test_runtime_evidence.py` remains Primary-owned;
-- canonical `VerificationEngine` semantics remain unchanged;
-- `CADVerificationReport v1` continues to use canonical `items`;
-- no compatibility `dimensions` field was added;
-- Chat-6-owned `tests/integration/test_chat3_to_chat4_boundary.py` fix came from the shared baseline, not a Chat-4 workaround;
-- no shared canonical contract was changed by this Pass-3 integration;
-- no Chat-6-owned CI workflow was edited by Chat 4.
+### Pass 6 — POINT / ARC vendor geometry
 
-## Executed GitHub verification
+The SOLIDWORKS vendor boundary/worker cumulative slice supports the complete mandatory canonical geometry subset:
 
-Implementation CI run:
+- `POINT`;
+- `LINE`;
+- `CIRCLE`;
+- `ARC`.
 
-- GitHub Actions run ID: `36632498690`;
-- implementation SHA: `f1c49fb9d85793b614403f758503878795c32c45`;
-- workflow conclusion: **SUCCESS**.
+POINT and ARC are preserved through the Python process boundary. The C# worker contains `CreatePoint` / `CreateArc` transfer logic, with canonical mm converted to SOLIDWORKS API meters inside the vendor layer. ARC start/end points are derived from canonical center/radius/angles; degenerate zero/full-circle ARC is rejected explicitly.
 
-Required gates:
+### Pass 7 — fail-closed ANGLE dimension support
+
+The cumulative vendor dimension subset is:
+
+- `DISTANCE` — canonical `mm`;
+- `DIAMETER` — canonical `mm`;
+- `RADIUS` — canonical `mm`;
+- `ANGLE` — canonical `deg`, exactly two LINE entities, strictly `0 < angle < 180`.
+
+For ANGLE the C# worker selects two line segments, derives deterministic dimension-text placement from canonical geometry, chooses the acute/obtuse sector closest to the canonical requested angle, and applies the canonical degree value through the existing degree-to-radian system-value path.
+
+Unsupported ANGLE units/entity combinations, parallel lines, degenerate lines and zero/straight angles fail explicitly rather than being guessed or silently rewritten.
+
+## Exact cumulative worker-owned file delta since accepted Round 3
+
+The direct baseline/file audit identifies the following cumulative Pass-4-through-Pass-7 worker-owned files as added or changed relative to certified Round-3 `main`:
+
+### Documentation
+
+1. `docs/PASS_4_FINAL_IMPLEMENTATION_REPORT_2026-09-30.md` — added
+2. `docs/PASS_5_RUNTIME_RECEIPT_REPORT_2026-09-30.md` — added
+3. `docs/PASS_6_POINT_ARC_VENDOR_SUPPORT_2026-09-30.md` — added
+4. `docs/PASS_7_ANGLE_DIMENSION_SUPPORT_2026-09-30.md` — added
+
+### Python implementation
+
+5. `src/mrea_cad_bridge/__init__.py` — modified public exports
+6. `src/mrea_cad_bridge/runtime_validation.py` — added
+7. `src/mrea_cad_bridge/runtime_receipt.py` — added
+8. `src/mrea_cad_bridge/solidworks_agent.py` — modified vendor preflight/request support through POINT/ARC/ANGLE
+
+### SOLIDWORKS C# worker
+
+9. `solidworks_agent/ProtocolModels.cs` — modified POINT/ARC DTO fields
+10. `solidworks_agent/SolidWorksTransfer.cs` — modified POINT/ARC creation and ANGLE dimension transfer
+
+### Tests
+
+11. `tests/test_runtime_validation.py` — added
+12. `tests/test_runtime_validation_side_inputs.py` — added
+13. `tests/test_runtime_receipt.py` — added
+14. `tests/test_solidworks_agent.py` — modified vendor boundary coverage through POINT/ARC/ANGLE
+
+The final handoff file itself is the only worker write performed after OD-004 delivery.
+
+Ownership invariants preserved:
+
+- no `core/contracts/` file changed by this cumulative worker cut;
+- no canonical fixture changed;
+- no `.github/workflows/` file changed;
+- no Chat-6-owned shared integration test changed;
+- no SOLIDWORKS COM/API type leaks into shared canonical contracts;
+- Primary `VerificationEngine`, canonical CADPackage/CADVerificationReport semantics and read-back verification remain vendor-neutral.
+
+## CI / regression evidence
+
+Required gates were re-run against the exact selected implementation SHA:
+
+`d9633e3b8e95158d359e502e9797d4876384cd09`
+
+GitHub Actions:
+
+- workflow: `MREA CI`;
+- run ID: `36652331029`;
+- re-run attempt: `2`;
+- conclusion: `SUCCESS`;
+- attempt start: 2026-09-30T13:37:52Z.
+
+The historical run metadata retains `head_branch = chat-4/pass-8` because that workflow record was originally created while another branch ref also pointed at the same commit. The re-run is commit-bound: checkout and test logs confirm exact SHA `d9633e3b8e95158d359e502e9797d4876384cd09`.
+
+Required results on attempt 2:
 
 - `Chat 4 / Generic CAD gate`: **SUCCESS**;
-- Chat 4 test suite: **61 tests, OK**;
-- Primary runtime-evidence tests: included and passing;
-- Side SOLIDWORKS runtime-input tests: included and passing;
-- Primary Side→runtime-evidence bridge tests: 10 included and passing;
+- Chat-4 Python suite: **94 tests, OK**;
 - `Contracts / canonical fixtures`: **SUCCESS**;
 - `Integration / Chat 3 -> Chat 4`: **SUCCESS**;
 - `Integration / Chat 4 -> Chat 5`: **SUCCESS**.
 
-The corrected Chat3→Chat4 gate validates canonical `CADVerificationReport.items`; no workaround for the obsolete `dimensions` lookup exists in Chat 4.
+The generic CI runner is Ubuntu and does not contain installed SOLIDWORKS; therefore these green gates prove vendor-neutral/pure boundary behavior only, not a real-host COM execution.
 
-## Real-host truth
+## Required truth invariants — status
 
-Synthetic/pure tests demonstrate that a complete valid fact bundle *can* produce Primary runtime `VERIFIED`, and that missing/tampered facts fail closed. This is only a deterministic contract test.
+- canonical/Primary verification semantics remain vendor-neutral: **PRESERVED**;
+- SOLIDWORKS types remain behind adapter/process boundary: **PRESERVED**;
+- unsupported geometry/dimensions/constraints fail explicitly: **PRESERVED**;
+- vendor success alone cannot produce canonical `VERIFIED` without Primary read-back verification: **PRESERVED**;
+- generic CAD CI does not require installed SOLIDWORKS: **PRESERVED**;
+- real-host success is not inferred from synthetic/static tests: **PRESERVED**.
 
-No controlled Windows 11 + SOLIDWORKS 2026 host run supplied actual evidence during this Pass-3 reconciliation, therefore:
+## Known limitations / unsupported vendor cases
+
+1. **Canonical sketch constraints are not translated to SOLIDWORKS sketch relations in Pass 7.** Non-empty canonical constraints remain explicitly rejected by the Pass-7 vendor preflight.
+2. **Vendor solver conflict extraction is not implemented as real SOLIDWORKS solver evidence.** Constraint-conflict plumbing exists in the vendor-neutral result/evidence path, but no real-host solver extraction is claimed.
+3. **ANGLE support is intentionally narrow:** two LINE entities only, canonical `deg`, `0 < value < 180`; unsupported combinations fail closed.
+4. **Real SOLIDWORKS COM runtime is unverified.** No controlled Windows 11 x64 + SOLIDWORKS 2026 x64 session supplied evidence for this cut.
+5. **Production C# build is unverified.** The .NET Framework worker was not actually compiled against an installed SOLIDWORKS 2026 interop set in the controlled target environment during this completion step.
+6. **Native `.SLDPRT` generation/read-back is unverified.** Code paths and evidence schemas exist, but no actual controlled-host native part created/read back by SOLIDWORKS is claimed here.
+7. Automated Windows/SOLIDWORKS CI is not established; the real-host track remains an external gate.
+
+## Environment truth
 
 ```text
 REAL_HOST = UNVERIFIED
+C# PRODUCTION BUILD = UNVERIFIED
+NATIVE SLDPRT GENERATION/READBACK = UNVERIFIED
 ```
 
-No native `.SLDPRT` produced in a real SOLIDWORKS session is claimed as verified here.
+These values are deliberate and must remain unchanged until actual controlled-host evidence exists.
 
-## Remaining limitations
+## Acceptance request
 
-- real SOLIDWORKS 2026 COM execution still requires a controlled Windows host;
-- production C# build against the installed SOLIDWORKS interop set remains unverified in this environment;
-- current real worker slice remains LINE/CIRCLE first;
-- POINT/ARC real-worker support remains follow-up work;
-- ANGLE real-worker support remains follow-up work;
-- canonical sketch constraints are not yet translated into SOLIDWORKS sketch relations;
-- vendor solver conflict extraction remains follow-up work;
-- automated Windows/SOLIDWORKS CI host is not established.
+Chat 6 should:
 
-## Acceptance requested from Chat 6
-
-1. verify the frozen Pass-3 branch and this handoff;
-2. verify Side diff reconciliation against the exact Side SHAs above;
-3. accept the Primary runtime-input bridge and ownership boundary;
-4. keep `REAL_HOST = UNVERIFIED` until an actual controlled Windows/SOLIDWORKS run supplies evidence;
-5. merge/accept Pass 3 if repository review is clean and issue the next Chat-4 directive.
+1. review this cumulative Pass-7 worker cut against OD-004;
+2. replay only accepted Chat-4-owned deltas onto the current central baseline using the Round-4 file-level reconciliation method;
+3. preserve current Chat-6-owned directive/shared infrastructure;
+4. keep all real-host/build/native statuses `UNVERIFIED` until controlled-host evidence exists;
+5. issue the Stage-1 verdict (`ACCEPTED / PROVISIONALLY_ACCEPTED / FIX_REQUIRED / REJECTED`).
 
 ## Freeze
 
-This handoff is the final Pass-3 branch-freeze artifact. No post-handoff commits should be made unless Chat 6 explicitly returns `FIX_REQUIRED`.
+This handoff freezes `chat-4/pass-7` immediately after publication.
+
+```text
+CHAT_4_PASS_7 = HANDOFF_PUBLISHED_AND_FROZEN
+ROUND_4_STAGE1_ACCEPTANCE = PENDING_CHAT6
+```
+
+No further commits may be pushed to `chat-4/pass-7` unless Chat 6 explicitly returns `FIX_REQUIRED` or issues another directive authorizing branch changes.
