@@ -3,34 +3,120 @@
 **Owner:** Chat 6 — Orchestrator / Repository Integrator  
 **Directive revision:** `OD-2026-09-30-004`  
 **Contract baseline:** `mrea.contracts.v1`  
-**Status:** Round 3 CLOSED — Round 4 Stage 1 BLOCKED ONLY on Chat 4 current-pass handoff
-
-## Source-of-truth hierarchy
-
-1. Current accepted repository state on `main`.
-2. Canonical shared contracts in `core/contracts/`.
-3. Canonical fixtures and Chat-6 integration tests under `tests/`.
-4. Chat 6 ADR/review/workflow/CI documents and active directives.
-5. Product SSOT v0.1 plus orchestration addendum.
-6. Slice-local documentation.
-
-If slice-local documentation conflicts with canonical contracts or an active Chat 6 directive, canonical/Chat-6 truth wins.
+**Status:** Round 3 CLOSED — Round 4 Stage 1 COMPLETE — READY FOR DEPUTY 1
 
 ## Round 3 closure
 
-Final accepted Round-3 software baseline before Round-4 planning commits:
+Accepted Round-3 software baseline:
 
 `bffc1dec2fe63c12b69a50c4bf348ef7df4cf662`
 
-Post-merge MREA CI:
+Post-merge CI `36651010221` — `SUCCESS`.
 
-`36651010221` — `SUCCESS`
+External SOLIDWORKS host validation remains separate and `UNVERIFIED`.
 
-Round-3 golden path: `SUCCESS`.
+## Round 4 Stage-1 source documents
 
-Overall verdict: **ROUND 3 SOFTWARE INTEGRATION CLOSED / VERIFIED**.
+- `PASS_4_PLAN_2026-09-30.md`
+- `ROUND_4_WORKER_INTAKE_2026-09-30.md`
+- `ROUND_4_STAGE0_STATE_RESET.md`
+- `ROUND_4_STAGE1_PARTIAL_REVIEW_2026-09-30.md`
+- `ROUND_4_STAGE1_RECHECK_2026-09-30.md`
+- `ROUND_4_STAGE1_RECHECK_2_2026-09-30.md`
+- `ROUND_4_STAGE1_FINAL_REVIEW_2026-09-30.md`
+- `ROUND_4_REPLAY_MANIFEST_2026-09-30.md`
 
-External vendor truth remains separate:
+## Accepted Stage-1 worker cuts
+
+```text
+Chat 1
+  branch: chat-1/pass-4
+  implementation: 1bd52e0a6c339e8f68fbae4d9005c8df86824e31
+  frozen handoff head: a7d607f8cdd281749ae40529de15c2d84dfda78e
+  -> ACCEPTED_FOR_DEPUTY1_REPLAY
+
+Chat 2
+  branch: chat-2/pass-6
+  implementation: b5f7a85c66a0c72aa41edd1b045fa5a9f474b9e7
+  frozen handoff head: 539d58567046fd29ccf2d42b629227ffe8da6546
+  -> ACCEPTED_FOR_DEPUTY1_REPLAY
+
+Chat 3
+  branch: chat-3/pass-8
+  replay implementation: 1a6b58e6e87786b8e67e6f8525ece98e588dfad3
+  frozen handoff head: d786e1d49b5c8f2837a3ce936f7f1c0d93336d49
+  -> ACCEPTED_FOR_DEPUTY1_REPLAY
+
+Chat 4
+  branch: chat-4/pass-7
+  cumulative implementation: d9633e3b8e95158d359e502e9797d4876384cd09
+  frozen handoff head: 61f37a4dd46921b7fe9145bcbe5242bc3f6417b3
+  -> ACCEPTED_FOR_DEPUTY1_REPLAY
+
+Chat 5
+  branch: chat-5/pass-8
+  implementation: 1b45f9a2b815ff4a150dd9a49d21dde4abdde9df
+  frozen handoff head: 82e2203aaeb69ee1fe9f89fd42d0aea451b8690f
+  -> ACCEPTED_FOR_DEPUTY1_REPLAY
+```
+
+Worker-local pass numbers are cumulative worker cuts, not central-round numbers.
+
+## Stage-1 replay validation
+
+Chat 6 did not merge diverged worker histories.
+
+A validation composition was constructed over current accepted `main` while preserving Chat-6-owned/shared infrastructure.
+
+Validation branch:
+
+`integration/pass-4-stage1-replay-candidate`
+
+Validation commit:
+
+`0a46ebb27abd3267e46afaf86b50383ab6b7d5a0`
+
+Validation tree:
+
+`d1fd50f49dd041e4b2be383be330f9a30255b43a`
+
+GitHub Actions:
+
+`36726156911` — `SUCCESS`
+
+Actually executed + successful:
+
+- Contracts / canonical fixtures;
+- all five slice jobs;
+- Chat 1 -> Chat 2;
+- Chat 2 -> Chat 3;
+- Chat 3 -> Chat 4;
+- Chat 4 -> Chat 5;
+- golden path.
+
+The previously known Chat-3 stale shared-test problem is closed for Stage 1 because the current-main replay passes Chat3->Chat4 on current shared infrastructure.
+
+## Integration policy for Deputy 1
+
+Deputy 1 is now authorized to create the official:
+
+`integration/pass-4-candidate`
+
+from the then-current `main`.
+
+Deputy 1 must:
+
+1. independently audit Chat-6 Stage-1 conclusions and replay manifest;
+2. preserve current `.github/workflows`, `core/contracts`, canonical fixtures and Chat-6-owned integration tests;
+3. integrate only accepted worker-owned Round-4 content;
+4. avoid blind worker-history merges;
+5. obtain full candidate CI with all slice jobs, contracts, all four boundary jobs and golden path actually executed + SUCCESS;
+6. publish Stage-2 audit/candidate evidence;
+7. return the candidate to Chat 8 without merging to `main`.
+
+The Chat-6 validation branch is evidence only and is not the final Deputy-1 candidate.
+
+## External environment truth
 
 ```text
 REAL_SOLIDWORKS_2026_HOST = EXTERNAL_GATE_UNVERIFIED
@@ -38,101 +124,15 @@ PRODUCTION_CSHARP_INTEROP_BUILD = UNVERIFIED
 NATIVE_SLDPRT_GENERATION_READBACK = UNVERIFIED
 ```
 
-## Round 4 purpose
-
-Round 4 is **Backlog Reconciliation & Cross-Slice Truth Hardening**.
-
-Primary review documents:
-
-- `ROUND_4_STAGE1_PARTIAL_REVIEW_2026-09-30.md`;
-- `ROUND_4_STAGE1_RECHECK_2026-09-30.md`;
-- `ROUND_4_STAGE1_RECHECK_2_2026-09-30.md`.
-
-## Round 4 selected worker cuts and Stage-1 state
-
-```text
-Chat 1  chat-1/pass-4
-        implementation/pre-handoff: 1bd52e0a6c339e8f68fbae4d9005c8df86824e31
-        frozen branch head: a7d607f8cdd281749ae40529de15c2d84dfda78e
-        Pass-4 OD-004 handoff present and frozen
-        pre-handoff CI 36719112956 = SUCCESS
-        -> PROVISIONALLY_ACCEPTED_FOR_FILE_LEVEL_REPLAY
-
-Chat 2  chat-2/pass-6 @ 539d58567046fd29ccf2d42b629227ffe8da6546
-        frozen handoff present
-        -> PROVISIONALLY_ACCEPTED_FOR_FILE_LEVEL_REPLAY
-
-Chat 3  chat-3/pass-8 @ d786e1d49b5c8f2837a3ce936f7f1c0d93336d49
-        frozen handoff present
-        known stale shared-baseline drift
-        -> PROVISIONALLY_ACCEPTED_WITH_CURRENT_MAIN_REPLAY_REQUIRED
-
-Chat 4  chat-4/pass-7 @ 2b4b34fe4d5053b189bc65172e04150eda4e29b7
-        OD-004 delivered
-        branch has not moved after directive delivery
-        current ORCHESTRATOR_HANDOFF still describes Pass 3 / chat-4/pass-3
-        -> FIX_REQUIRED_HANDOFF_ONLY
-
-Chat 5  chat-5/pass-8 @ 82e2203aaeb69ee1fe9f89fd42d0aea451b8690f
-        frozen handoff present
-        -> PROVISIONALLY_ACCEPTED_FOR_FILE_LEVEL_REPLAY
-```
-
-Worker-local pass numbers are not central-round numbers.
-
-## Chat 1 final Stage-1 recheck
-
-Chat 1's previous handoff blocker is closed.
-
-Independent checks:
-
-- final handoff explicitly identifies Pass 4 / OD-004 / `chat-1/pass-4`;
-- frozen branch HEAD is `a7d607f8cdd281749ae40529de15c2d84dfda78e`;
-- pre-handoff workflow `36719112956` is SUCCESS;
-- Contracts, Chat 1 slice and Chat1->Chat2 boundary are SUCCESS;
-- diff against accepted Round-3 baseline is historically diverged but the changed-file set is Chat-1-owned;
-- canonical CapturePackage v1 structure remains compatible;
-- recapture/reopen lineage remains explicit and fail closed;
-- historical evidence is not silently replaced.
-
-Blind branch-history merge remains forbidden; Chat-1-owned file-level replay is required.
-
-## Chat 4 remaining blocker
-
-Chat 4 has not yet responded to OD-004.
-
-Current remote head remains Chat-6 directive-delivery commit:
-
-`2b4b34fe4d5053b189bc65172e04150eda4e29b7`
-
-Current handoff still identifies Pass 3 and `chat-4/pass-3`.
-
-Required before Stage 1 can complete:
-
-1. truthful cumulative Pass-7 handoff on `chat-4/pass-7`;
-2. exact pre-handoff SHA and CI evidence;
-3. explicit branch freeze;
-4. preservation of `REAL_HOST = UNVERIFIED` unless actual controlled-host evidence exists.
-
-## Round 4 integration policy
-
-Future Round-4 candidate construction must start from the then-current accepted `main` and perform file-level replay of accepted worker-owned changes.
-
-Forbidden:
-
-- blind worker-history merge;
-- whole-worker-directory replacement;
-- importing stale `.github/workflows`, `core/contracts`, canonical fixtures or shared integration tests from worker ancestry;
-- overwriting current Chat-6-owned directive files with stale worker copies.
+No GitHub-hosted/mock evidence may promote these states.
 
 ## Current state machine
 
 ```text
 ROUND_3_CLOSED
     -> ROUND_4_STAGE0_COMPLETE
-    -> ROUND_4_STAGE1_PARTIAL_REVIEW
-    -> CHAT1_HANDOFF_VERIFIED
-    -> WAITING_ONLY_FOR_CHAT4_CURRENT_HANDOFF
-    -> ROUND_4_STAGE1_COMPLETE = FALSE
-    -> INTEGRATION_PASS_4_CANDIDATE_NOT_AUTHORIZED
+    -> ROUND_4_STAGE1_COMPLETE
+    -> STAGE1_REPLAY_VALIDATED_GREEN
+    -> READY_FOR_DEPUTY1
+    -> INTEGRATION_PASS_4_CANDIDATE_PENDING
 ```
