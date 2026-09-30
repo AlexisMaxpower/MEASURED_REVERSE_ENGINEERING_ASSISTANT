@@ -4,6 +4,7 @@ from .constraint_system import ConstraintSystemAnalyzer
 from .constraints import ConstraintResolver
 from .contracts import CanonicalGeometryInput
 from .core import GeometryPipeline
+from .dof_audit import StructuralDofAnalyzer, StructuralDofAudit
 from .sketch_package import SketchPackageBuilder
 from .vision import GeometryExtractionResult
 
@@ -17,11 +18,13 @@ class VisionGeometryPipeline:
         geometry: GeometryPipeline | None = None,
         constraint_resolver: ConstraintResolver | None = None,
         constraint_system_analyzer: ConstraintSystemAnalyzer | None = None,
+        dof_analyzer: StructuralDofAnalyzer | None = None,
         builder: SketchPackageBuilder | None = None,
     ) -> None:
         self.geometry = geometry or GeometryPipeline()
         self.constraint_resolver = constraint_resolver or ConstraintResolver()
         self.constraint_system_analyzer = constraint_system_analyzer or ConstraintSystemAnalyzer()
+        self.dof_analyzer = dof_analyzer or StructuralDofAnalyzer()
         self.builder = builder or SketchPackageBuilder()
 
     def build_sketch(
@@ -46,3 +49,15 @@ class VisionGeometryPipeline:
         )
         package["unresolved"].sort(key=lambda item: item["unresolved_id"])
         return package
+
+    def audit_structural_dof(
+        self,
+        extraction: GeometryExtractionResult,
+        context: CanonicalGeometryInput,
+    ) -> StructuralDofAudit:
+        """Return a conservative DOF lower-bound audit without mutating the sketch."""
+
+        draft = self.geometry.build(extraction.primitives, context.measurements)
+        resolution = self.constraint_resolver.resolve(draft)
+        system_analysis = self.constraint_system_analyzer.analyze(resolution)
+        return self.dof_analyzer.analyze(draft, system_analysis.resolution)
