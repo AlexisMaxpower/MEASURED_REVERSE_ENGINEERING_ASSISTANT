@@ -1,11 +1,11 @@
 # Chat 5 — Lifecycle & Engineering Knowledge
 
-Статус: **Pass 9 read-only HTTP/API transport implemented**  
+Статус: **Pass 10 authenticated HTTP cursors implemented**  
 Проект: **MREA — Measured Reverse Engineering Assistant**  
 Источник истины: **MREA SSOT v0.1 + orchestration addendum v0.2**  
-Запуск Pass 9: **direct user instruction; newer Chat-5-specific directive was absent on `main`**  
-Рабочая ветка: `chat-5/pass-9`  
-База ветки: `82e2203aaeb69ee1fe9f89fd42d0aea451b8690f` (frozen Pass 8 handoff)
+Запуск Pass 10: **direct user instruction; newer Chat-5-specific directive was absent on `main`**  
+Рабочая ветка: `chat-5/pass-10`  
+База ветки: `07b9b768404436707575869e7188e0392a021ba5` (frozen Pass 9 handoff)
 
 ## Назначение области
 
@@ -20,6 +20,7 @@ Revision
 → deterministic engineering knowledge queries
 → snapshot-bound pagination
 → local/internal read-only HTTP transport
+→ optional authenticated HTTP cursor boundary
 ```
 
 ## Реализовано
@@ -54,13 +55,14 @@ Revision
 
 ### Pass 9
 
-Added dependency-free WSGI transport:
+Added dependency-free GET-only WSGI transport with:
 
-```python
-from mrea_lifecycle import build_read_only_lifecycle_http_app
-
-app = build_read_only_lifecycle_http_app("lifecycle.db")
-```
+- verified `SQLiteLifecycleReadOnlySession` per successful request;
+- strict route/query validation;
+- deterministic JSON;
+- stale read model → `409`;
+- unavailable/invalid database → `503`;
+- no writable endpoints.
 
 HTTP API schema:
 
@@ -68,50 +70,47 @@ HTTP API schema:
 mrea.lifecycle-http.v1
 ```
 
-Read routes:
+### Pass 10
+
+Added optional HMAC-SHA256 authentication for pagination cursors crossing the HTTP boundary.
+
+Authenticated cursor format:
 
 ```text
-GET /health
-GET /v1/lifecycle/revisions
-GET /v1/lifecycle/failures
-GET /v1/lifecycle/equipment-occupancy
-GET /v1/lifecycle/physical-timeline
-GET /v1/knowledge/revision-lineage
-GET /v1/knowledge/revision-outcomes
-GET /v1/knowledge/equipment-history
-GET /v1/knowledge/failure-patterns
-GET /v1/knowledge/replacement-chain
+mrea.http-cursor.v1
 ```
 
-Transport guarantees:
+Configuration example:
 
-- GET-only;
-- fresh `SQLiteLifecycleReadOnlySession` per successful request;
-- strict known-route / known-query-parameter validation;
-- duplicate query parameters rejected;
-- Pass-8 cursor validation preserved;
-- stale read model fails closed with `409`;
-- missing/invalid database fails closed with `503`;
-- deterministic JSON serialization;
-- no write service or Unit of Work exposed by the production transport.
+```python
+from mrea_lifecycle import build_read_only_lifecycle_http_app
 
-No FastAPI/Flask dependency was added. The API uses Python WSGI so Chat 5 does not modify repository-wide dependency/CI policy.
+app = build_read_only_lifecycle_http_app(
+    "lifecycle.db",
+    cursor_signing_key=secret_key,
+    cursor_key_id="2026-09-primary",
+)
+```
+
+Guarantees:
+
+- minimum 32-byte binary signing key;
+- HMAC-SHA256;
+- constant-time MAC comparison;
+- key identifiers;
+- previous-key verification during rotation;
+- newly emitted cursors always use the active key;
+- tampered, malformed, unknown-key and wrong-key cursors fail closed;
+- underlying Pass-8 query/snapshot binding is preserved;
+- unsigned Pass-9 mode remains available when no signing key is configured.
+
+`GET /health` reports only cursor mode and active key ID, never key material.
 
 ## Verification
 
-Independent GitHub-hosted Chat 5 implementation CI on SHA:
+Pass 10 adds `tests/test_http_cursor_auth.py` for primitive, HTTP integration, tampering, wrong-key handling, key rotation, query binding, snapshot binding and backward compatibility.
 
-```text
-44dc38b040ee5e72248e9554c7bde44bd553632d
-```
-
-Result:
-
-```text
-46 passed in 1.66s
-```
-
-Required canonical contract and `Integration / Chat 4 -> Chat 5` gates are rechecked on the documented pre-handoff state before final branch freeze.
+GitHub-hosted implementation and cross-slice gates are checked on the current Pass-10 branch before final handoff.
 
 ## Documentation
 
@@ -122,18 +121,20 @@ Required canonical contract and `Integration / Chat 4 -> Chat 5` gates are reche
 - `docs/PASS_7_ENGINEERING_KNOWLEDGE_QUERIES.md`
 - `docs/PASS_8_KNOWLEDGE_PAGINATION.md`
 - `docs/PASS_9_READ_ONLY_HTTP_API.md`
+- `docs/PASS_10_AUTHENTICATED_HTTP_CURSORS.md`
 - `docs/IMPLEMENTATION_STATE.md`
 - `ORCHESTRATOR_HANDOFF.md`
 
 ## Still intentionally out of scope
 
-- public/remote network exposure;
-- authentication and authorization;
-- TLS / reverse-proxy / CORS policy;
+- client authentication and authorization;
+- TLS / reverse-proxy / CORS / rate-limiting policy;
+- secret provisioning/storage policy;
 - framework-specific application shell;
-- authenticated cursor signing across an external trust boundary;
 - keyset pagination for very large datasets;
 - materialized analytical aggregates;
 - AI / semantic interpretation;
 - field-device synchronization;
 - shared contract expansion for physical-only events.
+
+Pass 10 authenticates pagination cursors only; it does not by itself make the API an Internet-facing security boundary.
