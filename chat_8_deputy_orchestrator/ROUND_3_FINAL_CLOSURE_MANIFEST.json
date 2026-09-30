@@ -1,0 +1,67 @@
+{
+  "schema": "mrea.round3.final-closure.v1",
+  "status": "ROUND_3_CLOSED",
+  "finding_001": "CLOSED",
+  "finding_002": "CLOSED",
+  "candidate": {
+    "branch": "integration/pass-3-candidate",
+    "sha": "1c9ccb432664e57a24be8fe586bb07ad13fd5075",
+    "tree_sha": "435dda140d3980256ca32c42bd07d81b15c4328c",
+    "parent_sha": "dcdb1b7a1399415522a1a17a7979dda536f116f4",
+    "ci_run_id": 36644505122,
+    "ci_conclusion": "success"
+  },
+  "merge": {
+    "pull_request": 27,
+    "expected_head_sha": "1c9ccb432664e57a24be8fe586bb07ad13fd5075",
+    "merged": true,
+    "main_sha": "bffc1dec2fe63c12b69a50c4bf348ef7df4cf662",
+    "main_tree_sha": "435dda140d3980256ca32c42bd07d81b15c4328c",
+    "pre_merge_main_parent": "dcdb1b7a1399415522a1a17a7979dda536f116f4",
+    "candidate_parent": "1c9ccb432664e57a24be8fe586bb07ad13fd5075"
+  },
+  "post_merge_ci": {
+    "workflow": "MREA CI",
+    "run_id": 36651010221,
+    "event": "push",
+    "head_branch": "main",
+    "head_sha": "bffc1dec2fe63c12b69a50c4bf348ef7df4cf662",
+    "run_attempt": 1,
+    "status": "completed",
+    "conclusion": "success",
+    "required_jobs": {
+      "Contracts / canonical fixtures": "success",
+      "Chat 1 / Capture": "success",
+      "Chat 2 / Measurement": "success",
+      "Chat 3 / Geometry": "success",
+      "Chat 4 / Generic CAD gate": "success",
+      "Chat 5 / Lifecycle": "success",
+      "Integration / Chat 1 -> Chat 2": "success",
+      "Integration / Chat 2 -> Chat 3": "success",
+      "Integration / Chat 3 -> Chat 4": "success",
+      "Integration / Chat 4 -> Chat 5": "success",
+      "Integration / Round 3 golden path": "success"
+    },
+    "golden_step": "Run Round 3 Capture -> Physical Instance golden path",
+    "golden_step_conclusion": "success"
+  },
+  "frozen_worker_heads": {
+    "chat_1": "55918486d49a28ac85bf83a95e9917e40add79e2",
+    "chat_2": "7311d95000d457e1010c95dbefe6ed0ad588203d",
+    "chat_3": "08e716161a8c9173b7583d6ad87c84c10ddc4221",
+    "chat_4": "08beb9c45cdc1bbbcdebe220059a64288a880095",
+    "chat_5": "cdc5baceb281b657680d1e38cc49ea8094669ad8"
+  },
+  "frozen_worker_trees": {
+    "chat_1_project_guided_capture": "8c0be3cba0fbebc9505565c2d4cabfd216e802da",
+    "chat_2_physical_measurement": "9cf8811b8565b4101ea2ecf87657882e44543243",
+    "chat_3_geometry_semi_automatic_sketch": "dee35a8f5d4781365b5613e8309ebb1f86f3d916",
+    "chat_4_cad_bridge_verification": "c19331c4d91c8069e52e04a2a213e1f13d16dcdd",
+    "chat_5_lifecycle_engineering_knowledge": "9e66264d5d19932883a34e753f320cefb8e76a8b"
+  },
+  "external_gate": {
+    "real_solidworks_2026_host": "UNVERIFIED",
+    "production_csharp_interop_build": "UNVERIFIED",
+    "native_sldprt_generation_readback": "UNVERIFIED"
+  }
+}
