@@ -7,6 +7,13 @@ from .calibration import (
     OpenCvCharucoCalibrationDetector,
 )
 from .contracts import CanonicalContractBuilder, CanonicalContractError
+from .lineage import (
+    CaptureLineageError,
+    active_clean_reference,
+    calibration_for_active_reference,
+    measurement_frames_for_active_reference,
+    rectification_for_active_reference,
+)
 from .guidance import (
     GuidedCaptureAction,
     GuidedCaptureBlockerCode,
@@ -83,6 +90,7 @@ __all__ = [
     "CaptureQualityResult",
     "CaptureQualityService",
     "CaptureQualityVerdict",
+    "CaptureLineageError",
     "CanonicalContractBuilder",
     "CanonicalContractError",
     "CapturePlan",
@@ -124,4 +132,8 @@ __all__ = [
     "RectificationService",
     "RectifiedRaster",
     "RectifiedReferenceRecord",
+    "active_clean_reference",
+    "calibration_for_active_reference",
+    "measurement_frames_for_active_reference",
+    "rectification_for_active_reference",
 ]
