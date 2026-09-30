@@ -2,54 +2,59 @@
 
 **Central round:** 4  
 **Directive:** `OD-2026-09-30-004`  
-**Status:** Stage 1 incomplete; blocked only on Chat 4 current-pass handoff
+**Status:** Stage 1 COMPLETE — READY FOR DEPUTY 1
 
-## Accepted central baseline
+## Stage-1 accepted cuts
 
-Round 3 is closed on:
+| Slice | Frozen worker cut | Stage-1 verdict |
+|---|---|---|
+| Chat 1 — Project & Guided Capture | `chat-1/pass-4` @ `a7d607f8cdd281749ae40529de15c2d84dfda78e` | `ACCEPTED_FOR_DEPUTY1_REPLAY` |
+| Chat 2 — Physical Measurement | `chat-2/pass-6` @ `539d58567046fd29ccf2d42b629227ffe8da6546` | `ACCEPTED_FOR_DEPUTY1_REPLAY` |
+| Chat 3 — Geometry & Sketch | `chat-3/pass-8` @ `d786e1d49b5c8f2837a3ce936f7f1c0d93336d49` | `ACCEPTED_FOR_DEPUTY1_REPLAY` |
+| Chat 4 — CAD Bridge & Verification | `chat-4/pass-7` @ `61f37a4dd46921b7fe9145bcbe5242bc3f6417b3` | `ACCEPTED_FOR_DEPUTY1_REPLAY` |
+| Chat 5 — Lifecycle & Engineering Knowledge | `chat-5/pass-8` @ `82e2203aaeb69ee1fe9f89fd42d0aea451b8690f` | `ACCEPTED_FOR_DEPUTY1_REPLAY` |
 
-- software baseline `bffc1dec2fe63c12b69a50c4bf348ef7df4cf662`;
-- post-merge CI `36651010221` — SUCCESS;
-- Round-3 golden path — SUCCESS.
+## Replay validation
 
-## Round-4 selected cuts
+Stage-1 validation branch:
 
-| Slice | Selected Round-4 cut | Current Stage-1 status | Required next evidence |
-|---|---|---|---|
-| Chat 1 — Project & Guided Capture | `chat-1/pass-4`; implementation `1bd52e0a6c339e8f68fbae4d9005c8df86824e31`; frozen head `a7d607f8cdd281749ae40529de15c2d84dfda78e` | `PROVISIONALLY_ACCEPTED_FOR_FILE_LEVEL_REPLAY` | current-main replay + Chat1->Chat2 central verification |
-| Chat 2 — Physical Measurement | `chat-2/pass-6` @ `539d58567046fd29ccf2d42b629227ffe8da6546` | `PROVISIONALLY_ACCEPTED_FOR_FILE_LEVEL_REPLAY` | current-main replay + adjacent boundary verification |
-| Chat 3 — Geometry & Sketch | `chat-3/pass-8` @ `d786e1d49b5c8f2837a3ce936f7f1c0d93336d49` | `PROVISIONALLY_ACCEPTED_WITH_CURRENT_MAIN_REPLAY_REQUIRED` | current-main replay; Chat2->3 and Chat3->4 SUCCESS |
-| Chat 4 — CAD Bridge & Verification | `chat-4/pass-7` @ `2b4b34fe4d5053b189bc65172e04150eda4e29b7` | `FIX_REQUIRED_HANDOFF_ONLY` | truthful cumulative Pass-7 handoff + freeze; preserve real-host UNVERIFIED |
-| Chat 5 — Lifecycle & Engineering Knowledge | `chat-5/pass-8` @ `82e2203aaeb69ee1fe9f89fd42d0aea451b8690f` | `PROVISIONALLY_ACCEPTED_FOR_FILE_LEVEL_REPLAY` | current-main replay + Chat4->5 / golden verification |
+`integration/pass-4-stage1-replay-candidate`
 
-## Chat 1 evidence
+Commit:
 
-- final handoff: Pass 4 / `OD-2026-09-30-004` / `chat-1/pass-4`;
-- frozen head: `a7d607f8cdd281749ae40529de15c2d84dfda78e`;
-- pre-handoff CI: `36719112956` — SUCCESS;
-- Contracts — SUCCESS;
-- Chat 1 / Capture — SUCCESS;
-- Integration / Chat 1 -> Chat 2 — SUCCESS;
-- no shared canonical contract modification in the accepted worker delta;
-- active clean-reference lineage / recapture semantics remain explicit and fail closed.
+`0a46ebb27abd3267e46afaf86b50383ab6b7d5a0`
 
-## Chat 4 blocker
+Tree:
 
-Current `chat-4/pass-7` head remains:
+`d1fd50f49dd041e4b2be383be330f9a30255b43a`
 
-`2b4b34fe4d5053b189bc65172e04150eda4e29b7`
+CI run:
 
-This is Chat 6's OD-004 delivery commit. No later worker handoff/freeze commit is present.
+`36726156911` — `SUCCESS`
 
-Current `ORCHESTRATOR_HANDOFF.md` still identifies Pass 3 / `chat-4/pass-3`.
+Executed + SUCCESS:
 
-Therefore:
+- Contracts / canonical fixtures;
+- Chat 1 / Capture;
+- Chat 2 / Measurement;
+- Chat 3 / Geometry;
+- Chat 4 / Generic CAD gate;
+- Chat 5 / Lifecycle;
+- Integration / Chat 1 -> Chat 2;
+- Integration / Chat 2 -> Chat 3;
+- Integration / Chat 3 -> Chat 4;
+- Integration / Chat 4 -> Chat 5;
+- golden path.
+
+## Stage-2 authorization
 
 ```text
-CHAT_4_CURRENT_HANDOFF = MISSING
-ROUND_4_STAGE1_COMPLETE = FALSE
-INTEGRATION_PASS_4_CANDIDATE_AUTHORIZED = FALSE
+ROUND_4_STAGE1_COMPLETE = TRUE
+DEPUTY1_AUTHORIZED = TRUE
+OFFICIAL_INTEGRATION_PASS_4_CANDIDATE = PENDING_DEPUTY1
 ```
+
+Deputy 1 must independently audit the Stage-1 result and construct `integration/pass-4-candidate` from the then-current `main` using the accepted replay manifest. The Chat-6 validation branch is not the final candidate.
 
 ## Runtime exception
 
@@ -58,5 +63,3 @@ REAL_SOLIDWORKS_2026_HOST = EXTERNAL_GATE_UNVERIFIED
 PRODUCTION_CSHARP_INTEROP_BUILD = UNVERIFIED
 NATIVE_SLDPRT_GENERATION_READBACK = UNVERIFIED
 ```
-
-GitHub-hosted generic/test-double evidence cannot promote these states.
