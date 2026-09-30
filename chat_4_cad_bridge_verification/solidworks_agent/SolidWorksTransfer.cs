@@ -250,6 +250,24 @@ namespace Mrea.SolidWorksCadAgent
                 return;
             }
 
+            if (constraint.type == "TANGENT")
+            {
+                if (constraint.entity_ids.Count != 2)
+                    throw new NotSupportedException("TANGENT requires exactly two entities: " + constraint.constraint_id);
+
+                var firstType = entitySpecs[constraint.entity_ids[0]].type;
+                var secondType = entitySpecs[constraint.entity_ids[1]].type;
+                var firstSupported = firstType == "LINE" || firstType == "CIRCLE" || firstType == "ARC";
+                var secondSupported = secondType == "LINE" || secondType == "CIRCLE" || secondType == "ARC";
+                if (!firstSupported || !secondSupported)
+                    throw new NotSupportedException(
+                        "TANGENT supports LINE/CIRCLE/ARC only: " + constraint.constraint_id);
+                if (firstType == "LINE" && secondType == "LINE")
+                    throw new NotSupportedException(
+                        "TANGENT requires at least one CIRCLE/ARC: " + constraint.constraint_id);
+                return;
+            }
+
             throw new NotSupportedException(
                 "Unsupported fail-closed canonical constraint type: " + constraint.type + " id=" + constraint.constraint_id);
         }
@@ -312,6 +330,7 @@ namespace Mrea.SolidWorksCadAgent
                 case "PERPENDICULAR": return "sgPERPENDICULAR";
                 case "CONCENTRIC": return "sgCONCENTRIC";
                 case "EQUAL": return "sgSAMELENGTH";
+                case "TANGENT": return "sgTANGENT";
                 default:
                     throw new NotSupportedException("Unsupported relation mapping: " + constraintType);
             }
