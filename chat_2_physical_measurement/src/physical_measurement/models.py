@@ -79,7 +79,12 @@ class FeatureAnchor:
 
 @dataclass(frozen=True, slots=True)
 class PhysicalMeasurement:
-    """Internal physical measurement with unit-neutral uncertainty semantics.
+    """Internal physical measurement aligned with canonical 1..3 anchor cardinality.
+
+    ``anchor_a`` remains required for backward compatibility. ``anchor_b`` and
+    ``anchor_c`` are optional ordered slots. The :attr:`anchors` property exposes
+    the canonical ordered tuple without forcing existing two-anchor callers to
+    migrate.
 
     ``uncertainty`` is expressed in the measurement's own ``unit``. The legacy
     ``uncertainty_mm`` field remains temporarily available only as a compatibility
@@ -93,7 +98,8 @@ class PhysicalMeasurement:
     source: ProvenanceSource
     view_id: str
     anchor_a: FeatureAnchor
-    anchor_b: FeatureAnchor
+    anchor_b: FeatureAnchor | None = None
+    anchor_c: FeatureAnchor | None = None
     evidence_frame_id: str | None = None
     uncertainty: Decimal | None = None
     uncertainty_mm: Decimal | None = None
@@ -145,13 +151,20 @@ class PhysicalMeasurement:
             resolved_uncertainty if self.unit == "mm" else None,
         )
 
-        if self.anchor_a.anchor_id == self.anchor_b.anchor_id:
-            raise ValueError("anchor_a and anchor_b must be different")
-        for anchor in (self.anchor_a, self.anchor_b):
+        if self.anchor_c is not None and self.anchor_b is None:
+            raise ValueError("anchor_c requires anchor_b so anchor order remains contiguous")
+
+        anchors = self.anchors
+        anchor_ids = [anchor.anchor_id for anchor in anchors]
+        if len(anchor_ids) != len(set(anchor_ids)):
+            raise ValueError("measurement anchors must be unique")
+        for anchor in anchors:
             if anchor.view_id != self.view_id:
-                raise ValueError("measurement view_id must match both anchors")
-        if self.anchor_a.reference_frame_id != self.anchor_b.reference_frame_id:
-            raise ValueError("both anchors must belong to the same reference frame")
+                raise ValueError("measurement view_id must match all anchors")
+        reference_frame_ids = {anchor.reference_frame_id for anchor in anchors}
+        if len(reference_frame_ids) != 1:
+            raise ValueError("all anchors must use the same reference frame")
+
         candidate_sources = {
             ProvenanceSource.MANUAL_MEASURED,
             ProvenanceSource.DEVICE_REPORTED,
@@ -166,6 +179,16 @@ class PhysicalMeasurement:
             raise ValueError("confirmed measurement requires confirmation_source")
         if not self.confirmed and self.confirmed_at is not None:
             raise ValueError("unconfirmed measurement cannot have confirmed_at")
+
+    @property
+    def anchors(self) -> tuple[FeatureAnchor, ...]:
+        """Ordered 1..3 anchor view matching canonical ``PhysicalMeasurement``."""
+
+        return tuple(
+            anchor
+            for anchor in (self.anchor_a, self.anchor_b, self.anchor_c)
+            if anchor is not None
+        )
 
     @property
     def is_verified(self) -> bool:
