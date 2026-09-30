@@ -32,3 +32,18 @@ Before this work can be considered official Pass 4:
 3. this branch must be rebased/reconstructed onto that accepted baseline if required;
 4. full repository CI and Chat 1 -> Chat 2 boundary must be green;
 5. only then should an official `ORCHESTRATOR_HANDOFF.md` be published/frozen.
+
+
+## Additional isolated delta — recapture lineage
+
+The branch also closes the rejected-capture recovery gap:
+
+- immutable clean-reference supersession chain;
+- explicit active clean reference per view;
+- measurement frames linked to their source clean attempt;
+- old calibration/quality/rectification/measurement evidence preserved;
+- active-attempt filtering at every Chat 1 service and canonical boundary;
+- `RECAPTURE_CLEAN_REFERENCE` is now an executable guided action for rejected quality;
+- legacy single-clean persisted sessions migrate deterministically.
+
+No shared contract or Chat 2–5 file is modified. This delta remains provisional until the official next Chat 1 directive.
