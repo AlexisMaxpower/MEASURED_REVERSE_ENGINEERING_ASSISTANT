@@ -1,11 +1,11 @@
 # Chat 5 — Lifecycle & Engineering Knowledge
 
-Статус: **Pass 8 snapshot-bound engineering knowledge pagination implemented**  
+Статус: **Pass 9 read-only HTTP/API transport implemented**  
 Проект: **MREA — Measured Reverse Engineering Assistant**  
 Источник истины: **MREA SSOT v0.1 + orchestration addendum v0.2**  
-Запуск Pass 8: **direct user instruction; newer Chat-5-specific directive was absent on `main`**  
-Рабочая ветка: `chat-5/pass-8`  
-База ветки: `d9bed012eb8bbcea338522847a46572bb5415026` (frozen Pass 7 handoff)
+Запуск Pass 9: **direct user instruction; newer Chat-5-specific directive was absent on `main`**  
+Рабочая ветка: `chat-5/pass-9`  
+База ветки: `82e2203aaeb69ee1fe9f89fd42d0aea451b8690f` (frozen Pass 8 handoff)
 
 ## Назначение области
 
@@ -15,14 +15,11 @@ Chat 5 ведёт инженерную историю ревизии и факт
 Revision
 → ManufacturingRecord
 → PhysicalPartInstance
-→ Installed
-→ Tested
-→ Active / In service
-→ Failed
-→ Removed
-→ Superseded by replacement
+→ Installed / Tested / Active
+→ Failed / Removed / Superseded
 → deterministic engineering knowledge queries
-→ bounded snapshot-consistent pages
+→ snapshot-bound pagination
+→ local/internal read-only HTTP transport
 ```
 
 ## Реализовано
@@ -33,7 +30,7 @@ Revision
 - canonical LifecycleEvent v1 adapter;
 - CAD verification → manufacturing gate;
 - PhysicalPartInstance identity/state machine;
-- exact installation/test/failure evidence linkage;
+- exact evidence linkage;
 - removal/replacement/supersession.
 
 ### Pass 4–6
@@ -46,73 +43,75 @@ Revision
 - verified backup/restore;
 - read-only SQLite session.
 
-### Pass 7
+### Pass 7–8
 
-- deterministic revision lineage;
-- factual revision outcome summaries;
+- deterministic revision lineage and factual outcome summaries;
 - equipment/position history;
-- exact recurring failure-pattern groups;
-- explicit replacement chains;
-- fail-closed graph integrity checks.
+- recurring exact failure-pattern groups;
+- replacement chains;
+- fail-closed graph integrity checks;
+- opaque `mrea.knowledge-cursor.v1` pagination bound to query filters and committed snapshot version.
 
-### Pass 8
+### Pass 9
 
-Added opaque snapshot-bound knowledge pagination:
+Added dependency-free WSGI transport:
 
 ```python
-page = session.knowledge.revision_outcomes_page(
-    "PART-0042",
-    limit=100,
-)
+from mrea_lifecycle import build_read_only_lifecycle_http_app
 
-while page.next_cursor is not None:
-    page = session.knowledge.revision_outcomes_page(
-        "PART-0042",
-        limit=100,
-        cursor=page.next_cursor,
-    )
+app = build_read_only_lifecycle_http_app("lifecycle.db")
 ```
 
-Cursor guarantees:
+HTTP API schema:
 
 ```text
-format = mrea.knowledge-cursor.v1
-query/filter fingerprint must match
-cursor snapshot_version must equal current read-only snapshot
-checksum must match
-limit must be 1..500
+mrea.lifecycle-http.v1
 ```
 
-Paginated surfaces:
+Read routes:
 
-- `revision_outcomes_page()`;
-- `equipment_position_history_page()`;
-- `failure_patterns_page()`.
+```text
+GET /health
+GET /v1/lifecycle/revisions
+GET /v1/lifecycle/failures
+GET /v1/lifecycle/equipment-occupancy
+GET /v1/lifecycle/physical-timeline
+GET /v1/knowledge/revision-lineage
+GET /v1/knowledge/revision-outcomes
+GET /v1/knowledge/equipment-history
+GET /v1/knowledge/failure-patterns
+GET /v1/knowledge/replacement-chain
+```
 
-Equipment history pagination also supports exact filters for:
+Transport guarantees:
 
-- position;
-- event type;
-- revision ID;
-- physical instance ID.
+- GET-only;
+- fresh `SQLiteLifecycleReadOnlySession` per successful request;
+- strict known-route / known-query-parameter validation;
+- duplicate query parameters rejected;
+- Pass-8 cursor validation preserved;
+- stale read model fails closed with `409`;
+- missing/invalid database fails closed with `503`;
+- deterministic JSON serialization;
+- no write service or Unit of Work exposed by the production transport.
 
-`revision_lineage()` and `replacement_chain()` deliberately remain whole-graph/whole-chain integrity operations instead of being split into unsafe partial traversals.
-
-## Backward compatibility
-
-All Pass-7 tuple-returning knowledge queries remain unchanged.
-
-No SQLite migration or shared MREA contract change was needed.
+No FastAPI/Flask dependency was added. The API uses Python WSGI so Chat 5 does not modify repository-wide dependency/CI policy.
 
 ## Verification
 
-Independent GitHub-hosted Chat 5 CI on implementation SHA `1a6803bff00eeaa43ffb18fb18c86695c59403d2`:
+Independent GitHub-hosted Chat 5 implementation CI on SHA:
 
 ```text
-40 passed in 1.51s
+44dc38b040ee5e72248e9554c7bde44bd553632d
 ```
 
-Required canonical contract and `Integration / Chat 4 -> Chat 5` gates are rechecked on the final documented pre-handoff state before branch freeze.
+Result:
+
+```text
+46 passed in 1.66s
+```
+
+Required canonical contract and `Integration / Chat 4 -> Chat 5` gates are rechecked on the documented pre-handoff state before final branch freeze.
 
 ## Documentation
 
@@ -122,13 +121,17 @@ Required canonical contract and `Integration / Chat 4 -> Chat 5` gates are reche
 - `docs/PASS_6_BACKUP_RESTORE_READ_ONLY.md`
 - `docs/PASS_7_ENGINEERING_KNOWLEDGE_QUERIES.md`
 - `docs/PASS_8_KNOWLEDGE_PAGINATION.md`
+- `docs/PASS_9_READ_ONLY_HTTP_API.md`
 - `docs/IMPLEMENTATION_STATE.md`
 - `ORCHESTRATOR_HANDOFF.md`
 
 ## Still intentionally out of scope
 
-- REST/API transport;
-- cryptographically authenticated cursors across an external trust boundary;
+- public/remote network exposure;
+- authentication and authorization;
+- TLS / reverse-proxy / CORS policy;
+- framework-specific application shell;
+- authenticated cursor signing across an external trust boundary;
 - keyset pagination for very large datasets;
 - materialized analytical aggregates;
 - AI / semantic interpretation;
