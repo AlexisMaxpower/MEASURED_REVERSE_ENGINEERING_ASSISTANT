@@ -6,7 +6,7 @@
 **Branch:** `chat-5/pass-10.1`  
 **Base SHA:** `8044451abd050f69556c9274aec1a83caefad408` — frozen Chat 5 Pass 10  
 **Documented pre-handoff SHA:** `3333e1c801be35324e7947d2c6c97719ea015b59`  
-**Final state reconciliation SHA:** `625098bbc79d7482f2bffddbc3bb71c2636ddc05`  
+**Final state reconciliation SHA:** `5a94d600bc6db96a5eb449599546ac921085e783`  
 **Pre-handoff CI run:** `36728784438`  
 **Status at handoff:** required Chat 5 gates GREEN
 
