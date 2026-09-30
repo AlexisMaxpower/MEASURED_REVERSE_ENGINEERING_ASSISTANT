@@ -3,12 +3,25 @@
 ## Snapshot
 
 - Date: **2026-09-30**
-- Branch: `chat-5/pass-10`
+- Branch: `chat-5/pass-10.1`
 - Slice: **Lifecycle & Engineering Knowledge**
 - SSOT: **MREA v0.1 + orchestration addendum v0.2**
-- Pass 10 authorization: **direct user instruction; no newer Chat-5-specific directive present on `main` at branch start**
-- Base SHA: `07b9b768404436707575869e7188e0392a021ba5` (frozen Chat 5 Pass 9)
-- State: **authenticated HTTP cursors implemented; final CI/cross-slice gates and handoff pending**
+- Pass 10.1 authorization: **direct user instruction**
+- Central orchestrator state at start: **OD-2026-09-30-004 selects frozen Pass 8 for Round-4 review and does not centrally request new worker implementation**
+- Base SHA: `8044451abd050f69556c9274aec1a83caefad408` (frozen Chat 5 Pass 10)
+- State: **keyset pagination implementation complete; documented pre-handoff gates pending**
+
+## Orchestration truth
+
+Pass 10.1 is an explicit user-authorized worker continuation.
+
+It is not represented as:
+
+- accepted by Chat 6;
+- selected for central Round 4;
+- merged to `main`.
+
+The Chat-6-selected `chat-5/pass-8` branch remains untouched.
 
 ## Preserved baseline
 
@@ -29,184 +42,162 @@ Still active and unchanged:
 - verified backup/restore;
 - read-only SQLite query session;
 - deterministic engineering knowledge queries;
-- snapshot-bound knowledge pagination;
-- Pass-9 GET-only HTTP/API transport.
+- Pass-8 snapshot/query-bound cursor integrity;
+- Pass-9 GET-only HTTP transport;
+- Pass-10 HMAC HTTP cursor authentication and key rotation.
 
 No shared contract, canonical fixture, CI workflow, integration test, SQLite migration, or other chat-owned file was changed.
 
-## Pass 10 additions
+## Pass 10.1 additions
 
-### Authenticated HTTP cursor primitive
+### Knowledge cursor v2
 
-Added `src/mrea_lifecycle/http_cursor.py`.
-
-Public surface:
-
-- `HttpCursorAuthenticator`;
-- `LifecycleHttpCursorError`;
-- `HTTP_CURSOR_FORMAT_VERSION = mrea.http-cursor.v1`;
-- `MIN_HTTP_CURSOR_KEY_BYTES = 32`.
-
-The authenticator wraps the existing Pass-8 knowledge cursor rather than replacing it.
-
-### Authentication model
-
-Authenticated envelope fields:
+Added:
 
 ```text
-v    cursor format
-kid  key identifier
-c    inner knowledge cursor
-mac  HMAC-SHA256(v,kid,c)
+mrea.knowledge-cursor.v2
 ```
 
-The MAC is computed over canonical JSON with sorted keys and compact separators.
+V2 stores an ordered keyset tuple instead of an OFFSET position.
 
-Verification uses `hmac.compare_digest()`.
+New public types/constants include:
 
-### Key validation
+- `KNOWLEDGE_KEYSET_CURSOR_FORMAT_VERSION`;
+- `KnowledgeKeysetCursorState`;
+- `encode_knowledge_keyset_cursor()`;
+- `decode_knowledge_keyset_cursor()`.
 
-Fail-closed configuration rules:
+The decoder also accepts legacy `mrea.knowledge-cursor.v1` offset cursors.
 
-- signing key must be `bytes`;
-- signing key must be at least 32 bytes;
-- key ID must be a non-empty string;
-- key ID length is limited to 128 characters;
-- active key ID cannot map to conflicting verification-key bytes.
+### Keyset knowledge adapter
 
-### HTTP integration
+Added `SQLiteKeysetEngineeringKnowledgeRepository`.
 
-`ReadOnlyLifecycleHttpAPI` now accepts an optional `HttpCursorAuthenticator`.
+The adapter inherits existing factual semantics from `SQLiteEngineeringKnowledgeRepository` and overrides only the high-cardinality pagination execution paths.
 
-`build_read_only_lifecycle_http_app()` adds:
+`SQLiteLifecycleReadOnlySession` now instantiates the keyset adapter while keeping the public `.knowledge` return contract compatible with the existing repository base class.
 
-```python
-cursor_signing_key: bytes | None
-cursor_key_id: str = "default"
-cursor_verification_keys: Mapping[str, bytes] | None
-```
+### Revision outcome keyset
 
-Authenticated mode flow:
+Ordering:
 
 ```text
-external signed cursor
-→ HMAC verification
-→ inner mrea.knowledge-cursor.v1
-→ existing query/snapshot validation
-→ query execution
-→ inner next_cursor
-→ HMAC signing with active key
-→ external signed cursor
+created_at ASC,
+revision_id ASC
 ```
 
-### Key rotation
-
-Previous keys may be supplied through `cursor_verification_keys`.
-
-A cursor signed with a previous key remains accepted while that key ID is in the verification map. Every newly emitted cursor is signed with the current active key.
-
-### Health metadata
-
-Without authenticated mode:
+Continuation key:
 
 ```text
-cursor_authentication = checksum-only
+(created_at, revision_id)
 ```
 
-With authenticated mode:
+New v2 continuation uses key predicates and `LIMIT`, not `OFFSET`.
+
+### Equipment-history keyset
+
+Ordering:
 
 ```text
-cursor_authentication = hmac-sha256
-cursor_key_id = <active key id>
+occurred_at ASC,
+sequence ASC,
+event_id ASC
 ```
 
-No secret key material is serialized.
+Continuation key:
+
+```text
+(occurred_at, sequence, event_id)
+```
+
+The sequence/event ID pair provides deterministic tie-breaking.
+
+### Legacy v1 continuation
+
+A valid v1 cursor is still accepted by the keyset adapter.
+
+When a v1 cursor is supplied, the request stays on the old OFFSET continuation path for that legacy traversal. New traversals emit v2 keyset cursors.
+
+This preserves in-flight cursor continuity without forcing v1 state into v2 semantics.
+
+### Aggregate pagination boundary
+
+`failure_patterns_page()` intentionally remains the inherited v1 OFFSET implementation.
+
+Its first ordering key is a derived grouped `COUNT(*) DESC`; safe aggregate keyset continuation is deferred to a dedicated future slice instead of mixing aggregate semantics into this migration.
 
 ## Backward compatibility
 
-Pass 10 is additive.
-
 Unchanged:
 
-- direct Python lifecycle queries;
-- direct engineering knowledge queries;
-- `mrea.knowledge-cursor.v1` inner format;
-- query/filter binding;
+- query/filter fingerprinting;
 - snapshot-version binding;
-- persistence and relational schemas;
+- Pass-10 HMAC wrapper;
+- direct tuple knowledge queries;
+- HTTP route contract;
+- SQLite schemas;
 - lifecycle state transitions;
-- CAD verification/manufacturing eligibility;
-- canonical shared contracts;
-- checksum-only Pass-9 HTTP mode when no signing key is configured.
+- CAD eligibility;
+- canonical shared contracts.
 
 ## Verification
 
 ### New tests
 
-Added `tests/test_http_cursor_auth.py`.
+Added `tests/test_keyset_pagination_v2.py`.
 
 Coverage verifies:
 
-1. HMAC sign/verify round-trip;
-2. tampered token rejection;
-3. minimum signing-key length;
-4. binary key-type enforcement;
-5. signed HTTP pagination round-trip;
-6. authenticated health metadata;
-7. wrong-key / unknown-key rejection;
-8. rejection of raw unsigned cursor when authenticated mode is active;
-9. previous-key acceptance during rotation;
-10. re-signing with the current active key;
-11. preservation of query binding;
-12. preservation of snapshot staleness detection;
-13. checksum-only mode backward compatibility.
+1. revision outcomes emit v2 keyset state;
+2. six revisions traverse without duplicate/gap;
+3. v2 continuation SQL contains key predicates and no OFFSET;
+4. legacy v1 OFFSET cursor remains accepted;
+5. equipment history emits `(occurred_at, sequence, event_id)` keyset and continues exactly.
 
-### Required final gates
+Existing Pass-8/9/10 pagination, HTTP and HMAC tests run in the same suite against the new read-only adapter.
 
-Before handoff, verify on the documented pre-handoff SHA:
+### Implementation CI
 
-- `Chat 5 / Lifecycle`;
-- `Contracts / canonical fixtures`;
-- `Chat 4 / Generic CAD gate`;
-- `Integration / Chat 4 -> Chat 5`.
+Implementation SHA:
 
-## Files added in Pass 10
+```text
+e1265ad57bf602b0acd44ed029ed1b6e6ccd6666
+```
 
-- `src/mrea_lifecycle/http_cursor.py`;
-- `tests/test_http_cursor_auth.py`;
-- `docs/PASS_10_AUTHENTICATED_HTTP_CURSORS.md`.
+GitHub-hosted Chat 5 result:
 
-## Files modified in Pass 10
+```text
+57 passed in 1.96s
+```
 
-- `src/mrea_lifecycle/http_api.py`;
+Status: **SUCCESS**.
+
+## Files added in Pass 10.1
+
+- `src/mrea_lifecycle/keyset_knowledge.py`;
+- `tests/test_keyset_pagination_v2.py`;
+- `docs/PASS_10_1_KEYSET_PAGINATION.md`.
+
+## Files modified in Pass 10.1
+
+- `src/mrea_lifecycle/knowledge_paging.py`;
+- `src/mrea_lifecycle/read_only.py`;
 - `src/mrea_lifecycle/__init__.py`;
 - `README.md`;
 - `docs/IMPLEMENTATION_STATE.md`;
 - `ORCHESTRATOR_HANDOFF.md` at final freeze.
 
-## Security limitations
-
-Cursor authentication does not provide:
-
-- user/client authentication;
-- authorization;
-- TLS;
-- reverse-proxy hardening;
-- CORS policy;
-- rate limiting;
-- secure secret provisioning/storage.
-
-Those are required before arbitrary remote Internet exposure and are owned by the future integration/deployment layer.
-
-## Other known limitations
+## Known limitations
 
 Still open:
 
-- keyset pagination for very large histories;
+- aggregate keyset pagination for `failure_patterns_page()`;
 - materialized analytical aggregates;
+- client authentication/authorization;
+- deployment/TLS/CORS/rate-limit policy;
 - semantic/AI interpretation;
 - field-device synchronization.
 
 ## Handoff rule
 
-After `ORCHESTRATOR_HANDOFF.md` is published as the final worker commit, `chat-5/pass-10` is frozen. No later commit is allowed unless final verification finds a real missing/incorrect GitHub file or Chat 6 explicitly requests a correction.
+After required documented pre-handoff gates are green, `ORCHESTRATOR_HANDOFF.md` is published as the final worker commit. `chat-5/pass-10.1` is then frozen unless final GitHub verification finds a real missing/incorrect file or Chat 6 explicitly requests a correction.
