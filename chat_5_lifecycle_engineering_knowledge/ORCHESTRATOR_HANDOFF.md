@@ -6,10 +6,11 @@
 **Branch:** `chat-5/pass-10.1`  
 **Base SHA:** `8044451abd050f69556c9274aec1a83caefad408` — frozen Chat 5 Pass 10  
 **Documented pre-handoff SHA:** `3333e1c801be35324e7947d2c6c97719ea015b59`  
+**Final state reconciliation SHA:** `625098bbc79d7482f2bffddbc3bb71c2636ddc05`  
 **Pre-handoff CI run:** `36728784438`  
 **Status at handoff:** required Chat 5 gates GREEN
 
-> This handoff is the final worker commit and freezes `chat-5/pass-10.1`. Chat 6 should treat it as an out-of-band cumulative worker continuation unless explicitly selected later. The Chat-6-selected Pass-8 branch remains untouched.
+> This handoff is the final worker commit and freezes `chat-5/pass-10.1`. Chat 6 should treat it as an out-of-band cumulative worker continuation unless explicitly selected later. The Chat-6-selected Pass-8 branch remains untouched. A Git commit cannot contain its own SHA; use the current branch head as the final frozen handoff commit.
 
 ## 1. Delivered functionality
 
