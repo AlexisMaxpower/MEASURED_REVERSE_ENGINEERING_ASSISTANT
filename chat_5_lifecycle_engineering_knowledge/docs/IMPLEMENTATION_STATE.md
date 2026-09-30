@@ -3,12 +3,12 @@
 ## Snapshot
 
 - Date: **2026-09-30**
-- Branch: `chat-5/pass-8`
+- Branch: `chat-5/pass-9`
 - Slice: **Lifecycle & Engineering Knowledge**
 - SSOT: **MREA v0.1 + orchestration addendum v0.2**
-- Pass 8 authorization: **direct user instruction; no newer Chat-5-specific directive present on `main` at branch start**
-- Base SHA: `d9bed012eb8bbcea338522847a46572bb5415026` (frozen Chat 5 Pass 7)
-- State: **snapshot-bound knowledge pagination implemented; required pre-handoff gates green; branch freeze occurs at final `ORCHESTRATOR_HANDOFF.md` commit**
+- Pass 9 authorization: **direct user instruction; no newer Chat-5-specific directive present on `main` at branch start**
+- Base SHA: `82e2203aaeb69ee1fe9f89fd42d0aea451b8690f` (frozen Chat 5 Pass 8)
+- State: **read-only HTTP/API transport implemented; final cross-slice gates and handoff pending**
 
 ## Preserved baseline
 
@@ -28,184 +28,190 @@ Still active and unchanged:
 - SQL-native lifecycle queries;
 - verified backup/restore;
 - read-only SQLite query session;
-- deterministic engineering knowledge queries from Pass 7.
+- deterministic engineering knowledge queries;
+- snapshot-bound knowledge pagination.
 
 No shared contract, canonical fixture, CI workflow, integration test, SQLite migration, or other chat-owned file was changed.
 
-## Pass 8 additions
+## Pass 9 additions
 
-### Cursor primitive
+### Read-only HTTP transport
 
-Added `knowledge_paging.py` with:
+Added `src/mrea_lifecycle/http_api.py`.
 
-- `KNOWLEDGE_CURSOR_FORMAT_VERSION = mrea.knowledge-cursor.v1`;
-- `KnowledgePage[T]`;
-- `LifecycleKnowledgeCursorError`;
-- `DEFAULT_KNOWLEDGE_PAGE_LIMIT = 100`;
-- `MAX_KNOWLEDGE_PAGE_LIMIT = 500`;
-- deterministic query fingerprinting;
-- URL-safe cursor encoding/decoding;
-- cursor checksum validation;
-- snapshot-version validation;
-- page-limit validation.
+Public surface:
 
-### Query-bound cursors
+- `ReadOnlyLifecycleHttpAPI`;
+- `build_read_only_lifecycle_http_app()`;
+- `LifecycleHttpResponse`;
+- `LifecycleHttpRequestError`;
+- `LifecycleHttpNotFoundError`;
+- `LifecycleHttpMethodNotAllowedError`;
+- `LIFECYCLE_HTTP_API_SCHEMA_VERSION = mrea.lifecycle-http.v1`.
 
-Every cursor includes a fingerprint of:
+The adapter is a dependency-free WSGI callable.
 
-```text
-query name + normalized filter set
-```
+### Dependency boundary
 
-A cursor therefore fails closed when reused for a different equipment, position, event type, revision, instance, part, or other filter state.
+No FastAPI/Flask dependency was introduced.
 
-Page size is intentionally not part of query identity so callers may change page size while continuing the same deterministic snapshot traversal.
+Reason:
 
-### Snapshot binding
+- current Chat 5 CI installs Python + pytest only;
+- shared dependency/CI policy is outside Chat 5 ownership;
+- WSGI provides a real HTTP boundary using Python standard library only.
 
-`SQLiteLifecycleReadOnlySession` now passes its verified committed `snapshot_version` into `SQLiteEngineeringKnowledgeRepository`.
+### Exposed routes
 
-Each cursor records that version.
-
-If the database advances from snapshot N to N+1, a new read-only session refuses to continue an N cursor and raises `LifecycleKnowledgeCursorError`.
-
-This prevents mixed-version traversal.
-
-### Paginated revision outcomes
-
-Added:
-
-```python
-revision_outcomes_page(part_id, *, limit=100, cursor=None)
-```
-
-Ordering remains deterministic by revision creation time and revision ID.
-
-### Paginated equipment/position history
-
-Added:
-
-```python
-equipment_position_history_page(
-    *,
-    equipment_id,
-    position=None,
-    event_type=None,
-    revision_id=None,
-    instance_id=None,
-    limit=100,
-    cursor=None,
-)
-```
-
-Ordering remains:
+Health:
 
 ```text
-occurred_at, sequence, event_id
+GET /health
 ```
 
-### Paginated failure patterns
+SQL-native lifecycle read routes:
 
-Added:
-
-```python
-failure_patterns_page(
-    *,
-    part_id=None,
-    revision_id=None,
-    limit=100,
-    cursor=None,
-)
+```text
+GET /v1/lifecycle/revisions
+GET /v1/lifecycle/failures
+GET /v1/lifecycle/equipment-occupancy
+GET /v1/lifecycle/physical-timeline
 ```
 
-Ordering remains the exact factual Pass-7 grouping order.
+Engineering knowledge routes:
 
-### Integrity-preserving non-paged operations
+```text
+GET /v1/knowledge/revision-lineage
+GET /v1/knowledge/revision-outcomes
+GET /v1/knowledge/equipment-history
+GET /v1/knowledge/failure-patterns
+GET /v1/knowledge/replacement-chain
+```
 
-`revision_lineage()` remains whole-graph because missing-parent/cycle validation requires the complete ancestry graph.
+### Request validation
 
-`replacement_chain()` remains whole-chain because every replacement link must be checked for cycles, missing instances and valid physical state.
+Transport fails closed for:
 
-Pass 8 does not weaken those fail-closed guarantees merely to expose a page boundary.
+- non-GET methods;
+- unknown routes;
+- unknown parameters;
+- duplicate parameters;
+- missing/blank required identifiers;
+- non-integer limits;
+- invalid limits;
+- invalid/tampered/query-mismatched/stale cursors.
+
+### Status contract
+
+```text
+200 success
+400 invalid request / cursor
+404 route not found
+405 method not allowed
+409 read model stale
+503 read model unavailable
+```
+
+`405` includes `Allow: GET`.
+
+All responses include JSON content type, `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`.
+
+### Read-only invariant
+
+Every successful data request opens a fresh `SQLiteLifecycleReadOnlySession`.
+
+The existing session still enforces:
+
+```text
+SQLite mode=ro
+PRAGMA query_only = ON
+snapshot schema check
+relational schema check
+snapshot_version == read_model_version
+```
+
+Production HTTP code does not import `SQLiteLifecycleStore`, mutation services or `LifecycleUnitOfWork`.
+
+### Deterministic JSON
+
+Serialization supports:
+
+- dataclasses;
+- mappings;
+- tuples/lists;
+- datetime/date as ISO-8601;
+- Enum values;
+- Decimal as strings.
+
+Keys are sorted and compact separators are used, giving byte-identical JSON for identical requests against the same snapshot.
 
 ## Backward compatibility
 
-Existing Pass-7 knowledge methods remain unchanged:
+Pass 9 is additive.
 
-- `revision_lineage()`;
-- `revision_outcomes()`;
-- `equipment_position_history()`;
-- `failure_patterns()`;
-- `replacement_chain()`.
+Unchanged:
 
-Pagination is additive.
-
-No schema migration was added.
+- direct Python lifecycle queries;
+- direct engineering knowledge queries;
+- Pass-8 cursor format and semantics;
+- persistence and relational schemas;
+- lifecycle state transitions;
+- CAD verification/manufacturing eligibility;
+- canonical shared contracts.
 
 ## Verification
 
 ### New tests
 
-`tests/test_engineering_knowledge_paging.py` verifies:
+Added `tests/test_http_api.py`.
 
-1. five revision outcomes traverse limit-2 pages with no duplicates or omissions;
-2. every page carries the active read-only snapshot version;
-3. equipment history continues deterministically across pages;
-4. a cursor fails when filter identity changes;
-5. a cursor fails after a writer advances the committed snapshot;
-6. a modified cursor fails integrity validation;
-7. page limits below 1 or above 500 fail closed;
-8. two failure-pattern groups traverse page size one exactly;
-9. paginated failure-pattern output equals the legacy tuple query;
-10. legacy revision outcome ordering remains unchanged.
+Coverage verifies:
+
+1. health reports verified read-only state;
+2. all nine read routes return committed facts;
+3. pagination cursor round-trips through HTTP;
+4. query-bound cursor mismatch returns 400;
+5. POST returns 405;
+6. rejected write attempt does not advance snapshot version;
+7. duplicate parameters fail closed;
+8. unexpected parameters fail closed;
+9. unknown route returns 404;
+10. stale read model returns 409;
+11. missing database returns 503;
+12. repeated identical requests return byte-identical JSON.
 
 ### GitHub-hosted implementation run
 
 Implementation SHA:
 
 ```text
-1a6803bff00eeaa43ffb18fb18c86695c59403d2
+44dc38b040ee5e72248e9554c7bde44bd553632d
 ```
 
-Exact Chat 5 result:
+Workflow:
 
 ```text
-40 passed in 1.51s
+MREA CI / 36653295496
+```
+
+Chat 5 result:
+
+```text
+46 passed in 1.66s
 ```
 
 Status: **SUCCESS**.
 
-### Required pre-handoff gates
+Required cross-slice gates are rechecked on the documented pre-handoff SHA before `ORCHESTRATOR_HANDOFF.md` is published.
 
-Documented pre-handoff SHA:
+## Files added in Pass 9
 
-```text
-1b45f9a2b815ff4a150dd9a49d21dde4abdde9df
-```
+- `src/mrea_lifecycle/http_api.py`;
+- `tests/test_http_api.py`;
+- `docs/PASS_9_READ_ONLY_HTTP_API.md`.
 
-Workflow run:
+## Files modified in Pass 9
 
-```text
-36651237369
-```
-
-Results:
-
-- `Chat 5 / Lifecycle` — **SUCCESS**;
-- `Contracts / canonical fixtures` — **SUCCESS**;
-- `Chat 4 / Generic CAD gate` — **SUCCESS**;
-- `Integration / Chat 4 -> Chat 5` — **SUCCESS**.
-
-## Files added in Pass 8
-
-- `src/mrea_lifecycle/knowledge_paging.py`;
-- `tests/test_engineering_knowledge_paging.py`;
-- `docs/PASS_8_KNOWLEDGE_PAGINATION.md`.
-
-## Files modified in Pass 8
-
-- `src/mrea_lifecycle/engineering_knowledge.py`;
-- `src/mrea_lifecycle/read_only.py`;
 - `src/mrea_lifecycle/__init__.py`;
 - `README.md`;
 - `docs/IMPLEMENTATION_STATE.md`;
@@ -215,15 +221,18 @@ Results:
 
 Still open:
 
-- REST/API transport;
-- authenticated cursor signing if cursors cross an untrusted external boundary;
-- keyset pagination for very large tables;
+- public/remote network exposure;
+- authentication/authorization;
+- TLS/reverse-proxy/CORS policy;
+- framework-specific application shell;
+- authenticated cursor signing across external trust boundaries;
+- keyset pagination for very large histories;
 - materialized analytical aggregates;
 - semantic/AI interpretation;
 - field-device synchronization.
 
-The current offset cursor is safe against mixed snapshots because it is snapshot-bound. Keyset pagination is a later performance optimization, not a correctness requirement for this pass.
+Pass 9 transport is therefore a **local/internal read API**, not an Internet-facing security boundary.
 
 ## Handoff rule
 
-`ORCHESTRATOR_HANDOFF.md` is the final worker commit. After that commit, `chat-5/pass-8` is frozen. No later commit is allowed unless final verification finds a real missing/incorrect GitHub file or Chat 6 explicitly requests a correction.
+After `ORCHESTRATOR_HANDOFF.md` is published as the final worker commit, `chat-5/pass-9` is frozen. No later commit is allowed unless final verification finds a real missing/incorrect GitHub file or Chat 6 explicitly requests a correction.
