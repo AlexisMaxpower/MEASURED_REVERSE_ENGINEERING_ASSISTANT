@@ -23,6 +23,15 @@ from .engineering_knowledge import (
     RevisionOutcomeSummary,
     SQLiteEngineeringKnowledgeRepository,
 )
+from .http_api import (
+    LIFECYCLE_HTTP_API_SCHEMA_VERSION,
+    LifecycleHttpMethodNotAllowedError,
+    LifecycleHttpNotFoundError,
+    LifecycleHttpRequestError,
+    LifecycleHttpResponse,
+    ReadOnlyLifecycleHttpAPI,
+    build_read_only_lifecycle_http_app,
+)
 from .knowledge_paging import (
     DEFAULT_KNOWLEDGE_PAGE_LIMIT,
     KNOWLEDGE_CURSOR_FORMAT_VERSION,
@@ -118,6 +127,7 @@ __all__ = [
     "KnowledgePage",
     "KnowledgeQueryService",
     "LIFECYCLE_BACKUP_FORMAT_VERSION",
+    "LIFECYCLE_HTTP_API_SCHEMA_VERSION",
     "LifecycleBackupConsistencyError",
     "LifecycleBackupError",
     "LifecycleBackupIntegrityError",
@@ -128,6 +138,10 @@ __all__ = [
     "LifecycleDatabaseInspection",
     "LifecycleEvent",
     "LifecycleEventType",
+    "LifecycleHttpMethodNotAllowedError",
+    "LifecycleHttpNotFoundError",
+    "LifecycleHttpRequestError",
+    "LifecycleHttpResponse",
     "LifecycleInvariantError",
     "LifecycleKnowledgeCursorError",
     "LifecycleKnowledgeIntegrityError",
@@ -153,6 +167,7 @@ __all__ = [
     "PhysicalPartStateProjection",
     "PhysicalPartTimeline",
     "PhysicalTestOutcome",
+    "ReadOnlyLifecycleHttpAPI",
     "ReplacementChainEntry",
     "Revision",
     "RevisionComparison",
@@ -171,5 +186,6 @@ __all__ = [
     "SQLiteSchemaMigration",
     "TestRecord",
     "TestService",
+    "build_read_only_lifecycle_http_app",
     "inspect_lifecycle_database",
 ]
