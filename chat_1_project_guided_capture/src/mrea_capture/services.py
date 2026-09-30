@@ -5,6 +5,7 @@ from datetime import datetime
 from uuid import UUID
 
 from .artifacts import ArtifactStore
+from .lineage import active_clean_reference
 from .models import (
     CameraMetadata,
     CapturePlan,
@@ -129,8 +130,76 @@ class CaptureSessionService:
         session = self._repository.get(session_id)
         progress = self._progress_for(session, view)
         if any(frame.view is view and frame.kind is FrameKind.CLEAN_REFERENCE for frame in session.frames):
-            raise CaptureWorkflowError(f"clean reference already exists for view {view}")
+            raise CaptureWorkflowError(
+                f"clean reference history already exists for view {view.value}; use recapture_clean_reference"
+            )
 
+        frame = self._store_clean_reference(
+            session,
+            progress,
+            view=view,
+            image_bytes=image_bytes,
+            camera=camera,
+            captured_at=captured_at,
+            media_type=media_type,
+            extension=extension,
+            supersedes_frame_id=None,
+        )
+        self._repository.save(session)
+        return frame
+
+    def recapture_clean_reference(
+        self,
+        session_id: UUID,
+        *,
+        view: CaptureViewType,
+        image_bytes: bytes,
+        camera: CameraMetadata,
+        captured_at: datetime | None = None,
+        media_type: str = "image/jpeg",
+        extension: str = ".jpg",
+    ) -> FrameRecord:
+        """Create a new active clean-reference attempt without deleting prior evidence."""
+
+        session = self._repository.get(session_id)
+        progress = self._progress_for(session, view)
+        if progress.status is CaptureViewStatus.ACCEPTED:
+            raise CaptureWorkflowError(
+                f"accepted view {view.value} must be explicitly reopened before recapture"
+            )
+        previous = active_clean_reference(session, view)
+        if previous is None:
+            raise CaptureWorkflowError(
+                f"view {view.value} has no active clean reference to supersede"
+            )
+
+        frame = self._store_clean_reference(
+            session,
+            progress,
+            view=view,
+            image_bytes=image_bytes,
+            camera=camera,
+            captured_at=captured_at,
+            media_type=media_type,
+            extension=extension,
+            supersedes_frame_id=previous.frame_id,
+        )
+        self._repository.save(session)
+        return frame
+
+    def _store_clean_reference(
+        self,
+        session: CaptureSession,
+        progress: CaptureViewProgress,
+        *,
+        view: CaptureViewType,
+        image_bytes: bytes,
+        camera: CameraMetadata,
+        captured_at: datetime | None,
+        media_type: str,
+        extension: str,
+        supersedes_frame_id: UUID | None,
+    ) -> FrameRecord:
         artifact = self._artifact_store.put_bytes(
             image_bytes,
             media_type=media_type,
@@ -145,12 +214,14 @@ class CaptureSessionService:
             artifact=artifact,
             captured_at=timestamp,
             camera=camera,
+            supersedes_frame_id=supersedes_frame_id,
         )
         session.frames.append(frame)
+        progress.active_clean_reference_frame_id = frame.frame_id
         progress.status = CaptureViewStatus.CAPTURED
         progress.started_at = progress.started_at or timestamp
         progress.captured_at = timestamp
-        self._repository.save(session)
+        progress.accepted_at = None
         return frame
 
     def capture_measurement_frame(
@@ -166,12 +237,10 @@ class CaptureSessionService:
     ) -> FrameRecord:
         session = self._repository.get(session_id)
         self._progress_for(session, view)
-        if not any(
-            frame.view is view and frame.kind is FrameKind.CLEAN_REFERENCE
-            for frame in session.frames
-        ):
+        clean = active_clean_reference(session, view)
+        if clean is None:
             raise CaptureWorkflowError(
-                f"measurement frame requires clean reference for view {view}"
+                f"measurement frame requires clean reference; no active clean reference for view {view.value}"
             )
 
         artifact = self._artifact_store.put_bytes(
@@ -187,6 +256,7 @@ class CaptureSessionService:
             artifact=artifact,
             captured_at=captured_at or utc_now(),
             camera=camera,
+            source_clean_reference_frame_id=clean.frame_id,
         )
         session.frames.append(frame)
         self._repository.save(session)
@@ -201,11 +271,8 @@ class CaptureSessionService:
     ) -> CaptureSession:
         session = self._repository.get(session_id)
         progress = self._progress_for(session, view)
-        if not any(
-            frame.view is view and frame.kind is FrameKind.CLEAN_REFERENCE
-            for frame in session.frames
-        ):
-            raise CaptureWorkflowError(f"cannot accept {view} without clean reference")
+        if active_clean_reference(session, view) is None:
+            raise CaptureWorkflowError(f"cannot accept {view.value} without active clean reference")
 
         timestamp = accepted_at or utc_now()
         progress.status = CaptureViewStatus.ACCEPTED
@@ -228,4 +295,4 @@ class CaptureSessionService:
         for progress in session.views:
             if progress.view is view:
                 return progress
-        raise CaptureWorkflowError(f"view {view} is not part of capture plan")
+        raise CaptureWorkflowError(f"view {view.value} is not part of capture plan")
