@@ -8,7 +8,7 @@
 - SSOT: **MREA v0.1 + orchestration addendum v0.2**
 - Pass 8 authorization: **direct user instruction; no newer Chat-5-specific directive present on `main` at branch start**
 - Base SHA: `d9bed012eb8bbcea338522847a46572bb5415026` (frozen Chat 5 Pass 7)
-- State: **snapshot-bound knowledge pagination implemented; final handoff pending required gates**
+- State: **snapshot-bound knowledge pagination implemented; required pre-handoff gates green; branch freeze occurs at final `ORCHESTRATOR_HANDOFF.md` commit**
 
 ## Preserved baseline
 
@@ -175,7 +175,26 @@ Exact Chat 5 result:
 
 Status: **SUCCESS**.
 
-Contracts also passed on that workflow run. Required final gates are rechecked on the documented pre-handoff SHA before publishing `ORCHESTRATOR_HANDOFF.md`.
+### Required pre-handoff gates
+
+Documented pre-handoff SHA:
+
+```text
+1b45f9a2b815ff4a150dd9a49d21dde4abdde9df
+```
+
+Workflow run:
+
+```text
+36651237369
+```
+
+Results:
+
+- `Chat 5 / Lifecycle` — **SUCCESS**;
+- `Contracts / canonical fixtures` — **SUCCESS**;
+- `Chat 4 / Generic CAD gate` — **SUCCESS**;
+- `Integration / Chat 4 -> Chat 5` — **SUCCESS**.
 
 ## Files added in Pass 8
 
@@ -207,4 +226,4 @@ The current offset cursor is safe against mixed snapshots because it is snapshot
 
 ## Handoff rule
 
-After `ORCHESTRATOR_HANDOFF.md` is published as the final worker commit, `chat-5/pass-8` is frozen. No later commit is allowed unless final verification finds a real missing/incorrect GitHub file or Chat 6 explicitly requests a correction.
+`ORCHESTRATOR_HANDOFF.md` is the final worker commit. After that commit, `chat-5/pass-8` is frozen. No later commit is allowed unless final verification finds a real missing/incorrect GitHub file or Chat 6 explicitly requests a correction.
