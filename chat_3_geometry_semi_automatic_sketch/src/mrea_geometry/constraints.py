@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+from .constraint_confidence import ConstraintConfidenceModel
 from .constraint_satisfaction import ConstraintSatisfactionAnalyzer
 from .models import Circle, ConstraintCandidate, DimensionBinding, GeometryDraft, Line
 
@@ -68,6 +69,7 @@ class ConstraintResolver:
         minimum_confidence: float = 0.95,
         measurement_tolerance: float = 0.05,
         satisfaction_analyzer: ConstraintSatisfactionAnalyzer | None = None,
+        confidence_model: ConstraintConfidenceModel | None = None,
     ) -> None:
         if not 0.0 <= minimum_confidence <= 1.0:
             raise ValueError("minimum_confidence must be between 0 and 1")
@@ -76,6 +78,7 @@ class ConstraintResolver:
         self.minimum_confidence = minimum_confidence
         self.measurement_tolerance = measurement_tolerance
         self.satisfaction_analyzer = satisfaction_analyzer or ConstraintSatisfactionAnalyzer()
+        self.confidence_model = confidence_model or ConstraintConfidenceModel()
 
     def resolve(self, draft: GeometryDraft) -> ConstraintResolution:
         entities = {item.entity_id: item for item in draft.entities}
@@ -100,21 +103,6 @@ class ConstraintResolver:
                 )
                 continue
 
-            effective_confidence = self._effective_confidence(candidate, entities)
-            if effective_confidence < self.minimum_confidence:
-                issues.append(
-                    ConstraintIssue(
-                        issue_id=f"U-{candidate.constraint_id}",
-                        code="CONSTRAINT_BELOW_PROMOTION_CONFIDENCE",
-                        message=(
-                            f"Constraint confidence {effective_confidence:.3f} is below "
-                            f"promotion threshold {self.minimum_confidence:.3f}."
-                        ),
-                        entity_ids=candidate.entity_ids,
-                    )
-                )
-                continue
-
             satisfaction = self.satisfaction_analyzer.analyze(candidate, entities)
             if not satisfaction.satisfied:
                 issues.append(
@@ -125,6 +113,26 @@ class ConstraintResolver:
                             f"{candidate.kind} relation residual {satisfaction.residual:.6g} "
                             f"{satisfaction.unit} exceeds tolerance {satisfaction.tolerance:.6g} "
                             f"{satisfaction.unit}; relation was not published."
+                        ),
+                        entity_ids=candidate.entity_ids,
+                    )
+                )
+                continue
+
+            geometric_confidence = self.confidence_model.score(satisfaction).confidence
+            effective_confidence = self._effective_confidence(
+                candidate,
+                entities,
+                geometric_confidence=geometric_confidence,
+            )
+            if effective_confidence < self.minimum_confidence:
+                issues.append(
+                    ConstraintIssue(
+                        issue_id=f"U-{candidate.constraint_id}",
+                        code="CONSTRAINT_BELOW_PROMOTION_CONFIDENCE",
+                        message=(
+                            f"Constraint confidence {effective_confidence:.3f} is below "
+                            f"promotion threshold {self.minimum_confidence:.3f}."
                         ),
                         entity_ids=candidate.entity_ids,
                     )
@@ -162,8 +170,10 @@ class ConstraintResolver:
     def _effective_confidence(
         candidate: ConstraintCandidate,
         entities: dict[str, object],
+        *,
+        geometric_confidence: float = 1.0,
     ) -> float:
-        values = [candidate.confidence]
+        values = [candidate.confidence, geometric_confidence]
         for entity_id in candidate.entity_ids:
             confidence = getattr(entities[entity_id], "confidence", None)
             if confidence is not None:
