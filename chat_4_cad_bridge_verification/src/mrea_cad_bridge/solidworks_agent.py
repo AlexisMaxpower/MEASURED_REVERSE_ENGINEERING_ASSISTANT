@@ -8,6 +8,7 @@ import tempfile
 from typing import Any, Mapping, Protocol
 
 from .contracts import MappedSketchPackage
+from .solidworks_capabilities import evaluate_solidworks_constraint_support_v1
 from .vendor import (
     CadAdapterError,
     CadAdapterResult,
@@ -20,17 +21,6 @@ SOLIDWORKS_AGENT_PROTOCOL = "mrea.solidworks-agent.v1"
 SOLIDWORKS_ADAPTER_NAME = "SOLIDWORKS_2026"
 _SUPPORTED_ENTITY_TYPES = frozenset({"POINT", "LINE", "CIRCLE", "ARC"})
 _SUPPORTED_DIMENSION_TYPES = frozenset({"DISTANCE", "DIAMETER", "RADIUS", "ANGLE"})
-_SUPPORTED_CONSTRAINT_TYPES = frozenset(
-    {
-        "HORIZONTAL",
-        "VERTICAL",
-        "PARALLEL",
-        "PERPENDICULAR",
-        "CONCENTRIC",
-        "EQUAL",
-        "TANGENT",
-    }
-)
 
 
 @dataclass(frozen=True, slots=True)
@@ -126,68 +116,12 @@ def _validate_constraint_support(
     constraint: Mapping[str, Any],
     entities_by_id: Mapping[str, Mapping[str, Any]],
 ) -> None:
-    constraint_id = str(constraint.get("constraint_id", "<unknown>"))
-    constraint_type = constraint.get("type")
-    status = constraint.get("status")
-    entity_ids = tuple(constraint.get("entity_ids") or ())
-
-    if status != "VERIFIED":
-        raise CadAdapterError(
-            f"SOLIDWORKS constraint {constraint_id} must be VERIFIED; got {status!r}"
-        )
-    if constraint_type not in _SUPPORTED_CONSTRAINT_TYPES:
-        raise CadAdapterError(
-            f"SOLIDWORKS vendor slice does not support constraint type {constraint_type!r}: "
-            f"{constraint_id}"
-        )
-    if len(set(entity_ids)) != len(entity_ids):
-        raise CadAdapterError(
-            f"SOLIDWORKS constraint {constraint_id} contains duplicate entity_ids"
-        )
-    if any(entity_id not in entities_by_id for entity_id in entity_ids):
-        raise CadAdapterError(
-            f"SOLIDWORKS constraint {constraint_id} references unknown entities"
-        )
-
-    types = tuple(entities_by_id[entity_id].get("type") for entity_id in entity_ids)
-    if constraint_type in {"HORIZONTAL", "VERTICAL"}:
-        if len(entity_ids) != 1 or types != ("LINE",):
-            raise CadAdapterError(
-                f"SOLIDWORKS {constraint_type} constraint {constraint_id} requires one LINE"
-            )
+    decision = evaluate_solidworks_constraint_support_v1(constraint, entities_by_id)
+    if decision.supported:
         return
-
-    if constraint_type in {"PARALLEL", "PERPENDICULAR", "EQUAL"}:
-        if len(entity_ids) != 2 or types != ("LINE", "LINE"):
-            raise CadAdapterError(
-                f"SOLIDWORKS {constraint_type} constraint {constraint_id} requires two LINE entities"
-            )
-        return
-
-    if constraint_type == "CONCENTRIC":
-        if len(entity_ids) != 2 or any(item not in {"CIRCLE", "ARC"} for item in types):
-            raise CadAdapterError(
-                f"SOLIDWORKS CONCENTRIC constraint {constraint_id} requires two CIRCLE/ARC entities"
-            )
-        return
-
-    if constraint_type == "TANGENT":
-        if len(entity_ids) != 2:
-            raise CadAdapterError(
-                f"SOLIDWORKS TANGENT constraint {constraint_id} requires exactly two entities"
-            )
-        if any(item not in {"LINE", "CIRCLE", "ARC"} for item in types):
-            raise CadAdapterError(
-                f"SOLIDWORKS TANGENT constraint {constraint_id} supports LINE/CIRCLE/ARC only"
-            )
-        if all(item == "LINE" for item in types):
-            raise CadAdapterError(
-                f"SOLIDWORKS TANGENT constraint {constraint_id} requires at least one CIRCLE/ARC"
-            )
-        return
-
     raise CadAdapterError(
-        f"SOLIDWORKS vendor slice cannot safely map constraint {constraint_id}"
+        "SOLIDWORKS constraint preflight failed "
+        f"[{decision.code}] {decision.constraint_id}: {decision.message}"
     )
 
 
