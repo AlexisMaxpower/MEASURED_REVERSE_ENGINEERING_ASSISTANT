@@ -12,6 +12,7 @@ namespace Mrea.SolidWorksCadAgent
         public bool attach_to_running { get; set; }
         public bool allow_launch { get; set; }
         public List<EntitySpec> entities { get; set; }
+        public List<ConstraintSpec> constraints { get; set; }
         public List<DimensionSpec> dimensions { get; set; }
     }
 
@@ -32,6 +33,14 @@ namespace Mrea.SolidWorksCadAgent
         public double radius { get; set; }
         public double start_angle_deg { get; set; }
         public double end_angle_deg { get; set; }
+    }
+
+    internal sealed class ConstraintSpec
+    {
+        public string constraint_id { get; set; }
+        public string type { get; set; }
+        public List<string> entity_ids { get; set; }
+        public string status { get; set; }
     }
 
     internal sealed class DimensionSpec
