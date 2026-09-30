@@ -14,6 +14,12 @@ from .lineage import (
     measurement_frames_for_active_reference,
     rectification_for_active_reference,
 )
+from .history import (
+    CaptureAttemptHistoryError,
+    CaptureAttemptHistoryService,
+    CaptureAttemptSnapshot,
+    CaptureViewAttemptHistory,
+)
 from .guidance import (
     GuidedCaptureAction,
     GuidedCaptureBlockerCode,
@@ -91,6 +97,9 @@ __all__ = [
     "CaptureQualityResult",
     "CaptureQualityService",
     "CaptureQualityVerdict",
+    "CaptureAttemptHistoryError",
+    "CaptureAttemptHistoryService",
+    "CaptureAttemptSnapshot",
     "CaptureLineageError",
     "CanonicalContractBuilder",
     "CanonicalContractError",
@@ -100,6 +109,7 @@ __all__ = [
     "CaptureSession",
     "CaptureSessionNotFoundError",
     "CaptureSessionService",
+    "CaptureViewAttemptHistory",
     "CaptureViewProgress",
     "CaptureViewRevisionEvent",
     "CaptureViewStatus",
