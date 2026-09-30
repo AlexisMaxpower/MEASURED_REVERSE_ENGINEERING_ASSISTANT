@@ -1,6 +1,14 @@
 """Chat 2 Physical Measurement internal domain package."""
 
 from .boundary import CanonicalMeasurementAdapter
+from .display_roi import (
+    DisplayRoiCandidate,
+    DisplayRoiOcrBridge,
+    DisplayRoiProposal,
+    DisplayRoiSelection,
+    DisplayRoiSelector,
+    RoiSelectionStatus,
+)
 from .hands_free import (
     AmbiguousMeasurementCommand,
     HandsFreeMeasurementController,
@@ -39,6 +47,11 @@ from .type_registry import MeasurementTypeRegistry, MeasurementTypeSemantics
 __all__ = [
     "AmbiguousMeasurementCommand",
     "CanonicalMeasurementAdapter",
+    "DisplayRoiCandidate",
+    "DisplayRoiOcrBridge",
+    "DisplayRoiProposal",
+    "DisplayRoiSelection",
+    "DisplayRoiSelector",
     "FeatureAnchor",
     "FeatureAnchorSelector",
     "FeatureSnapCandidate",
@@ -69,6 +82,7 @@ __all__ = [
     "ParsedMeasurementCommand",
     "PhysicalMeasurement",
     "ProvenanceSource",
+    "RoiSelectionStatus",
     "SnapSelectionStatus",
     "normalize_measurement_number",
 ]
