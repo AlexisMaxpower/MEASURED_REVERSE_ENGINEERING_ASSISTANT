@@ -19,7 +19,7 @@ from .vendor import (
 SOLIDWORKS_AGENT_PROTOCOL = "mrea.solidworks-agent.v1"
 SOLIDWORKS_ADAPTER_NAME = "SOLIDWORKS_2026"
 _SUPPORTED_ENTITY_TYPES = frozenset({"POINT", "LINE", "CIRCLE", "ARC"})
-_SUPPORTED_DIMENSION_TYPES = frozenset({"DISTANCE", "DIAMETER", "RADIUS"})
+_SUPPORTED_DIMENSION_TYPES = frozenset({"DISTANCE", "DIAMETER", "RADIUS", "ANGLE"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,6 +111,49 @@ def _verified_dimension_contracts(package: MappedSketchPackage) -> tuple[Mapping
     )
 
 
+def _validate_dimension_support(
+    dimension: Mapping[str, Any],
+    entities_by_id: Mapping[str, Mapping[str, Any]],
+) -> None:
+    dimension_id = str(dimension.get("dimension_id", "<unknown>"))
+    dimension_type = dimension.get("type")
+    unit = dimension.get("unit")
+    entity_ids = tuple(dimension.get("entity_ids") or ())
+
+    if dimension_type == "ANGLE":
+        if unit != "deg":
+            raise CadAdapterError(
+                f"SOLIDWORKS ANGLE dimension {dimension_id} requires canonical unit 'deg'"
+            )
+        if len(entity_ids) != 2:
+            raise CadAdapterError(
+                f"SOLIDWORKS ANGLE dimension {dimension_id} requires exactly two LINE entities"
+            )
+        if any(
+            entities_by_id.get(entity_id, {}).get("type") != "LINE"
+            for entity_id in entity_ids
+        ):
+            raise CadAdapterError(
+                f"SOLIDWORKS ANGLE dimension {dimension_id} supports LINE/LINE only"
+            )
+        try:
+            value = float(dimension.get("value"))
+        except (TypeError, ValueError) as exc:
+            raise CadAdapterError(
+                f"SOLIDWORKS ANGLE dimension {dimension_id} requires a numeric value"
+            ) from exc
+        if not 0.0 < value < 180.0:
+            raise CadAdapterError(
+                f"SOLIDWORKS ANGLE dimension {dimension_id} requires 0 < value < 180 deg"
+            )
+        return
+
+    if unit != "mm":
+        raise CadAdapterError(
+            f"SOLIDWORKS {dimension_type} dimension {dimension_id} requires canonical unit 'mm'"
+        )
+
+
 def _preflight(package: MappedSketchPackage) -> None:
     if package.constraints:
         raise CadAdapterError(
@@ -168,18 +211,11 @@ def _preflight(package: MappedSketchPackage) -> None:
             f"{unsupported_dimensions!r}"
         )
 
-    unsupported_units = sorted(
-        {
-            str(dimension.get("unit"))
-            for dimension in verified_dimensions
-            if dimension.get("unit") != "mm"
-        }
-    )
-    if unsupported_units:
-        raise CadAdapterError(
-            "SOLIDWORKS real-host slice supports verified mm dimensions only; "
-            f"unsupported units: {unsupported_units!r}"
-        )
+    entities_by_id = {
+        str(entity.get("entity_id")): entity for entity in package.entity_contracts
+    }
+    for dimension in verified_dimensions:
+        _validate_dimension_support(dimension, entities_by_id)
 
 
 def build_solidworks_agent_request(
