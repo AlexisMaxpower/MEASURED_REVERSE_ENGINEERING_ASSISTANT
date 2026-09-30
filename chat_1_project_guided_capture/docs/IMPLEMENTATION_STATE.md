@@ -184,3 +184,16 @@ Backward compatibility:
 Guided `QUALITY_REJECTED` / strict-WARN handling now returns the executable `RECAPTURE_CLEAN_REFERENCE` action.
 
 Local schema-independent regression after this extension: `28 passed`. The remaining three full-suite failures in the patch workspace are only missing root-schema file loads; calibration/rectification/canonical behavior reaches those final validation calls successfully.
+
+## Isolated Pass 4 work package — Explicit accepted-view revision
+
+Added an explicit reopen/revision gate on top of immutable recapture lineage.
+
+- `CaptureViewRevisionEvent` persists why/when an accepted view was reopened and which clean frame was active at that moment.
+- `CaptureViewProgress.recapture_required` prevents silently reusing the previously accepted attempt.
+- `CaptureSessionService.reopen_view(...)` only accepts `ACCEPTED` views, clears completion and records audit provenance.
+- `accept_view(...)` fails while a fresh clean reference is still required.
+- `recapture_clean_reference(...)` clears the gate only after a new immutable clean artifact is active.
+- Guided Capture returns `RECAPTURE_CLEAN_REFERENCE` / `VIEW_REOPENED_RECAPTURE_REQUIRED` until recapture occurs.
+
+Local schema-independent regression including quality: `33 passed in 0.32s`.
