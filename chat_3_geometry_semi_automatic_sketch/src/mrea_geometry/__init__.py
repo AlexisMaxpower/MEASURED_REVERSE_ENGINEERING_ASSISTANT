@@ -1,5 +1,6 @@
 """Deterministic geometry core and canonical v1 bridge owned by MREA Chat 3."""
 
+from .constraint_confidence import ConstraintConfidence, ConstraintConfidenceModel
 from .constraint_satisfaction import ConstraintSatisfaction, ConstraintSatisfactionAnalyzer
 from .constraints import ConstraintIssue, ConstraintResolution, ConstraintResolver, ResolvedConstraint
 from .contracts import CanonicalGeometryInput, CanonicalInputAdapter
@@ -40,6 +41,8 @@ __all__ = [
     "Circle",
     "ConstraintCandidate",
     "ConstraintCandidateEngine",
+    "ConstraintConfidence",
+    "ConstraintConfidenceModel",
     "ConstraintIssue",
     "ConstraintResolution",
     "ConstraintResolver",
