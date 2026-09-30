@@ -1,126 +1,94 @@
-# ORCHESTRATOR HANDOFF — Chat 3 — Pass 9
+# ORCHESTRATOR HANDOFF — Chat 3 — Pass 10
 
 **From:** Chat 3 — Geometry & Semi-Automatic Sketch  
 **To:** Chat 6 — Orchestrator / Repository Integrator  
-**Pass / Ring:** 9  
-**Branch:** `chat-3/pass-9`  
-**Branch base:** frozen Ring 8 head `d786e1d49b5c8f2837a3ce936f7f1c0d93336d49`  
-**Implementation/docs head before handoff commit:** `f31b3e3e5390229e90e94d949cbb7aa90a5f224e`  
+**Pass / Ring:** 10  
+**Branch:** `chat-3/pass-10`  
+**Branch base:** frozen Ring 9 head `0b657c07cc6d325be8e813c565fe5ca6bcad309a`  
+**Authoritative code/test head:** `77ca90a17b8b9bdc60c5cbade996b5bd412364a9`  
+**Pre-handoff docs/state head:** `d54917b21db1f50663c4d27c2c06f5c912f0c435`  
 **Date:** 2026-09-30
 
 ## Authorization / baseline note
 
-Ring 9 was started by explicit user instruction. At start, current `main` still exposed Chat 3 directive `OD-2026-09-29-003`; no newer Chat 3 worker directive had been published.
+Ring 10 was started by explicit user instruction. No newer Chat 3 worker directive than `OD-2026-09-29-003` had been published when the pass started.
 
-To preserve user-authorized Rings 4–8 work, `chat-3/pass-9` was created directly from frozen Ring 8 head.
+To preserve user-authorized Rings 4–9 work, `chat-3/pass-10` was created directly from frozen Ring 9 head.
 
 No shared contracts, CI, integration tests or other chat-owned files were modified.
 
 ## Status
 
-`READY_FOR_RING9_INTEGRATOR_REVIEW`
+`READY_FOR_RING10_INTEGRATOR_REVIEW`
 
 ## Delivered functionality
 
-Ring 9 adds deterministic global constraint-set diagnostics after the existing resolver/confidence/satisfaction pipeline.
+Ring 10 adds a conservative structural degrees-of-freedom audit before any future numerical solver/entity movement layer.
 
 New module:
 
-`src/mrea_geometry/constraint_system.py`
+`src/mrea_geometry/dof_audit.py`
 
 Public types:
 
-- `ConstraintSystemAnalysis`;
-- `ConstraintSystemAnalyzer`.
+- `StructuralDofAudit`;
+- `StructuralDofAnalyzer`.
 
-## Orientation parity diagnostics
+## DOF semantics
 
-The analyzer proves consistency for:
+The analyzer counts exact internal primitive parameters:
 
-- `HORIZONTAL`;
-- `VERTICAL`;
-- `PARALLEL`;
-- `PERPENDICULAR`.
+- POINT -> 2;
+- LINE -> 4;
+- CIRCLE -> 3;
+- ARC -> 5.
 
-Relations are represented as an XOR parity graph:
+It then computes a conservative upper bound on scalar equations supplied by globally retained constraints and bound dimensions.
 
-```text
-same orientation -> parity 0
-perpendicular orientation -> parity 1
-```
+If the exact parameter count still exceeds this upper bound, Ring 10 proves the sketch is:
 
-`HORIZONTAL` and `VERTICAL` connect an entity to a virtual world-axis node.
+`DEFINITELY_UNDERCONSTRAINED`
 
-## Deterministic evidence priority
+with a positive `remaining_dof_lower_bound`.
 
-Constraint processing order is:
+If the equation budget covers the parameter count, the result is only:
 
-1. higher confidence;
-2. `DETECTED` before `INFERRED` at equal confidence;
-3. direct `HORIZONTAL` / `VERTICAL` before pair relations at equal evidence strength;
-4. `constraint_id` tie-breaker.
+`NOT_PROVEN_UNDERCONSTRAINED`
 
-A lower-quality constraint cannot silently displace stronger accepted evidence.
+Ring 10 intentionally never labels such a sketch `FULLY_CONSTRAINED` because equation dependence/degeneracy requires a numerical rank/solver proof.
 
-## Global outcomes
+Unknown future constraint arity yields:
 
-For orientation constraints:
+`INDETERMINATE_UNKNOWN_CONSTRAINT_ARITY`
 
-```text
-new independent relation
-→ retained
-
-relation already implied by accepted graph
-→ omitted as redundant
-
-relation contradicts accepted graph
-→ OVERCONSTRAINED_ORIENTATION_CONFLICT
-```
-
-A contradictory constraint is not published to the canonical SketchPackage.
-
-## Safe transitive reduction
-
-Ring 9 also removes provably redundant cycles for:
-
-- `EQUAL`;
-- `CONCENTRIC`.
-
-No unsafe transitivity is assumed for:
-
-- `COINCIDENT`;
-- `TANGENT`;
-- `SYMMETRIC`.
+with no asserted lower bound.
 
 ## Pipeline integration
 
-The image-derived path is now:
+New additive API:
+
+`VisionGeometryPipeline.audit_structural_dof(extraction, context)`
+
+Flow:
 
 ```text
-ImageGeometryExtractor
-→ GeometryPipeline
+GeometryPipeline
 → ConstraintResolver
 → ConstraintSystemAnalyzer
-→ SketchPackageBuilder
+→ StructuralDofAnalyzer
 ```
 
-Existing resolver issues remain intact and global conflict issues are appended before canonical package construction.
+The normal canonical output path remains unchanged:
 
-## Truth hierarchy
+`VisionGeometryPipeline.build_sketch(...) -> SketchPackage v1`
 
-Unchanged:
-
-```text
-verified physical measurement > image/geometry-derived relation
-```
-
-Ring 9 does not move entities, rewrite measurements or solve geometry numerically.
+No Chat 3 -> Chat 4 wire-contract change is introduced.
 
 ## Runtime / dependencies
 
 Package version:
 
-`0.9.0`
+`0.10.0`
 
 New dependencies: **none**.
 
@@ -128,32 +96,32 @@ New dependencies: **none**.
 
 New acceptance module:
 
-`tests/test_constraint_system.py`
+`tests/test_dof_audit.py`
 
-Coverage:
+Coverage includes:
 
-- consistent orientation chain;
-- conflicting orientation relation;
-- `DETECTED` vs `INFERRED` priority;
-- transitive `PARALLEL` reduction;
-- transitive `EQUAL` reduction;
-- preservation of non-graph relations;
-- preservation of prior resolver issues;
-- deterministic result under reversed input order.
+- provable underconstraint for a lone point;
+- line + axis + dimension remaining DOF;
+- concentric/equal circle equation budgets;
+- no false `FULLY_CONSTRAINED` claim when equation budget reaches parameter count;
+- conservative symmetry arity;
+- unknown future constraint fail-closed behavior;
+- all v1 primitive parameterizations;
+- deterministic result under input reordering.
 
 ## GitHub Actions verification
 
-Authoritative implementation head:
+Authoritative code/test/build-reuse head:
 
-`7b317e0c0a3e7c5f69000f8c51dd47adff362aa6`
+`77ca90a17b8b9bdc60c5cbade996b5bd412364a9`
 
 Workflow run:
 
-`36652647774`
+`36659318018`
 
 Results:
 
-- `Chat 3 / Geometry`: **SUCCESS — 73 passed in 0.46s**;
+- `Chat 3 / Geometry`: **SUCCESS — 81 passed in 0.50s**;
 - `Contracts / canonical fixtures`: **SUCCESS**;
 - `Chat 1 / Capture`: **SUCCESS**;
 - `Chat 2 / Measurement`: **SUCCESS**;
@@ -163,13 +131,13 @@ Results:
 
 ## Chat 3 -> Chat 4 inherited baseline drift
 
-The frozen worker ancestry still contains the old shared integration-test lookup:
+The frozen worker ancestry still carries the older Chat-6-owned test lookup:
 
 ```python
 transfer.cad_verification_report["dimensions"]
 ```
 
-The boundary run reaches successful SketchPackage generation, canonical validation, CAD transfer, CADPackage validation, CADVerificationReport validation and `overall_status == "VERIFIED"`, then fails with `KeyError: 'dimensions'`.
+The run reaches successful SketchPackage generation, CAD transfer, CADPackage validation, CADVerificationReport validation and `overall_status == "VERIFIED"`, then fails with `KeyError: 'dimensions'`.
 
 Current `main` uses canonical:
 
@@ -177,7 +145,7 @@ Current `main` uses canonical:
 transfer.cad_verification_report["items"]
 ```
 
-Chat 3 did not backport or modify Chat-6-owned shared integration infrastructure.
+Chat 3 did not backport or modify shared integration infrastructure.
 
 ## Shared ownership / Change Requests
 
@@ -193,29 +161,29 @@ Change Requests: **none**.
 Validate on the current shared baseline:
 
 ```text
-resolved per-constraint relations
-→ global orientation/equivalence diagnostics
-→ deterministic retention/redundancy/conflict decision
-→ SketchPackage constraints + explicit unresolved
+GeometryDraft + globally retained constraints
+→ exact primitive parameter count
+→ conservative maximum equation budget
+→ proven remaining DOF lower bound or explicit non-proof state
 ```
 
-Confirm that stronger evidence wins deterministically, verified measurements remain unchanged, and no unsafe transitivity is introduced.
+Confirm especially that `NOT_PROVEN_UNDERCONSTRAINED` is not interpreted as `FULLY_CONSTRAINED`.
 
 ## Known limitations / next owned work
 
 Deferred unless Chat 6 reprioritizes:
 
-- full numerical constraint solving/entity movement;
-- complete degrees-of-freedom accounting;
-- nonlinear/global geometric consistency beyond the proven graph subset;
+- numerical Jacobian-rank DOF proof;
+- numerical constraint solving/entity movement;
+- nonlinear/global consistency beyond the proven graph subset;
 - uncertainty propagation from calibration/vision into tolerance selection;
 - multi-view relationships;
 - CAD-native logic.
 
 ## Branch freeze
 
-This handoff is the final normal worker commit for Ring 9.
+This handoff is the final normal worker commit for Ring 10.
 
-After publication, `chat-3/pass-9` is treated as **frozen** pending Chat 6 verdict or explicit user/orchestrator instruction.
+After publication, `chat-3/pass-10` is treated as **frozen** pending Chat 6 verdict or explicit user/orchestrator instruction.
 
-The only permitted post-handoff write is a minimal repair if the mandatory final GitHub upload audit proves that a claimed Ring 9 file failed to land or differs from intended payload. Any such repair must itself be re-audited.
+The only permitted post-handoff write is a minimal repair if the mandatory final GitHub upload audit proves that a claimed Ring 10 file failed to land or differs from intended payload. Any such repair must itself be re-audited.
