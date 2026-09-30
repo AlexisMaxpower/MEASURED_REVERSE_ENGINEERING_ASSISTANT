@@ -7,6 +7,7 @@ from typing import Mapping, Optional
 from .models import (
     CADArtifactReference,
     CADRevisionLink,
+    CADRuntimeStatus,
     CADVerificationStatus,
     FailureRecord,
     Installation,
@@ -21,6 +22,7 @@ from .store import InMemoryLifecycleStore, LifecycleInvariantError
 
 CAD_PACKAGE_SCHEMA_VERSION = "mrea.cad-package.v1"
 CAD_VERIFICATION_SCHEMA_VERSION = "mrea.cad-verification.v1"
+CAD_RUNTIME_EVIDENCE_SCHEMA_VERSION = "mrea.cad-runtime-evidence.v1"
 _ALLOWED_ARTIFACT_FIELDS = {
     "artifact_id",
     "kind",
@@ -107,6 +109,7 @@ class CADRevisionPreparationService:
         event_id: str,
         parent_revision_id: Optional[str] = None,
         notes: Optional[str] = None,
+        runtime_evidence: Optional[Mapping[str, object]] = None,
     ) -> Revision:
         package = _require_mapping(cad_package, field_name="cad_package")
         report = _require_mapping(
@@ -155,6 +158,68 @@ class CADRevisionPreparationService:
             raise LifecycleInvariantError(
                 "CADVerificationReport overall_status must be VERIFIED or FAILED"
             ) from exc
+
+        runtime_status: Optional[CADRuntimeStatus] = None
+        runtime_schema_version: Optional[str] = None
+        runtime_real_host_executed: Optional[bool] = None
+        if runtime_evidence is not None:
+            evidence = _require_mapping(
+                runtime_evidence, field_name="runtime_evidence"
+            )
+            runtime_schema_version = _require_non_empty_string(
+                evidence.get("schema_version"),
+                field_name="runtime_evidence.schema_version",
+            )
+            if runtime_schema_version != CAD_RUNTIME_EVIDENCE_SCHEMA_VERSION:
+                raise LifecycleInvariantError(
+                    "unsupported CAD runtime evidence schema_version"
+                )
+            try:
+                runtime_status = CADRuntimeStatus(evidence.get("status"))
+            except (TypeError, ValueError) as exc:
+                raise LifecycleInvariantError(
+                    "runtime evidence status must be VERIFIED, FAILED, or UNVERIFIED"
+                ) from exc
+
+            runtime_adapter = _require_non_empty_string(
+                evidence.get("adapter_name"),
+                field_name="runtime_evidence.adapter_name",
+            )
+            if runtime_adapter != cad_adapter:
+                raise LifecycleInvariantError(
+                    "runtime evidence adapter_name does not match CADPackage adapter"
+                )
+
+            runtime_sketch_package_id = _require_non_empty_string(
+                evidence.get("sketch_package_id"),
+                field_name="runtime_evidence.sketch_package_id",
+            )
+            if runtime_sketch_package_id != sketch_package_id:
+                raise LifecycleInvariantError(
+                    "runtime evidence sketch_package_id does not match CADPackage"
+                )
+
+            runtime_cad_package_id = evidence.get("cad_package_id")
+            if runtime_cad_package_id is not None:
+                runtime_cad_package_id = _require_non_empty_string(
+                    runtime_cad_package_id,
+                    field_name="runtime_evidence.cad_package_id",
+                )
+                if runtime_cad_package_id != cad_package_id:
+                    raise LifecycleInvariantError(
+                        "runtime evidence cad_package_id does not match CADPackage"
+                    )
+
+            raw_real_host_executed = evidence.get("real_host_executed")
+            if not isinstance(raw_real_host_executed, bool):
+                raise LifecycleInvariantError(
+                    "runtime_evidence.real_host_executed must be boolean"
+                )
+            runtime_real_host_executed = raw_real_host_executed
+            if runtime_status is CADRuntimeStatus.VERIFIED and not runtime_real_host_executed:
+                raise LifecycleInvariantError(
+                    "runtime VERIFIED requires real_host_executed=true"
+                )
 
         raw_artifacts = package.get("artifacts")
         if not isinstance(raw_artifacts, list):
@@ -219,6 +284,9 @@ class CADRevisionPreparationService:
                 cad_adapter=cad_adapter,
                 verification_status=verification_status,
                 artifacts=tuple(artifacts),
+                runtime_status=runtime_status,
+                runtime_evidence_schema_version=runtime_schema_version,
+                runtime_real_host_executed=runtime_real_host_executed,
             ),
         )
         return self.revisions.create(revision, event_id=event_id)
@@ -236,10 +304,16 @@ class ManufacturingService:
         if revision.origin is not RevisionOrigin.CAD_TRANSFER:
             return True
 
-        return (
-            revision.cad_link is not None
-            and revision.cad_link.verification_status is CADVerificationStatus.VERIFIED
-        )
+        if revision.cad_link is None:
+            return False
+        if revision.cad_link.verification_status is not CADVerificationStatus.VERIFIED:
+            return False
+        if (
+            revision.cad_link.runtime_status is not None
+            and revision.cad_link.runtime_status is not CADRuntimeStatus.VERIFIED
+        ):
+            return False
+        return True
 
     def record(self, record: ManufacturingRecord, *, event_id: str) -> ManufacturingRecord:
         if record.manufacturing_id in self.store.manufacturing_records:
@@ -251,7 +325,7 @@ class ManufacturingService:
             raise LifecycleInvariantError(f"unknown revision_id: {record.revision_id}")
         if not self.is_revision_eligible(record.revision_id):
             raise LifecycleInvariantError(
-                "CAD transfer is not VERIFIED; manufacturing is blocked"
+                "CAD transfer verification/runtime gate is not VERIFIED; manufacturing is blocked"
             )
 
         self.store.manufacturing_records[record.manufacturing_id] = record
