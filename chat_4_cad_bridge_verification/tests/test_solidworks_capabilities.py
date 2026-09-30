@@ -35,22 +35,39 @@ class SolidWorksCapabilitiesTests(unittest.TestCase):
         manifest = build_solidworks_capabilities_v1()
         self.assertEqual(
             set(manifest["constraints"]["supported"]),
-            {"HORIZONTAL", "VERTICAL", "PARALLEL", "PERPENDICULAR", "CONCENTRIC", "EQUAL"},
+            {
+                "HORIZONTAL",
+                "VERTICAL",
+                "PARALLEL",
+                "PERPENDICULAR",
+                "CONCENTRIC",
+                "EQUAL",
+                "TANGENT",
+            },
         )
 
     def test_unimplemented_constraints_are_explicitly_unsupported(self):
         manifest = build_solidworks_capabilities_v1()
         self.assertEqual(
             set(manifest["constraints"]["unsupported"]),
-            {"COINCIDENT", "TANGENT", "SYMMETRIC"},
+            {"COINCIDENT", "SYMMETRIC"},
         )
 
-    def test_tangent_is_not_claimed_supported_only_because_vendor_api_has_it(self):
-        self.assertFalse(is_solidworks_constraint_supported_v1("TANGENT"))
+    def test_tangent_is_reported_supported_after_worker_mapping_exists(self):
+        self.assertTrue(is_solidworks_constraint_supported_v1("TANGENT"))
+
+    def test_tangent_manifest_records_fail_closed_geometry_limit(self):
+        manifest = build_solidworks_capabilities_v1()
+        limitation = manifest["constraints"]["limitations"]["TANGENT"]
+        self.assertIn("LINE/CIRCLE/ARC", limitation)
+        self.assertIn("at least one CIRCLE/ARC", limitation)
 
     def test_nonverified_constraint_status_is_not_supported(self):
         self.assertFalse(
             is_solidworks_constraint_supported_v1("HORIZONTAL", status="DETECTED")
+        )
+        self.assertFalse(
+            is_solidworks_constraint_supported_v1("TANGENT", status="INFERRED")
         )
 
     def test_verified_supported_constraint_is_reported_supported(self):
@@ -66,9 +83,9 @@ class SolidWorksCapabilitiesTests(unittest.TestCase):
 
     def test_manifest_is_deep_copied_for_callers(self):
         first = build_solidworks_capabilities_v1()
-        first["constraints"]["supported"].append("TANGENT")
+        first["constraints"]["supported"].append("__MUTATED__")
         second = build_solidworks_capabilities_v1()
-        self.assertNotIn("TANGENT", second["constraints"]["supported"])
+        self.assertNotIn("__MUTATED__", second["constraints"]["supported"])
 
 
 if __name__ == "__main__":
