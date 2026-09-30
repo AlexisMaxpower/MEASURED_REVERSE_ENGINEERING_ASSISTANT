@@ -81,7 +81,8 @@ chat_1_project_guided_capture/
 │  ├─ test_rectification.py
 │  ├─ test_quality.py
 │  ├─ test_guidance.py
-│  └─ test_recapture.py
+│  ├─ test_recapture.py
+│  └─ test_reopen.py
 └─ docs/
    ├─ IMPLEMENTATION_STATE.md
    ├─ BUILD_REUSE_CHECK_PASS3_GUIDED_QUALITY.md
@@ -134,3 +135,7 @@ The guided workflow can now recover from a rejected clean-reference attempt with
 - accepted views cannot be silently recaptured without a future explicit reopen workflow.
 
 This remains isolated on `chat-1/pass-4` until Round 3 closes and Chat 6 issues the official next directive.
+
+### Isolated Pass 4 — Explicit accepted-view revision
+
+Accepted views can now be intentionally reopened through an audited `reopen_view(...)` operation. Reopening never deletes evidence: it records a `CaptureViewRevisionEvent`, clears completion, and requires a fresh clean-reference attempt before the view can be accepted again. Guided Capture exposes this as `RECAPTURE_CLEAN_REFERENCE` with `VIEW_REOPENED_RECAPTURE_REQUIRED`. This state remains internal and does not change `CapturePackage v1`.
