@@ -1,11 +1,12 @@
 # Chat 1 — Implementation State
 
-**Date:** 2026-09-29  
+**Date:** 2026-09-30  
 **Role:** Chat 1 — Project & Guided Capture  
-**Current pass:** 3  
-**Directive:** `OD-2026-09-29-003`  
-**Working branch:** `chat-1/pass-3`  
-**Baseline main SHA:** `c3452d7fa68c9c5c3716db5fef71172e9c3b9532`
+**Current pass:** 4  
+**Directive:** `OD-2026-09-30-004`  
+**Working branch:** `chat-1/pass-4`  
+**Accepted Round-3 baseline SHA:** `bffc1dec2fe63c12b69a50c4bf348ef7df4cf662`  
+**Pass-4 state:** completion / handoff preparation; Stage-1 acceptance pending Chat 6
 
 ## Source-of-truth order
 
@@ -150,9 +151,9 @@ Before handoff freeze, require:
 - final `ORCHESTRATOR_HANDOFF.md` published once, then branch frozen.
 
 
-## Isolated Pass 4 work package — Guided Capture Readiness
+## Pass 4 work package — Guided Capture Readiness
 
-While Round 3 final merge remains blocked by Chat-6-owned post-merge golden-path CI coverage, Chat 1 future work is isolated on `chat-1/pass-4` and is **not yet accepted/integrated**.
+Round 3 is closed and Chat 1 Pass 3 is accepted. Under `OD-2026-09-30-004`, `chat-1/pass-4` is now the selected Round-4 worker cut. The implementation below is **not yet Stage-1 accepted or merged**; this pass is being completed for review and branch freeze.
 
 Added `guidance.py` with versioned deterministic readiness orchestration over existing capture evidence. It derives the first remaining required view and next action across clean reference, calibration, quality, measurement frame and explicit acceptance. Quality `REJECT` blocks progression; WARN handling is policy-controlled. Optional views do not block required completion.
 
@@ -161,9 +162,9 @@ This layer is pure/read-only and does not change `CapturePackage v1`, physical m
 Local schema-independent regression: `24 passed`. Full repository CI is required after upload.
 
 
-## Isolated Pass 4 extension — immutable recapture / supersession lineage
+## Pass 4 extension — immutable recapture / supersession lineage
 
-The readiness flow previously had a dead-end after `QUALITY_REJECTED`: evidence was immutable, while the session allowed only one clean reference per view. The isolated branch now resolves that gap without deleting history.
+The readiness flow previously had a dead-end after `QUALITY_REJECTED`: evidence was immutable, while the session allowed only one clean reference per view. Pass 4 resolves that gap without deleting history.
 
 Added lineage fields:
 
@@ -185,7 +186,7 @@ Guided `QUALITY_REJECTED` / strict-WARN handling now returns the executable `REC
 
 Local schema-independent regression after this extension: `28 passed`. The remaining three full-suite failures in the patch workspace are only missing root-schema file loads; calibration/rectification/canonical behavior reaches those final validation calls successfully.
 
-## Isolated Pass 4 work package — Explicit accepted-view revision
+## Pass 4 work package — Explicit accepted-view revision
 
 Added an explicit reopen/revision gate on top of immutable recapture lineage.
 
@@ -198,7 +199,7 @@ Added an explicit reopen/revision gate on top of immutable recapture lineage.
 
 Local schema-independent regression including quality: `33 passed`.
 
-## Isolated Pass 4 extension — capture attempt history projection
+## Pass 4 extension — capture attempt history projection
 
 Added `history.py` with a deterministic read-only projection of immutable per-view capture attempts. The projection groups calibration, quality, rectification, measurement and revision evidence by the exact clean-reference source frame and marks the active attempt explicitly. It preserves persisted view order and does not mutate session state.
 
