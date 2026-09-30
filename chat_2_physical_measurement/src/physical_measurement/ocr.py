@@ -9,6 +9,7 @@ from math import isfinite
 
 from .hands_free import HandsFreeMeasurementController, HandsFreeTransition
 from .models import ProvenanceSource
+from .type_registry import MeasurementTypeRegistry
 
 
 _NUMERIC_MENTION_RE = re.compile(r"[+-]?\d+(?:[.,]\d+)?")
@@ -172,11 +173,8 @@ class OcrMeasurementPipeline:
         *,
         reader: OcrMeasurementReader,
         controller: HandsFreeMeasurementController,
-        expected_unit: str,
+        type_registry: MeasurementTypeRegistry | None = None,
     ) -> None:
-        if expected_unit not in {"mm", "deg"}:
-            raise ValueError("expected_unit must be 'mm' or 'deg'")
-
         context = controller.context
         anchors = tuple(
             anchor
@@ -189,12 +187,19 @@ class OcrMeasurementPipeline:
         if context.evidence_frame_id is None:
             raise ValueError("OCR measurement context requires evidence_frame_id")
 
+        registry = type_registry or MeasurementTypeRegistry()
+        registry.validate_complete()
+
         self._reader = reader
         self._controller = controller
-        self._expected_unit = expected_unit
+        self._expected_unit = registry.unit_for(context.measurement_type)
         self._view_id = context.view_id
         self._reference_frame_id = next(iter(reference_frame_ids))
         self._evidence_frame_id = context.evidence_frame_id
+
+    @property
+    def expected_unit(self) -> str:
+        return self._expected_unit
 
     def process(self, observation: OcrObservation) -> OcrPipelineResult:
         if observation.view_id != self._view_id:
