@@ -18,12 +18,23 @@ from .hands_free import (
 from .models import FeatureAnchor, MeasurementSession, MeasurementType, PhysicalMeasurement, ProvenanceSource
 from .repository import InMemoryMeasurementSessionRepository
 from .service import MeasurementSessionService
+from .snapping import (
+    FeatureAnchorSelector,
+    FeatureSnapCandidate,
+    FeatureSnapProposal,
+    FeatureSnapSelection,
+    SnapSelectionStatus,
+)
 from .type_registry import MeasurementTypeRegistry, MeasurementTypeSemantics
 
 __all__ = [
     "AmbiguousMeasurementCommand",
     "CanonicalMeasurementAdapter",
     "FeatureAnchor",
+    "FeatureAnchorSelector",
+    "FeatureSnapCandidate",
+    "FeatureSnapProposal",
+    "FeatureSnapSelection",
     "HandsFreeMeasurementController",
     "HandsFreeMeasurementState",
     "HandsFreePhase",
@@ -42,5 +53,6 @@ __all__ = [
     "ParsedMeasurementCommand",
     "PhysicalMeasurement",
     "ProvenanceSource",
+    "SnapSelectionStatus",
     "normalize_measurement_number",
 ]
