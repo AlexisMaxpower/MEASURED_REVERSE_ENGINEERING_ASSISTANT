@@ -32,6 +32,12 @@ from .http_api import (
     ReadOnlyLifecycleHttpAPI,
     build_read_only_lifecycle_http_app,
 )
+from .http_cursor import (
+    HTTP_CURSOR_FORMAT_VERSION,
+    MIN_HTTP_CURSOR_KEY_BYTES,
+    HttpCursorAuthenticator,
+    LifecycleHttpCursorError,
+)
 from .knowledge_paging import (
     DEFAULT_KNOWLEDGE_PAGE_LIMIT,
     KNOWLEDGE_CURSOR_FORMAT_VERSION,
@@ -120,6 +126,8 @@ __all__ = [
     "FailureQueryResult",
     "FailureRecord",
     "FailureService",
+    "HTTP_CURSOR_FORMAT_VERSION",
+    "HttpCursorAuthenticator",
     "InMemoryLifecycleStore",
     "Installation",
     "InstallationService",
@@ -138,6 +146,7 @@ __all__ = [
     "LifecycleDatabaseInspection",
     "LifecycleEvent",
     "LifecycleEventType",
+    "LifecycleHttpCursorError",
     "LifecycleHttpMethodNotAllowedError",
     "LifecycleHttpNotFoundError",
     "LifecycleHttpRequestError",
@@ -155,6 +164,7 @@ __all__ = [
     "LifecycleTransactionRequiredError",
     "LifecycleUnitOfWork",
     "MAX_KNOWLEDGE_PAGE_LIMIT",
+    "MIN_HTTP_CURSOR_KEY_BYTES",
     "ManufacturingRecord",
     "ManufacturingService",
     "PhysicalEquipmentRegistry",
