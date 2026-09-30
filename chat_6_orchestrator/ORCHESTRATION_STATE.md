@@ -3,7 +3,7 @@
 **Owner:** Chat 6 — Orchestrator / Repository Integrator  
 **Directive revision:** `OD-2026-09-30-004`  
 **Contract baseline:** `mrea.contracts.v1`  
-**Status:** Round 3 CLOSED — Round 4 Stage 2 ACCEPTED — READY FOR CHAT 8 FINAL REVIEW
+**Status:** Round 3 CLOSED — Round 4 Stage 2 TECHNICALLY ACCEPTED — FINAL-REVIEW CANDIDATE REBUILD REQUIRED AFTER DOC FREEZE
 
 ## Round 3 closure
 
@@ -13,13 +13,15 @@ Accepted Round-3 software baseline:
 
 Post-merge CI `36651010221` — `SUCCESS`.
 
-## Round 4 authoritative review documents
+## Round 4 authoritative documents
 
 - `PASS_4_PLAN_2026-09-30.md`
 - `ROUND_4_STAGE1_FINAL_REVIEW_2026-09-30.md`
 - `ROUND_4_REPLAY_MANIFEST_2026-09-30.md`
 - `ROUND_4_STAGE2_REVIEW_2026-09-30.md`
-- `ROUND_4_FINAL_REVIEW_HANDOFF_2026-09-30.md`
+- `ROUND_4_FINAL_REVIEW_HANDOFF_V2_2026-09-30.md`
+
+V2 supersedes the older final-review handoff for final candidate identity.
 
 ## Frozen Round-4 worker provenance
 
@@ -31,85 +33,63 @@ Chat 4  chat-4/pass-7 @ 61f37a4dd46921b7fe9145bcbe5242bc3f6417b3
 Chat 5  chat-5/pass-8 @ 82e2203aaeb69ee1fe9f89fd42d0aea451b8690f
 ```
 
-These exact selected cuts were independently rechecked during Stage 2 and remain unchanged. Newer worker pass branches are outside this Round-4 candidate unless explicitly selected by a later central round.
+These exact refs were independently rechecked during Stage 2 and remain unchanged.
 
-## Stage-1 validation evidence
+Newer worker-local pass branches are outside the selected Round-4 candidate unless a later central round explicitly selects them.
 
-Validation branch:
-
-`integration/pass-4-stage1-replay-candidate`
-
-Validation commit:
-
-`0a46ebb27abd3267e46afaf86b50383ab6b7d5a0`
-
-Validation CI:
-
-`36726156911` — `SUCCESS`
-
-Stage 1 proved the accepted worker-owned replay composition against current shared infrastructure.
-
-## Stage-2 official candidate
-
-Base `main` used by Deputy 1:
-
-`11975decc69caf80952942c58377f9d896d70303`
-
-Official candidate:
+## Stage-1 validation
 
 ```text
-branch: integration/pass-4-candidate
-SHA:    05f999e1cc24307cfb4842d19bc5d42a1f1c9721
-tree:   fa751dce49166023741324c338f1dd587b24cc49
-PR:     #38
+branch: integration/pass-4-stage1-replay-candidate
+SHA:    0a46ebb27abd3267e46afaf86b50383ab6b7d5a0
+CI:     36726156911 = SUCCESS
 ```
 
-The candidate is exactly one commit ahead of that base SHA.
+## Stage-2 Deputy-1 candidate evidence
 
-Chat 6 independently verified that:
+The Deputy-1 candidate tested during Stage 2 was:
 
-- all worker-owned replay surfaces match `ROUND_4_REPLAY_MANIFEST_2026-09-30.md` by blob/tree SHA;
-- candidate shared `.github`, `core`, root `tests`, Chat 6 and Chat 8 trees are identical to the base `main` trees;
-- the changed-file set contains only accepted Chat 1–5 worker-owned content;
-- worker directives/handoffs were not replaced;
-- no blind worker-history merge is present.
+```text
+base: 11975decc69caf80952942c58377f9d896d70303
+SHA:  05f999e1cc24307cfb4842d19bc5d42a1f1c9721
+tree: fa751dce49166023741324c338f1dd587b24cc49
+PR:   #38
+```
 
-## Stage-2 CI
+Chat 6 independently verified:
 
-Push run:
+- exact manifest tree/blob matches for all approved worker-owned replay surfaces;
+- shared `.github`, `core`, root `tests`, Chat 6 and Chat 8 trees were preserved from the candidate base;
+- no worker directive/handoff replacement;
+- no blind worker-history merge;
+- push CI `36728546973` = `SUCCESS`;
+- PR CI `36728980497` = `SUCCESS` with contracts, all five slices, all four boundaries and golden path actually executed.
 
-`36728546973` — `SUCCESS`
+Therefore Stage 2 technical verdict is:
 
-PR run:
+`ACCEPTED_WITH_DOCUMENTATION_PROCESS_DEFECT`
 
-`36728980497` — `SUCCESS`
+## Deputy-1 documentation process defect
 
-On exact candidate SHA `05f999e1...`, the PR run actually executed and passed:
-
-- Contracts / canonical fixtures;
-- all five slice jobs;
-- Chat 1 -> Chat 2;
-- Chat 2 -> Chat 3;
-- Chat 3 -> Chat 4;
-- Chat 4 -> Chat 5;
-- Round-3 golden path.
-
-No skipped required job is counted as PASS.
-
-## Deputy-1 documentation defect
-
-The Stage-2 directive required repository files:
+The specifically required repository files were not found:
 
 - `ROUND_4_DEPUTY1_AUDIT.md`
 - `ROUND_4_INTEGRATION_CANDIDATE_REPORT.md`
 
-Those files were not found. PR #38 contains the Deputy-1 candidate summary, and Chat 6 independently reconstructed and verified the required evidence in `ROUND_4_STAGE2_REVIEW_2026-09-30.md`.
+This defect is recorded, not concealed. PR #38 contains the Deputy-1 summary, and Chat 6 reconstructed the independent evidence in `ROUND_4_STAGE2_REVIEW_2026-09-30.md`.
 
-Therefore:
+## Why final-review candidate must be rebuilt
 
-`ROUND_4_STAGE2 = ACCEPTED_WITH_DOCUMENTATION_PROCESS_DEFECT`
+After verifying `05f999e1...`, Chat 6 wrote the Stage-2 evidence documents to `main` as explicitly required by the orchestration workflow/user.
 
-This omission must not be described later as if the missing Deputy-1 files existed.
+That documentation advanced `main`, so `05f999e1...` is no longer based on the latest `main`.
+
+Per `ROUND_4_FINAL_REVIEW_HANDOFF_V2_2026-09-30.md`, Chat 6 must now rebuild `integration/pass-4-candidate` once from the final documentation HEAD using the same already-verified worker trees.
+
+After this documentation freeze:
+
+- no further `main` write is allowed before Chat 8 Final Review;
+- exact rebuilt candidate SHA/base/CI will be recorded on PR #38, not back into `main`, to avoid another circular base shift.
 
 ## External environment truth
 
@@ -119,19 +99,16 @@ PRODUCTION_CSHARP_INTEROP_BUILD = UNVERIFIED
 NATIVE_SLDPRT_GENERATION_READBACK = UNVERIFIED
 ```
 
-GitHub-hosted generic/test-double evidence cannot promote these states.
-
 ## Current state machine
 
 ```text
 ROUND_3_CLOSED
-    -> ROUND_4_STAGE0_COMPLETE
     -> ROUND_4_STAGE1_COMPLETE
-    -> STAGE1_REPLAY_VALIDATED_GREEN
-    -> ROUND_4_STAGE2_CANDIDATE_VERIFIED
-    -> STAGE2_ACCEPTED_WITH_DOCUMENTATION_PROCESS_DEFECT
-    -> CHAT8_FINAL_REVIEW_AUTHORIZED
-    -> MERGE_TO_MAIN_NOT_YET_AUTHORIZED
+    -> ROUND_4_STAGE2_TECHNICALLY_ACCEPTED
+    -> DEPUTY1_DOCUMENTATION_PROCESS_DEFECT_RECORDED
+    -> CHAT6_DOCUMENTATION_FREEZE
+    -> FINAL_REVIEW_CANDIDATE_REBUILD_PENDING
+    -> FULL_CI_REQUIRED
+    -> CHAT8_FINAL_REVIEW
+    -> MERGE_TO_MAIN_NOT_AUTHORIZED
 ```
-
-Chat 8 must independently review exact candidate SHA `05f999e1cc24307cfb4842d19bc5d42a1f1c9721` and issue an exact-SHA final verdict before any merge to `main`.
