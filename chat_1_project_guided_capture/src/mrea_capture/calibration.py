@@ -5,7 +5,8 @@ from typing import Protocol
 from uuid import UUID
 
 from .artifacts import ArtifactStore
-from .models import CalibrationResult, CaptureViewType, FrameKind, MeasurementMatProfile
+from .lineage import active_clean_reference
+from .models import CalibrationResult, CaptureViewType, MeasurementMatProfile
 from .repositories import CaptureSessionRepository
 
 
@@ -133,18 +134,15 @@ class CalibrationService:
         profile: MeasurementMatProfile,
     ) -> CalibrationResult:
         session = self._repository.get(session_id)
-        if any(item.view is view for item in session.calibrations):
-            raise CalibrationDetectionError(f"calibration already exists for view {view.value}")
-        clean_frames = [
-            frame
-            for frame in session.frames
-            if frame.view is view and frame.kind is FrameKind.CLEAN_REFERENCE
-        ]
-        if len(clean_frames) != 1:
+        clean = active_clean_reference(session, view)
+        if clean is None:
             raise CalibrationDetectionError(
-                f"view {view.value} requires exactly one clean reference frame"
+                f"view {view.value} requires an active clean reference frame"
             )
-        clean = clean_frames[0]
+        if any(item.source_frame_id == clean.frame_id for item in session.calibrations):
+            raise CalibrationDetectionError(
+                f"calibration already exists for active clean reference {clean.frame_id}"
+            )
         result = self._detector.detect(
             self._artifact_store.get_bytes(clean.artifact),
             profile=profile,
