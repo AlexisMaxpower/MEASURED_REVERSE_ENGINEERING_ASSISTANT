@@ -2,18 +2,18 @@
 
 **Date:** 2026-09-30  
 **Repository:** `AlexisMaxpower/MEASURED_REVERSE_ENGINEERING_ASSISTANT`  
-**Active branch:** `chat-3/pass-7`  
+**Active branch:** `chat-3/pass-8`  
 **Role:** Chat 3 — Geometry & Semi-Automatic Sketch  
-**Ring:** 7  
-**Authorization:** explicit user-requested continuation; no newer Chat 3 worker directive than OD-2026-09-29-003 was present on `main` when Ring 7 started.
+**Ring:** 8  
+**Authorization:** explicit user-requested continuation; no newer Chat 3 worker directive than OD-2026-09-29-003 was present on `main` when Ring 8 started.
 
 ## Baseline
 
-Ring 7 branches from frozen Ring 6 head:
+Ring 8 branches from frozen Ring 7 head:
 
-`28d4373b0e9cfdb25a1a833e9ca646c2a06f9d14`
+`40340f38974ea71ea626a73d4d7f3c5c271dd086`
 
-## Capabilities through Ring 6
+## Capabilities through Ring 7
 
 Chat 3 already provides:
 
@@ -21,85 +21,94 @@ Chat 3 already provides:
 - `IMAGE_PX -> MAT_XY_MM` normalization;
 - POINT / LINE / CIRCLE / ARC models;
 - deterministic GeometryGraph;
-- measurement binding and geometry conflict visibility;
+- measurement binding and conflict visibility;
 - deterministic SketchPackage v1 generation;
-- OpenCV-backed LINE/CIRCLE/ARC extraction with `VISION_DETECTED` provenance;
+- OpenCV LINE/CIRCLE/ARC extraction with `VISION_DETECTED` provenance;
 - fail-closed ambiguous geometry handling;
-- `ConstraintResolver` confidence, verified-measurement and redundancy gates;
-- COINCIDENT / HORIZONTAL / VERTICAL / PARALLEL / PERPENDICULAR / TANGENT / CONCENTRIC / EQUAL / SYMMETRIC candidates;
+- all canonical v1 constraint candidate families;
+- `ConstraintResolver` with confidence, verified-measurement and redundancy gates;
+- `ConstraintSatisfactionAnalyzer` with explicit residuals and `UNSATISFIED_CONSTRAINT` diagnostics;
 - deterministic SVG Dimensioned View.
 
-## Ring 7 — Constraint Satisfaction Diagnostics
+## Ring 8 — Residual-Aware Constraint Confidence
 
 New module:
 
-`src/mrea_geometry/constraint_satisfaction.py`
+`src/mrea_geometry/constraint_confidence.py`
 
 Public API:
 
-- `ConstraintSatisfaction`;
-- `ConstraintSatisfactionAnalyzer`.
+- `ConstraintConfidence`;
+- `ConstraintConfidenceModel`.
 
 ### Purpose
 
-A candidate relation is no longer publishable solely because detection once emitted it. Before canonical promotion, current geometry must still satisfy the relation within explicit tolerances.
+A relation that only barely satisfies a configured geometric tolerance is no longer treated as equally reliable to an exact relation.
 
-### Residuals
+For satisfied geometry:
 
-Normalized angular residual (`1e-3` default):
+```text
+ratio = clamp(residual / tolerance, 0, 1)
+confidence = 1 - (1 - boundary_confidence) * ratio^2
+```
 
-- HORIZONTAL;
-- VERTICAL;
-- PARALLEL;
-- PERPENDICULAR.
+Default `boundary_confidence = 0.5`.
 
-Linear residual (`0.05 mm` default):
+### Resolver behavior
 
-- COINCIDENT;
-- TANGENT;
-- CONCENTRIC;
-- EQUAL;
-- SYMMETRIC.
-
-### Resolver order
+Resolver order is now:
 
 1. entity existence;
-2. confidence gate;
-3. geometric satisfaction;
-4. redundancy filter;
-5. verified measurement conflict checks;
-6. canonical publication.
+2. geometric satisfaction;
+3. residual-derived confidence;
+4. effective confidence gate;
+5. redundancy policy;
+6. verified measurement conflict policy;
+7. canonical publication.
 
-Unsatisfied candidates become canonical unresolved with code:
+Effective confidence is:
 
-`UNSATISFIED_CONSTRAINT`
+```text
+min(candidate confidence, entity confidences, residual-derived confidence)
+```
 
-No geometry is moved and no verified measurement is changed.
+The residual model can only lower confidence; it cannot increase source evidence.
+
+### Distinct fail-closed outcomes
+
+- relation outside tolerance -> `UNSATISFIED_CONSTRAINT`;
+- relation inside tolerance but too noisy -> `CONSTRAINT_BELOW_PROMOTION_CONFIDENCE`;
+- exact/high-quality relation -> publishable if all other gates pass.
+
+Verified physical measurements remain unchanged and higher priority.
 
 ## Runtime / dependencies
 
 Package version:
 
-`0.7.0`
+`0.8.0`
 
-New Ring 7 dependencies: **none**.
+New Ring 8 dependencies: **none**.
 
 ## Verification
 
 GitHub Actions implementation run:
 
-- run: `36645593928`;
-- implementation head: `8527a4ad9c711b18c6fc1bcd61dbfe537c6d53d5`;
-- Chat 3 / Geometry: **56 passed in 0.44s**;
+- run: `36651103396`;
+- implementation head: `1a6b58e6e87786b8e67e6f8525ece98e588dfad3`;
+- Chat 3 / Geometry: **65 passed in 0.61s**;
 - Contracts: SUCCESS;
-- Chat 2 -> Chat 3: SUCCESS;
-- Chat 4 generic CAD: SUCCESS.
+- Chat 1: SUCCESS;
+- Chat 2: SUCCESS;
+- Chat 4 generic CAD: SUCCESS;
+- Chat 5: SUCCESS;
+- Chat 2 -> Chat 3: SUCCESS.
 
-The worker branch's Chat 3 -> Chat 4 gate still inherits the old shared test lookup `cad_verification_report["dimensions"]`; current `main` already uses canonical `cad_verification_report["items"]`. Ring 7 does not modify shared integration infrastructure.
+The worker branch's Chat 3 -> Chat 4 gate still inherits the old shared `cad_verification_report["dimensions"]` lookup; current `main` uses canonical `cad_verification_report["items"]`. Ring 8 does not modify shared integration infrastructure.
 
 ## Shared ownership
 
-Ring 7 modifies no:
+Ring 8 modifies no:
 
 - shared contracts;
 - canonical shared fixtures;
@@ -111,16 +120,16 @@ Ring 7 modifies no:
 
 - numerical constraint solving/entity movement;
 - global over-constrained-system diagnosis;
-- uncertainty-aware/noisy-vision tolerance models;
+- uncertainty propagation from calibration/vision into tolerance selection;
 - multi-view geometry relationships;
 - CAD-native logic.
 
 ## Current status
 
-`READY_FOR_RING7_INTEGRATOR_REVIEW`
+`READY_FOR_RING8_INTEGRATOR_REVIEW`
 
-## Ring 7 documents
+## Ring 8 documents
 
-- `BUILD_REUSE_CHECK_RING7_CONSTRAINT_SATISFACTION.md`;
-- `IMPLEMENTATION_REPORT_RING7_CONSTRAINT_SATISFACTION_2026-09-30.md`;
+- `BUILD_REUSE_CHECK_RING8_RESIDUAL_CONFIDENCE.md`;
+- `IMPLEMENTATION_REPORT_RING8_RESIDUAL_CONFIDENCE_2026-09-30.md`;
 - `ORCHESTRATOR_HANDOFF.md`.
