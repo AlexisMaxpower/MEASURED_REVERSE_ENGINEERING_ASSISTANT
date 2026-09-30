@@ -68,7 +68,7 @@ Updated guidance tests for the executable recapture action.
 Schema-independent local regression:
 
 ```text
-28 passed in 0.27s
+28 passed in 0.23s
 ```
 
 The three schema-coupled tests also execute their capture/calibration/rectification/canonical behavior successfully and fail only when the archive-restored workspace attempts to open missing repository-root `core/contracts/mrea_contracts_v1.schema.json`.
