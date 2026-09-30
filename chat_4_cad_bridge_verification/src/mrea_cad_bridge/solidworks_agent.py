@@ -21,7 +21,15 @@ SOLIDWORKS_ADAPTER_NAME = "SOLIDWORKS_2026"
 _SUPPORTED_ENTITY_TYPES = frozenset({"POINT", "LINE", "CIRCLE", "ARC"})
 _SUPPORTED_DIMENSION_TYPES = frozenset({"DISTANCE", "DIAMETER", "RADIUS", "ANGLE"})
 _SUPPORTED_CONSTRAINT_TYPES = frozenset(
-    {"HORIZONTAL", "VERTICAL", "PARALLEL", "PERPENDICULAR", "CONCENTRIC", "EQUAL"}
+    {
+        "HORIZONTAL",
+        "VERTICAL",
+        "PARALLEL",
+        "PERPENDICULAR",
+        "CONCENTRIC",
+        "EQUAL",
+        "TANGENT",
+    }
 )
 
 
@@ -160,6 +168,21 @@ def _validate_constraint_support(
         if len(entity_ids) != 2 or any(item not in {"CIRCLE", "ARC"} for item in types):
             raise CadAdapterError(
                 f"SOLIDWORKS CONCENTRIC constraint {constraint_id} requires two CIRCLE/ARC entities"
+            )
+        return
+
+    if constraint_type == "TANGENT":
+        if len(entity_ids) != 2:
+            raise CadAdapterError(
+                f"SOLIDWORKS TANGENT constraint {constraint_id} requires exactly two entities"
+            )
+        if any(item not in {"LINE", "CIRCLE", "ARC"} for item in types):
+            raise CadAdapterError(
+                f"SOLIDWORKS TANGENT constraint {constraint_id} supports LINE/CIRCLE/ARC only"
+            )
+        if all(item == "LINE" for item in types):
+            raise CadAdapterError(
+                f"SOLIDWORKS TANGENT constraint {constraint_id} requires at least one CIRCLE/ARC"
             )
         return
 
