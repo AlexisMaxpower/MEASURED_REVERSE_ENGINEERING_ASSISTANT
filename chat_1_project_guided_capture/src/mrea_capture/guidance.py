@@ -5,13 +5,17 @@ from uuid import UUID
 
 from pydantic import Field
 
+from .lineage import (
+    active_clean_reference,
+    calibration_for_active_reference,
+    measurement_frames_for_active_reference,
+)
 from .models import (
     CaptureQualityResult,
     CaptureQualityVerdict,
     CaptureSession,
     CaptureViewStatus,
     CaptureViewType,
-    FrameKind,
     StrictModel,
 )
 
@@ -22,6 +26,7 @@ class GuidedCaptureError(RuntimeError):
 
 class GuidedCaptureAction(StrEnum):
     CAPTURE_CLEAN_REFERENCE = "CAPTURE_CLEAN_REFERENCE"
+    RECAPTURE_CLEAN_REFERENCE = "RECAPTURE_CLEAN_REFERENCE"
     RUN_CALIBRATION = "RUN_CALIBRATION"
     ANALYZE_QUALITY = "ANALYZE_QUALITY"
     RESOLVE_QUALITY = "RESOLVE_QUALITY"
@@ -82,7 +87,11 @@ class GuidedCaptureReadinessService:
 
     def evaluate(self, session: CaptureSession) -> GuidedCaptureReadiness:
         states = [self._evaluate_view(session, item.view) for item in session.views]
-        remaining = [state.view for state in states if state.required and state.action is not GuidedCaptureAction.COMPLETE]
+        remaining = [
+            state.view
+            for state in states
+            if state.required and state.action is not GuidedCaptureAction.COMPLETE
+        ]
 
         if remaining:
             next_view = remaining[0]
@@ -109,19 +118,8 @@ class GuidedCaptureReadinessService:
         if progress is None:
             raise GuidedCaptureError(f"view {view.value} is not part of the capture session")
 
-        clean_frames = [
-            frame
-            for frame in session.frames
-            if frame.view is view and frame.kind is FrameKind.CLEAN_REFERENCE
-        ]
-        if len(clean_frames) > 1:
-            raise GuidedCaptureError(f"view {view.value} has multiple clean reference frames")
-        clean = clean_frames[0] if clean_frames else None
-
-        calibrations = [item for item in session.calibrations if item.view is view]
-        if len(calibrations) > 1:
-            raise GuidedCaptureError(f"view {view.value} has multiple calibrations")
-        calibration = calibrations[0] if calibrations else None
+        clean = active_clean_reference(session, view)
+        calibration = calibration_for_active_reference(session, view)
 
         quality: CaptureQualityResult | None = None
         if clean is not None:
@@ -134,11 +132,7 @@ class GuidedCaptureReadinessService:
                 )
             quality = quality_matches[0] if quality_matches else None
 
-        measurement_count = sum(
-            1
-            for frame in session.frames
-            if frame.view is view and frame.kind is FrameKind.MEASUREMENT
-        )
+        measurement_count = len(measurement_frames_for_active_reference(session, view))
 
         action, blockers, ready = self._next_action(
             accepted=progress.status is CaptureViewStatus.ACCEPTED,
@@ -197,7 +191,7 @@ class GuidedCaptureReadinessService:
 
         if quality is not None and quality.verdict is CaptureQualityVerdict.REJECT:
             return (
-                GuidedCaptureAction.RESOLVE_QUALITY,
+                GuidedCaptureAction.RECAPTURE_CLEAN_REFERENCE,
                 [GuidedCaptureBlockerCode.QUALITY_REJECTED],
                 False,
             )
@@ -208,7 +202,7 @@ class GuidedCaptureReadinessService:
             and not self.policy.allow_quality_warn
         ):
             return (
-                GuidedCaptureAction.RESOLVE_QUALITY,
+                GuidedCaptureAction.RECAPTURE_CLEAN_REFERENCE,
                 [GuidedCaptureBlockerCode.QUALITY_WARNING_REVIEW_REQUIRED],
                 False,
             )
