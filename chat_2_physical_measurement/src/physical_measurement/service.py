@@ -14,6 +14,7 @@ from .models import (
     decimal_value,
 )
 from .repository import InMemoryMeasurementSessionRepository
+from .snapping import FeatureSnapProposal
 from .type_registry import MeasurementTypeRegistry
 
 
@@ -187,6 +188,44 @@ class MeasurementSessionService:
             uncertainty_mm=uncertainty_mm,
             instrument_type=instrument_type,
         )
+
+    def apply_anchor_snap(
+        self,
+        *,
+        session_id: str,
+        measurement_id: str,
+        proposal: FeatureSnapProposal,
+        explicit_user_acceptance: bool,
+    ) -> PhysicalMeasurement:
+        if not explicit_user_acceptance:
+            raise ValueError("anchor snapping requires explicit user acceptance")
+
+        session = self._repository.get(session_id)
+        measurement = session.get(measurement_id)
+        if measurement.is_verified:
+            raise ValueError("verified measurement anchors cannot be modified by snapping")
+
+        current_anchor = next(
+            (anchor for anchor in measurement.anchors if anchor.anchor_id == proposal.anchor_id),
+            None,
+        )
+        if current_anchor is None:
+            raise KeyError(proposal.anchor_id)
+        if proposal.view_id != current_anchor.view_id:
+            raise ValueError("snap proposal view_id does not match target anchor")
+        if proposal.reference_frame_id != current_anchor.reference_frame_id:
+            raise ValueError("snap proposal reference_frame_id does not match target anchor")
+        if proposal.source is not ProvenanceSource.VISION_DETECTED:
+            raise ValueError("snap proposal must preserve VISION_DETECTED provenance")
+
+        snapped_anchor = current_anchor.snap_to(
+            feature_id=proposal.feature_id,
+            x_px=proposal.x_px,
+            y_px=proposal.y_px,
+        )
+        updated = measurement.replace_anchor(snapped_anchor)
+        self._repository.save(session.replace_measurement(updated))
+        return updated
 
     def confirm_measurement(
         self,
