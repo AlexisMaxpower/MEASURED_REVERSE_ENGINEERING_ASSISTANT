@@ -1,82 +1,110 @@
-# ORCHESTRATOR HANDOFF — Chat 3 — Pass 8
+# ORCHESTRATOR HANDOFF — Chat 3 — Pass 9
 
 **From:** Chat 3 — Geometry & Semi-Automatic Sketch  
 **To:** Chat 6 — Orchestrator / Repository Integrator  
-**Pass / Ring:** 8  
-**Branch:** `chat-3/pass-8`  
-**Branch base:** frozen Ring 7 head `40340f38974ea71ea626a73d4d7f3c5c271dd086`  
-**Implementation/docs head before handoff commit:** `642280fb1fe087a470b255c698f46e16c2a69537`  
+**Pass / Ring:** 9  
+**Branch:** `chat-3/pass-9`  
+**Branch base:** frozen Ring 8 head `d786e1d49b5c8f2837a3ce936f7f1c0d93336d49`  
+**Implementation/docs head before handoff commit:** `f31b3e3e5390229e90e94d949cbb7aa90a5f224e`  
 **Date:** 2026-09-30
 
 ## Authorization / baseline note
 
-Ring 8 was started by explicit user instruction. At start, current `main` still exposed Chat 3 directive `OD-2026-09-29-003`; no newer Chat 3 worker directive had been published.
+Ring 9 was started by explicit user instruction. At start, current `main` still exposed Chat 3 directive `OD-2026-09-29-003`; no newer Chat 3 worker directive had been published.
 
-To preserve user-authorized Rings 4–7 work, `chat-3/pass-8` was created directly from frozen Ring 7 head.
+To preserve user-authorized Rings 4–8 work, `chat-3/pass-9` was created directly from frozen Ring 8 head.
 
 No shared contracts, CI, integration tests or other chat-owned files were modified.
 
 ## Status
 
-`READY_FOR_RING8_INTEGRATOR_REVIEW`
+`READY_FOR_RING9_INTEGRATOR_REVIEW`
 
 ## Delivered functionality
 
-Ring 8 adds deterministic residual-aware confidence to constraint promotion.
+Ring 9 adds deterministic global constraint-set diagnostics after the existing resolver/confidence/satisfaction pipeline.
 
 New module:
 
-`src/mrea_geometry/constraint_confidence.py`
+`src/mrea_geometry/constraint_system.py`
 
 Public types:
 
-- `ConstraintConfidence`;
-- `ConstraintConfidenceModel`.
+- `ConstraintSystemAnalysis`;
+- `ConstraintSystemAnalyzer`.
 
-## Confidence semantics
+## Orientation parity diagnostics
 
-For a satisfied relation:
+The analyzer proves consistency for:
 
-```text
-ratio = clamp(residual / tolerance, 0, 1)
-confidence = 1 - (1 - boundary_confidence) * ratio^2
-```
+- `HORIZONTAL`;
+- `VERTICAL`;
+- `PARALLEL`;
+- `PERPENDICULAR`.
 
-Default:
-
-```text
-boundary_confidence = 0.5
-```
-
-Result:
-
-- exact relation -> `1.0`;
-- half tolerance -> `0.875`;
-- tolerance boundary -> `0.5`;
-- unsatisfied/non-finite -> `0.0`.
-
-## Resolver integration
-
-Constraint promotion now distinguishes:
+Relations are represented as an XOR parity graph:
 
 ```text
-outside tolerance
-→ UNSATISFIED_CONSTRAINT
-
-inside tolerance but low residual quality
-→ CONSTRAINT_BELOW_PROMOTION_CONFIDENCE
-
-high-quality satisfied relation
-→ eligible for remaining gates
+same orientation -> parity 0
+perpendicular orientation -> parity 1
 ```
 
-Effective confidence is the minimum of:
+`HORIZONTAL` and `VERTICAL` connect an entity to a virtual world-axis node.
 
-- candidate confidence;
-- all referenced entity confidences;
-- residual-derived confidence.
+## Deterministic evidence priority
 
-The new confidence model cannot strengthen evidence and cannot override verified measurements.
+Constraint processing order is:
+
+1. higher confidence;
+2. `DETECTED` before `INFERRED` at equal confidence;
+3. direct `HORIZONTAL` / `VERTICAL` before pair relations at equal evidence strength;
+4. `constraint_id` tie-breaker.
+
+A lower-quality constraint cannot silently displace stronger accepted evidence.
+
+## Global outcomes
+
+For orientation constraints:
+
+```text
+new independent relation
+→ retained
+
+relation already implied by accepted graph
+→ omitted as redundant
+
+relation contradicts accepted graph
+→ OVERCONSTRAINED_ORIENTATION_CONFLICT
+```
+
+A contradictory constraint is not published to the canonical SketchPackage.
+
+## Safe transitive reduction
+
+Ring 9 also removes provably redundant cycles for:
+
+- `EQUAL`;
+- `CONCENTRIC`.
+
+No unsafe transitivity is assumed for:
+
+- `COINCIDENT`;
+- `TANGENT`;
+- `SYMMETRIC`.
+
+## Pipeline integration
+
+The image-derived path is now:
+
+```text
+ImageGeometryExtractor
+→ GeometryPipeline
+→ ConstraintResolver
+→ ConstraintSystemAnalyzer
+→ SketchPackageBuilder
+```
+
+Existing resolver issues remain intact and global conflict issues are appended before canonical package construction.
 
 ## Truth hierarchy
 
@@ -86,13 +114,13 @@ Unchanged:
 verified physical measurement > image/geometry-derived relation
 ```
 
-No entity movement and no numerical solving are introduced.
+Ring 9 does not move entities, rewrite measurements or solve geometry numerically.
 
 ## Runtime / dependencies
 
 Package version:
 
-`0.8.0`
+`0.9.0`
 
 New dependencies: **none**.
 
@@ -100,23 +128,32 @@ New dependencies: **none**.
 
 New acceptance module:
 
-`tests/test_constraint_confidence.py`
+`tests/test_constraint_system.py`
 
-It verifies exact, partial-tolerance, boundary, non-finite and zero-tolerance scoring plus resolver behavior under different promotion thresholds.
+Coverage:
+
+- consistent orientation chain;
+- conflicting orientation relation;
+- `DETECTED` vs `INFERRED` priority;
+- transitive `PARALLEL` reduction;
+- transitive `EQUAL` reduction;
+- preservation of non-graph relations;
+- preservation of prior resolver issues;
+- deterministic result under reversed input order.
 
 ## GitHub Actions verification
 
 Authoritative implementation head:
 
-`1a6b58e6e87786b8e67e6f8525ece98e588dfad3`
+`7b317e0c0a3e7c5f69000f8c51dd47adff362aa6`
 
 Workflow run:
 
-`36651103396`
+`36652647774`
 
 Results:
 
-- `Chat 3 / Geometry`: **SUCCESS — 65 passed in 0.61s**;
+- `Chat 3 / Geometry`: **SUCCESS — 73 passed in 0.46s**;
 - `Contracts / canonical fixtures`: **SUCCESS**;
 - `Chat 1 / Capture`: **SUCCESS**;
 - `Chat 2 / Measurement`: **SUCCESS**;
@@ -126,7 +163,7 @@ Results:
 
 ## Chat 3 -> Chat 4 inherited baseline drift
 
-The frozen worker ancestry still contains the old shared integration-test field lookup:
+The frozen worker ancestry still contains the old shared integration-test lookup:
 
 ```python
 transfer.cad_verification_report["dimensions"]
@@ -134,7 +171,7 @@ transfer.cad_verification_report["dimensions"]
 
 The boundary run reaches successful SketchPackage generation, canonical validation, CAD transfer, CADPackage validation, CADVerificationReport validation and `overall_status == "VERIFIED"`, then fails with `KeyError: 'dimensions'`.
 
-Current `main` already uses canonical:
+Current `main` uses canonical:
 
 ```python
 transfer.cad_verification_report["items"]
@@ -156,30 +193,29 @@ Change Requests: **none**.
 Validate on the current shared baseline:
 
 ```text
-constraint candidate
-→ satisfaction residual
-→ residual-derived confidence
-→ min(candidate/entity/geometric confidence)
-→ promotion threshold
-→ canonical constraint or explicit unresolved
+resolved per-constraint relations
+→ global orientation/equivalence diagnostics
+→ deterministic retention/redundancy/conflict decision
+→ SketchPackage constraints + explicit unresolved
 ```
 
-Confirm that exact geometry remains deterministic and that verified measurements remain unchanged.
+Confirm that stronger evidence wins deterministically, verified measurements remain unchanged, and no unsafe transitivity is introduced.
 
 ## Known limitations / next owned work
 
 Deferred unless Chat 6 reprioritizes:
 
-- numerical constraint solving/entity movement;
-- global over-constrained-system diagnosis;
+- full numerical constraint solving/entity movement;
+- complete degrees-of-freedom accounting;
+- nonlinear/global geometric consistency beyond the proven graph subset;
 - uncertainty propagation from calibration/vision into tolerance selection;
 - multi-view relationships;
 - CAD-native logic.
 
 ## Branch freeze
 
-This handoff is the final normal worker commit for Ring 8.
+This handoff is the final normal worker commit for Ring 9.
 
-After publication, `chat-3/pass-8` is treated as **frozen** pending Chat 6 verdict or explicit user/orchestrator instruction.
+After publication, `chat-3/pass-9` is treated as **frozen** pending Chat 6 verdict or explicit user/orchestrator instruction.
 
-The only permitted post-handoff write is a minimal repair if the mandatory final GitHub upload audit proves that a claimed Ring 8 file failed to land or differs from intended payload. Any such repair must itself be re-audited.
+The only permitted post-handoff write is a minimal repair if the mandatory final GitHub upload audit proves that a claimed Ring 9 file failed to land or differs from intended payload. Any such repair must itself be re-audited.
