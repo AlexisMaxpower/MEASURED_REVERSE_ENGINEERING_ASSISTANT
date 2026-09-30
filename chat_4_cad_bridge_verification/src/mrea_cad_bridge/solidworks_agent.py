@@ -20,6 +20,9 @@ SOLIDWORKS_AGENT_PROTOCOL = "mrea.solidworks-agent.v1"
 SOLIDWORKS_ADAPTER_NAME = "SOLIDWORKS_2026"
 _SUPPORTED_ENTITY_TYPES = frozenset({"POINT", "LINE", "CIRCLE", "ARC"})
 _SUPPORTED_DIMENSION_TYPES = frozenset({"DISTANCE", "DIAMETER", "RADIUS", "ANGLE"})
+_SUPPORTED_CONSTRAINT_TYPES = frozenset(
+    {"HORIZONTAL", "VERTICAL", "PARALLEL", "PERPENDICULAR", "CONCENTRIC", "EQUAL"}
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,6 +114,60 @@ def _verified_dimension_contracts(package: MappedSketchPackage) -> tuple[Mapping
     )
 
 
+def _validate_constraint_support(
+    constraint: Mapping[str, Any],
+    entities_by_id: Mapping[str, Mapping[str, Any]],
+) -> None:
+    constraint_id = str(constraint.get("constraint_id", "<unknown>"))
+    constraint_type = constraint.get("type")
+    status = constraint.get("status")
+    entity_ids = tuple(constraint.get("entity_ids") or ())
+
+    if status != "VERIFIED":
+        raise CadAdapterError(
+            f"SOLIDWORKS constraint {constraint_id} must be VERIFIED; got {status!r}"
+        )
+    if constraint_type not in _SUPPORTED_CONSTRAINT_TYPES:
+        raise CadAdapterError(
+            f"SOLIDWORKS vendor slice does not support constraint type {constraint_type!r}: "
+            f"{constraint_id}"
+        )
+    if len(set(entity_ids)) != len(entity_ids):
+        raise CadAdapterError(
+            f"SOLIDWORKS constraint {constraint_id} contains duplicate entity_ids"
+        )
+    if any(entity_id not in entities_by_id for entity_id in entity_ids):
+        raise CadAdapterError(
+            f"SOLIDWORKS constraint {constraint_id} references unknown entities"
+        )
+
+    types = tuple(entities_by_id[entity_id].get("type") for entity_id in entity_ids)
+    if constraint_type in {"HORIZONTAL", "VERTICAL"}:
+        if len(entity_ids) != 1 or types != ("LINE",):
+            raise CadAdapterError(
+                f"SOLIDWORKS {constraint_type} constraint {constraint_id} requires one LINE"
+            )
+        return
+
+    if constraint_type in {"PARALLEL", "PERPENDICULAR", "EQUAL"}:
+        if len(entity_ids) != 2 or types != ("LINE", "LINE"):
+            raise CadAdapterError(
+                f"SOLIDWORKS {constraint_type} constraint {constraint_id} requires two LINE entities"
+            )
+        return
+
+    if constraint_type == "CONCENTRIC":
+        if len(entity_ids) != 2 or any(item not in {"CIRCLE", "ARC"} for item in types):
+            raise CadAdapterError(
+                f"SOLIDWORKS CONCENTRIC constraint {constraint_id} requires two CIRCLE/ARC entities"
+            )
+        return
+
+    raise CadAdapterError(
+        f"SOLIDWORKS vendor slice cannot safely map constraint {constraint_id}"
+    )
+
+
 def _validate_dimension_support(
     dimension: Mapping[str, Any],
     entities_by_id: Mapping[str, Mapping[str, Any]],
@@ -155,12 +212,6 @@ def _validate_dimension_support(
 
 
 def _preflight(package: MappedSketchPackage) -> None:
-    if package.constraints:
-        raise CadAdapterError(
-            "SOLIDWORKS vendor slice does not yet implement canonical constraints; "
-            "non-empty constraints must not be silently ignored"
-        )
-
     verified_dimensions = _verified_dimension_contracts(package)
     verified_entity_ids = {
         entity_id
@@ -214,6 +265,8 @@ def _preflight(package: MappedSketchPackage) -> None:
     entities_by_id = {
         str(entity.get("entity_id")): entity for entity in package.entity_contracts
     }
+    for constraint in package.constraints:
+        _validate_constraint_support(constraint, entities_by_id)
     for dimension in verified_dimensions:
         _validate_dimension_support(dimension, entities_by_id)
 
@@ -240,6 +293,7 @@ def build_solidworks_agent_request(
         "attach_to_running": config.attach_to_running,
         "allow_launch": config.allow_launch,
         "entities": [dict(entity) for entity in package.entity_contracts],
+        "constraints": [dict(constraint) for constraint in package.constraints],
         "dimensions": [dict(dimension) for dimension in verified_dimensions],
     }
 
