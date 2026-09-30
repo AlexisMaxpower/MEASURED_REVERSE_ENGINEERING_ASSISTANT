@@ -43,7 +43,9 @@ from .runtime_validation import (
 )
 from .solidworks_capabilities import (
     SOLIDWORKS_CAPABILITIES_SCHEMA,
+    SolidWorksConstraintSupportDecision,
     build_solidworks_capabilities_v1,
+    evaluate_solidworks_constraint_support_v1,
     is_solidworks_constraint_supported_v1,
 )
 from .solidworks_runtime_inputs import (
@@ -121,6 +123,7 @@ __all__ = [
     "SOLIDWORKS_RUNTIME_ADAPTER_NAME",
     "SOLIDWORKS_RUNTIME_INPUTS_PRODUCER",
     "SOLIDWORKS_RUNTIME_INPUTS_SCHEMA",
+    "SolidWorksConstraintSupportDecision",
     "SolidWorksRuntimeInputs",
     "SolidWorksRuntimeValidationExecution",
     "SvgExporter",
@@ -141,6 +144,7 @@ __all__ = [
     "build_solidworks_capabilities_v1",
     "build_solidworks_runtime_evidence_from_inputs_v1",
     "canonical_json_bytes",
+    "evaluate_solidworks_constraint_support_v1",
     "evaluate_solidworks_runtime_inputs_v1",
     "execute_cad_runtime_validation_v1",
     "execute_cad_transfer_v1",
