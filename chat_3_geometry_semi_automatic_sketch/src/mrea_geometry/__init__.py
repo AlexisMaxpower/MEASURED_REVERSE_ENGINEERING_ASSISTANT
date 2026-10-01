@@ -2,11 +2,11 @@
 
 from .constraint_confidence import ConstraintConfidence, ConstraintConfidenceModel
 from .constraint_freedom import (
-    ConstraintFreedomAnalyzer,
     ConstraintFreedomDiagnosis,
     ConstraintFreedomIssue,
     ConstraintFreedomStatus,
 )
+from .constraint_freedom_policy import ConstraintFreedomAnalyzer
 from .constraint_satisfaction import ConstraintSatisfaction, ConstraintSatisfactionAnalyzer
 from .constraint_system import (
     ConstraintSystemAnalyzer,
