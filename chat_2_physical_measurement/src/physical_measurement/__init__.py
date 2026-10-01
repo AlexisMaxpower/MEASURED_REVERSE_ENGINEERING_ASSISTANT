@@ -18,6 +18,8 @@ from .hands_free import (
 from .models import FeatureAnchor, MeasurementSession, MeasurementType, PhysicalMeasurement, ProvenanceSource
 from .repository import (
     InMemoryMeasurementSessionRepository,
+    MeasurementSessionPage,
+    MeasurementSessionPageCursor,
     MeasurementSessionRepository,
     SqliteMeasurementSessionRepository,
 )
@@ -39,6 +41,8 @@ __all__ = [
     "MeasurementCommandIntent",
     "MeasurementCommandParser",
     "MeasurementSession",
+    "MeasurementSessionPage",
+    "MeasurementSessionPageCursor",
     "MeasurementSessionRepository",
     "MeasurementSessionService",
     "MeasurementType",
