@@ -1,111 +1,106 @@
-# ORCHESTRATOR HANDOFF — Chat 5 / Pass 15
+# ORCHESTRATOR HANDOFF — Chat 5 / Pass 16
 
-**Directive:** `OD-2026-10-01-008`  
-**Branch:** `chat-5/pass-15`  
-**Accepted base SHA:** `99d8c6d9322f3669a43226e4fd2675fe683ab9f6`  
-**Independently tested implementation SHA:** `a0372ac3e7e4036a1b17d600cc3c29b3d09bb5a4`  
-**Implementation CI:** `36816060128` — SUCCESS  
-**Documented pre-freeze SHA:** `f77546b59f3d874a6f43e2c1bd44c038d5ca5423`  
-**Pre-freeze CI:** `36816304038` — SUCCESS  
-**Status:** required Chat-5 software gates GREEN; this commit freezes the worker branch.
+**Directive:** `OD-2026-10-01-008` + direct user authorization for Pass 16  
+**Branch:** `chat-5/pass-16`  
+**Shared `main` observed at worker start:** `99d8c6d9322f3669a43226e4fd2675fe683ab9f6`  
+**Required cumulative dependency:** frozen `chat-5/pass-15` @ `70ac1fa5331df47525e42ad4f2d848abddb268fe`  
+**Independently tested implementation SHA:** `cce9819eba0117bc1401c28e765b6ce2444efed7`  
+**Implementation CI:** `36933325252` — SUCCESS  
+**Implementation-state commit:** `70c8121c9e20a8404cb700ab3167b027ec305d8f`  
+**Status:** Pass-16 software slice complete; this commit freezes the worker branch.
 
-A Git commit cannot contain its own SHA. The current branch head containing this file is the final Pass-15 handoff/freeze commit. No further worker mutation is permitted after this file is published; final CI is to be read against that exact frozen HEAD.
+A commit cannot contain its own SHA. The branch head containing this file is the final Pass-16 handoff/freeze commit. No further Chat-5 worker mutation is permitted after publication; final CI must be checked on that exact frozen HEAD.
+
+## Baseline note
+
+At Pass-16 start, shared `main` still contained Round-14 closure and had not integrated the already-frozen Chat-5 Pass 15. Pass 16 depends directly on Pass-15 `compare_revision_details(...)`, so the new branch was created from the frozen Pass-15 head rather than discarding that published dependency. The Pass-16 delta itself remains entirely inside Chat-5 ownership.
 
 ## Delivered slice
 
-Pass 15 extends durable revision comparison with a structured factual side-by-side surface while preserving the compact Pass-14 API.
+Pass 16 adds deterministic, evidence-backed **revision change explanation** over the Pass-15 durable structured comparison.
 
-Added `compare_revision_details(left_revision_id, right_revision_id)` with immutable snapshots containing only committed Chat-5 facts:
+New public types/functions:
 
-- revision metadata/provenance and source CAD artifact ID;
-- persisted CAD verification/runtime fields when present;
-- ordered manufacturing records including material/method/process metadata;
-- ordered tests and exact artifact IDs;
-- ordered failures and exact evidence IDs plus stored cause/feature fields;
-- deterministic revision-level lifecycle state;
-- stable `changed_categories` describing which factual structures differ.
+- `RevisionChangeSource`;
+- `RevisionChangeFact`;
+- `RevisionChangeExplanation`;
+- `build_revision_change_explanation(...)`;
+- `explain_revision_changes(...)`.
 
-No ranking, score, recommendation or causal inference is produced.
+The explanation identifies changed committed facts in stable order and attaches exact persisted record/artifact identifiers for the supporting manufacturing, test and failure evidence.
 
-Geometry is deliberately absent because the current durable Chat-5 model has no approved upstream geometry-comparison payload. Pass 15 does not infer geometry from notes, failure locations or CAD artifact identifiers.
+Supported factual categories:
 
-## Read / transport behavior
+- revision metadata/provenance;
+- persisted CAD verification/runtime truth;
+- materials;
+- manufacturing methods and records;
+- tests and test artifact IDs;
+- failures and failure evidence artifact IDs;
+- deterministic lifecycle state.
 
-All detailed comparison SQL is executed through the existing snapshot guard. Generation drift remains fail-closed.
+The explanation is derived from the existing snapshot-guarded `compare_revision_details(...)` result. It verifies that its category sequence exactly matches the durable comparison and raises `LifecycleKnowledgeIntegrityError` if the two surfaces diverge.
 
-Added additive GET route:
+## Truth / non-inference boundary
 
-```text
-/v1/knowledge/revision-comparison-details
-  ?left_revision_id=<id>
-  &right_revision_id=<id>
-```
+Pass 16 does not:
 
-Missing revisions, cross-part inputs and unexpected parameters use the existing `400 invalid_request` boundary. Existing compact comparison and HTTP payloads are unchanged.
+- rank, score or recommend revisions;
+- infer that any revision change caused a test/failure result;
+- promote estimated failure causes into confirmed causes;
+- synthesize geometry or infer geometry from notes/evidence identifiers;
+- add semantic search, embeddings or LLM behavior.
+
+The result is factual evidence for later knowledge/AI layers, not an AI conclusion.
 
 ## Compatibility / ownership
 
 No changes to:
 
-- `core/contracts/**`;
-- canonical fixtures;
-- SQLite relational schema version (`4`);
-- snapshot schema or cursor formats;
+- `core/contracts/**` or canonical fixtures;
+- SQLite relational/snapshot schemas;
+- cursor formats;
+- HTTP routes/schema;
 - Chat 1–4 code;
 - workflows;
-- lifecycle manufacturing-eligibility rules.
+- lifecycle manufacturing-eligibility policy;
+- snapshot-drift fail-closed behavior.
 
-`LIFECYCLE_HTTP_API_SCHEMA_VERSION` remains `mrea.lifecycle-http.v1`.
+## Pass-16 changed / added files
 
-## Changed / added files
+Relative to frozen `chat-5/pass-15`:
 
 ```text
-chat_5_lifecycle_engineering_knowledge/README.md
 chat_5_lifecycle_engineering_knowledge/ORCHESTRATOR_HANDOFF.md
 chat_5_lifecycle_engineering_knowledge/docs/IMPLEMENTATION_STATE.md
-chat_5_lifecycle_engineering_knowledge/docs/PASS_15_STRUCTURED_REVISION_COMPARISON.md
-chat_5_lifecycle_engineering_knowledge/docs/BUILD_REUSE_CHECK_PASS15_REVISION_COMPARISON.md
+chat_5_lifecycle_engineering_knowledge/docs/PASS_16_REVISION_CHANGE_EXPLANATION.md
 chat_5_lifecycle_engineering_knowledge/src/mrea_lifecycle/__init__.py
-chat_5_lifecycle_engineering_knowledge/src/mrea_lifecycle/http_api.py
-chat_5_lifecycle_engineering_knowledge/src/mrea_lifecycle/revision_comparison.py
-chat_5_lifecycle_engineering_knowledge/tests/test_revision_comparison_details.py
-chat_5_lifecycle_engineering_knowledge/tests/test_revision_comparison_durable.py
+chat_5_lifecycle_engineering_knowledge/src/mrea_lifecycle/revision_explanation.py
+chat_5_lifecycle_engineering_knowledge/tests/test_revision_change_explanation.py
 ```
 
-No file outside Chat-5 ownership was modified.
+No file outside Chat-5 ownership is modified by the Pass-16 delta.
 
 ## Verification before freeze
 
-Implementation SHA `a0372ac3e7e4036a1b17d600cc3c29b3d09bb5a4`:
+Implementation SHA `cce9819eba0117bc1401c28e765b6ce2444efed7`:
 
 ```text
-MREA CI / 36816060128 — SUCCESS
-Chat 5 / Lifecycle — 82 passed in 3.54s
+MREA CI / 36933325252 — SUCCESS
+Chat 5 / Lifecycle — 85 passed in 5.85s
 Contracts / canonical fixtures — SUCCESS
 Chat 4 / Generic CAD gate — SUCCESS
 Integration / Chat 4 -> Chat 5 — SUCCESS
 ```
 
-Documented pre-freeze SHA `f77546b59f3d874a6f43e2c1bd44c038d5ca5423`:
-
-```text
-MREA CI / 36816304038 — SUCCESS
-Chat 5 / Lifecycle — SUCCESS
-Contracts / canonical fixtures — SUCCESS
-Chat 4 / Generic CAD gate — SUCCESS
-Integration / Chat 4 -> Chat 5 — SUCCESS
-```
-
-## Build / reuse decision
-
-Pass 15 reuses the existing normalized lifecycle tables, materialized knowledge inheritance, guarded read-only session, lifecycle-state semantics and GET-only HTTP serializer. No new external dependency or duplicate comparison storage was introduced.
+The full MREA CI run completed successfully on that exact implementation SHA.
 
 ## Remaining intentional boundaries
 
-- geometry comparison requires an approved upstream durable fact source;
-- no revision ranking/recommendation;
+- geometry comparison/explanation requires an approved upstream durable fact source;
+- no ranking/recommendation;
 - no semantic/AI interpretation;
-- no client authn/authz or deployment edge policy;
+- no external client authn/authz or deployment edge policy;
 - no field-device synchronization.
 
 Branch is frozen after this commit.
