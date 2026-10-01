@@ -1,6 +1,6 @@
 # ORCHESTRATOR DIRECTIVE — Chat 4
 
-**Revision:** `OD-2026-10-01-007`  
+**Revision:** `OD-2026-10-01-008`  
 **Control owner:** central orchestration  
 **Status:** `READY_FOR_NEXT_FULL_WORKER_PASS_FROM_CURRENT_MAIN`
 
@@ -12,8 +12,8 @@ Before starting the next worker pass:
 
 1. read `chat_6_orchestrator/ORCHESTRATION_STATE.md`;
 2. read `chat_6_orchestrator/SOLIDWORKS_HOST_QUALIFICATION_POLICY.md`;
-3. require `ROUND_13_CLOSED = TRUE` and `NEXT_FULL_WORKER_PASS = READY`;
-4. branch from the then-current shared `main` containing the Round-13 closure state;
+3. require `ROUND_14_CLOSED = TRUE` and `NEXT_FULL_WORKER_PASS = READY`;
+4. branch from the then-current shared `main` containing the Round-14 closure state;
 5. do not use a historical Chat-4/4B pass branch as the implementation base.
 
 ## Slice ownership
@@ -26,15 +26,15 @@ Preserve these invariants:
 - unsupported vendor cases fail closed;
 - vendor/process success alone does not promote canonical verification;
 - real-host execution is never inferred from Linux CI, static checks, mocks or test doubles;
-- capability/protocol compatibility checks occur before CAD mutation where designed;
-- dimension-shape capability rules remain fingerprinted into standing host qualification;
+- capability/protocol compatibility and entity/dimension/constraint support checks occur before CAD mutation where designed;
+- dimension-shape and entity-geometry capability rules remain fingerprinted into standing host qualification;
 - canonical contracts/shared CI are not changed without an approved central change.
 
 ## Standing SOLIDWORKS host qualification
 
 The per-round host-gate carry-forward is retired. Real-host truth is owned only by the standing `SOLIDWORKS_HOST_QUALIFICATION` workflow and its fingerprinted evidence.
 
-Round 13 changed the fingerprinted SOLIDWORKS host boundary. Any previous positive qualification may be reused only when its recorded fingerprint matches the current boundary and the controlled host has not materially changed. Never promote software CI into real-host qualification.
+Round 14 changed the fingerprinted SOLIDWORKS host boundary by adding entity-geometry capability rules to the worker compatibility surface. Any previous positive qualification may be reused only when its recorded fingerprint matches the current boundary and the controlled host has not materially changed. Never promote software CI into real-host qualification.
 
 ## Next pass rule
 

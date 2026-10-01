@@ -1,6 +1,6 @@
 # ORCHESTRATOR DIRECTIVE — Chat 2
 
-**Revision:** `OD-2026-10-01-007`  
+**Revision:** `OD-2026-10-01-008`  
 **Control owner:** central orchestration  
 **Status:** `READY_FOR_NEXT_FULL_WORKER_PASS_FROM_CURRENT_MAIN`
 
@@ -11,13 +11,13 @@ This directive supersedes all older Chat-2 directives.
 Before starting the next worker pass:
 
 1. read `chat_6_orchestrator/ORCHESTRATION_STATE.md`;
-2. require `ROUND_13_CLOSED = TRUE` and `NEXT_FULL_WORKER_PASS = READY`;
-3. branch from the then-current shared `main` containing the Round-13 closure state;
+2. require `ROUND_14_CLOSED = TRUE` and `NEXT_FULL_WORKER_PASS = READY`;
+3. branch from the then-current shared `main` containing the Round-14 closure state;
 4. do not use a historical pass/readiness branch as the implementation base.
 
 ## Slice ownership
 
-Chat 2 owns Physical Measurement. Preserve measurement provenance, explicit confirmation, uncertainty truth, raw anchors and the rule that downstream AI/geometry/CAD cannot silently rewrite verified physical facts. Preserve durable local measurement-session state unless an approved migration explicitly changes that storage boundary.
+Chat 2 owns Physical Measurement. Preserve measurement provenance, explicit confirmation, uncertainty truth, raw anchors and the rule that downstream AI/geometry/CAD cannot silently rewrite verified physical facts. Preserve durable local measurement-session state and deterministic enumeration semantics unless an approved migration explicitly changes that storage boundary.
 
 ## Standing SOLIDWORKS qualification
 
