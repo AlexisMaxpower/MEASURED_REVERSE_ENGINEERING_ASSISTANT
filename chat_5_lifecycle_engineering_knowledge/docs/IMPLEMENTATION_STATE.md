@@ -2,229 +2,119 @@
 
 ## Snapshot
 
-- Date: **2026-09-30**
-- Branch: `chat-5/pass-10.1`
+- Date: **2026-10-01**
+- Branch: `chat-5/pass-11`
 - Slice: **Lifecycle & Engineering Knowledge**
-- SSOT: **MREA v0.1 + orchestration addendum v0.2**
-- Pass 10.1 authorization: **direct user instruction**
-- Central orchestrator state at start: **OD-2026-09-30-004 selects frozen Pass 8 for Round-4 review and does not centrally request new worker implementation**
-- Base SHA: `8044451abd050f69556c9274aec1a83caefad408` (frozen Chat 5 Pass 10)
-- State: **keyset pagination implementation complete; required gates green; handoff published; branch frozen**
+- Authorization: **direct user instruction — Pass 11**
+- Central repository baseline checked before work: `main` @ `c034f7583d4e1f130f827d94a43762f3cad1a7e5`
+- Central directive observed: `OD-2026-09-30-004`
+- State: **implementation prepared; CI/final handoff pending**
 
-## Orchestration truth
+## Baseline reconciliation
 
-Pass 10.1 is an explicit user-authorized worker continuation.
+Pass 10.1 and corrected Round-4 Pass 8 had diverged from common Chat-5 Pass-8 ancestry.
 
-It is not represented as:
-
-- accepted by Chat 6;
-- selected for central Round 4;
-- merged to `main`.
-
-The Chat-6-selected `chat-5/pass-8` branch remains untouched.
-
-## Preserved baseline
-
-Still active and unchanged:
-
-- Revision / Manufacturing / Installation / Test / Failure domain;
-- canonical CADPackage + CADVerificationReport transfer;
-- VERIFIED manufacturing eligibility gate;
-- canonical `LifecycleEvent v1` adapter;
-- physical-instance state machine;
-- exact instance/evidence linkage;
-- equipment/position occupancy protection;
-- removal/replacement/supersession semantics;
-- LifecycleRepository + LifecycleUnitOfWork;
-- authoritative SQLite snapshot;
-- normalized relational read model and migrations;
-- SQL-native lifecycle queries;
-- verified backup/restore;
-- read-only SQLite query session;
-- deterministic engineering knowledge queries;
-- Pass-8 snapshot/query-bound cursor integrity;
-- Pass-9 GET-only HTTP transport;
-- Pass-10 HMAC HTTP cursor authentication and key rotation.
-
-No shared contract, canonical fixture, CI workflow, integration test, SQLite migration, or other chat-owned file was changed.
-
-## Pass 10.1 additions
-
-### Knowledge cursor v2
-
-Added:
+Pass 11 does not extend either stale tree blindly. It was rebuilt as:
 
 ```text
-mrea.knowledge-cursor.v2
+current main
+→ file-level replay of Chat-5-owned cumulative Pass 9–10.1 surface
+→ corrected Round-4 runtime-truth files from frozen chat-5/pass-8
+→ Pass-11 aggregate keyset delta
 ```
 
-V2 stores an ordered keyset tuple instead of an OFFSET position.
+Preserved from current `main`:
 
-New public types/constants include:
+- Chat-6-owned `ORCHESTRATOR_DIRECTIVE.md`;
+- Chat-6 `FIX_REQUIRED` control document;
+- shared contracts/fixtures;
+- root integration tests;
+- workflows;
+- all Chat 1–4 and Chat 6/7/8 surfaces.
 
-- `KNOWLEDGE_KEYSET_CURSOR_FORMAT_VERSION`;
-- `KnowledgeKeysetCursorState`;
-- `encode_knowledge_keyset_cursor()`;
-- `decode_knowledge_keyset_cursor()`.
+The frozen `chat-5/pass-8` ref was not mutated.
 
-The decoder also accepts legacy `mrea.knowledge-cursor.v1` offset cursors.
+## Preserved lifecycle truth
 
-### Keyset knowledge adapter
+The cumulative line now includes the corrected Round-4 runtime boundary:
 
-Added `SQLiteKeysetEngineeringKnowledgeRepository`.
+- `CADRuntimeStatus = VERIFIED | FAILED | UNVERIFIED`;
+- runtime evidence persists through snapshot and normalized read model;
+- runtime VERIFIED requires real-host execution evidence;
+- runtime FAILED/UNVERIFIED blocks manufacturing when runtime evidence is supplied;
+- canonical numerical verification remains separate;
+- generic flows without a runtime gate remain backward compatible.
 
-The adapter inherits existing factual semantics from `SQLiteEngineeringKnowledgeRepository` and overrides only the high-cardinality pagination execution paths.
+## Pass 11 addition
 
-`SQLiteLifecycleReadOnlySession` now instantiates the keyset adapter while keeping the public `.knowledge` return contract compatible with the existing repository base class.
+`failure_patterns_page()` now joins the Pass-10.1 keyset adapter.
 
-### Revision outcome keyset
-
-Ordering:
+New v2 aggregate key:
 
 ```text
-created_at ASC,
-revision_id ASC
+(
+  occurrence_count,
+  failure_type,
+  damage_location,
+  cause_null_rank,
+  cause_sort
+)
 ```
 
-Continuation key:
+Sort direction is:
 
 ```text
-(created_at, revision_id)
+occurrence_count DESC
+failure_type ASC
+damage_location ASC
+cause_null_rank ASC
+cause_sort ASC
 ```
 
-New v2 continuation uses key predicates and `LIMIT`, not `OFFSET`.
+The grouped result is produced in a CTE; v2 continuation applies key predicates to the grouped rows and uses `LIMIT + 1` without OFFSET.
 
-### Equipment-history keyset
+## Legacy cursor continuity
 
-Ordering:
+A valid `mrea.knowledge-cursor.v1` supplied to `failure_patterns_page()` remains on the exact historical grouped OFFSET query/order.
 
-```text
-occurred_at ASC,
-sequence ASC,
-event_id ASC
-```
+New traversals emit v2.
 
-Continuation key:
+The query/filter fingerprint and committed snapshot binding remain unchanged.
 
-```text
-(occurred_at, sequence, event_id)
-```
+## Tests added
 
-The sequence/event ID pair provides deterministic tie-breaking.
+`tests/test_failure_pattern_keyset_pagination.py` verifies:
 
-### Legacy v1 continuation
+1. v2 aggregate cursor emission;
+2. complete grouped traversal without duplicates/gaps;
+3. count-descending and deterministic tie continuation;
+4. explicit NULL/empty-cause tie-breaking;
+5. v2 continuation SQL has key predicates and no OFFSET;
+6. v1 cursor remains on the legacy OFFSET path;
+7. malformed aggregate keysets fail closed.
 
-A valid v1 cursor is still accepted by the keyset adapter.
+## Shared-contract impact
 
-When a v1 cursor is supplied, the request stays on the old OFFSET continuation path for that legacy traversal. New traversals emit v2 keyset cursors.
+None.
 
-This preserves in-flight cursor continuity without forcing v1 state into v2 semantics.
+No canonical fixture or shared schema change is required.
 
-### Aggregate pagination boundary
+## Remaining intentional limitations
 
-`failure_patterns_page()` intentionally remains the inherited v1 OFFSET implementation.
-
-Its first ordering key is a derived grouped `COUNT(*) DESC`; safe aggregate keyset continuation is deferred to a dedicated future slice instead of mixing aggregate semantics into this migration.
-
-## Backward compatibility
-
-Unchanged:
-
-- query/filter fingerprinting;
-- snapshot-version binding;
-- Pass-10 HMAC wrapper;
-- direct tuple knowledge queries;
-- HTTP route contract;
-- SQLite schemas;
-- lifecycle state transitions;
-- CAD eligibility;
-- canonical shared contracts.
-
-## Verification
-
-### New tests
-
-Added `tests/test_keyset_pagination_v2.py`.
-
-Coverage verifies:
-
-1. revision outcomes emit v2 keyset state;
-2. six revisions traverse without duplicate/gap;
-3. v2 continuation SQL contains key predicates and no OFFSET;
-4. legacy v1 OFFSET cursor remains accepted;
-5. equipment history emits `(occurred_at, sequence, event_id)` keyset and continues exactly.
-
-Existing Pass-8/9/10 pagination, HTTP and HMAC tests run in the same suite against the new read-only adapter.
-
-### Implementation CI
-
-Implementation SHA:
-
-```text
-e1265ad57bf602b0acd44ed029ed1b6e6ccd6666
-```
-
-GitHub-hosted Chat 5 result:
-
-```text
-57 passed in 1.96s
-```
-
-Status: **SUCCESS**.
-
-### Documented pre-handoff CI
-
-Pre-handoff SHA:
-
-```text
-3333e1c801be35324e7947d2c6c97719ea015b59
-```
-
-Workflow:
-
-```text
-MREA CI / 36728784438
-```
-
-Results:
-
-- `Chat 5 / Lifecycle` — **SUCCESS**, `57 passed in 2.00s`;
-- `Contracts / canonical fixtures` — **SUCCESS**;
-- `Chat 4 / Generic CAD gate` — **SUCCESS**;
-- `Integration / Chat 4 -> Chat 5` — **SUCCESS**, `2 passed, 1 warning in 0.51s`.
-
-The warning is the pre-existing Chat 4 `TestDoubleCadAdapter` pytest collection warning and is outside Chat 5 ownership.
-
-### Final handoff CI
-
-The final branch handoff commit is required to pass the same MREA CI workflow before external delivery. Its exact SHA and workflow result are verified after the final handoff commit is published.
-
-## Files added in Pass 10.1
-
-- `src/mrea_lifecycle/keyset_knowledge.py`;
-- `tests/test_keyset_pagination_v2.py`;
-- `docs/PASS_10_1_KEYSET_PAGINATION.md`.
-
-## Files modified in Pass 10.1
-
-- `src/mrea_lifecycle/knowledge_paging.py`;
-- `src/mrea_lifecycle/read_only.py`;
-- `src/mrea_lifecycle/__init__.py`;
-- `README.md`;
-- `docs/IMPLEMENTATION_STATE.md`;
-- `ORCHESTRATOR_HANDOFF.md` at final freeze.
-
-## Known limitations
-
-Still open:
-
-- aggregate keyset pagination for `failure_patterns_page()`;
 - materialized analytical aggregates;
-- client authentication/authorization;
+- external client authn/authz;
 - deployment/TLS/CORS/rate-limit policy;
 - semantic/AI interpretation;
 - field-device synchronization.
 
-## Handoff rule
+## Completion rule
 
-`ORCHESTRATOR_HANDOFF.md` is the final worker commit. After that commit, `chat-5/pass-10.1` is frozen. No later commit is allowed unless final verification finds a real missing/incorrect GitHub file or Chat 6 explicitly requests a correction.
+Before final freeze:
+
+1. inspect actual branch HEAD/diff;
+2. require Chat-5 slice CI green;
+3. require canonical contracts green;
+4. require Chat4 generic CAD and Chat4→Chat5 integration gates green;
+5. verify Round-4 runtime-truth regression remains present;
+6. publish `ORCHESTRATOR_HANDOFF.md` as the final branch mutation;
+7. verify CI on the final handoff HEAD.

@@ -4,6 +4,7 @@ from typing import Optional
 
 from .engineering_knowledge import (
     EquipmentPositionHistoryEntry,
+    FailurePatternSummary,
     RevisionOutcomeSummary,
     SQLiteEngineeringKnowledgeRepository,
 )
@@ -12,6 +13,7 @@ from .knowledge_paging import (
     KnowledgeCursorState,
     KnowledgeKeysetCursorState,
     KnowledgePage,
+    LifecycleKnowledgeCursorError,
     decode_knowledge_keyset_cursor,
     encode_knowledge_keyset_cursor,
     page_from_rows,
@@ -21,11 +23,11 @@ from .knowledge_paging import (
 
 
 class SQLiteKeysetEngineeringKnowledgeRepository(SQLiteEngineeringKnowledgeRepository):
-    """Pass-10.1 keyset paging for high-cardinality factual history queries.
+    """Keyset paging for factual lifecycle histories and grouped failure patterns.
 
-    Existing tuple queries and aggregate failure-pattern paging stay inherited from
-    Pass 7-8. Revision outcomes and equipment history emit v2 keyset cursors, while
-    already-issued v1 offset cursors remain accepted for traversal continuity.
+    New traversals emit v2 keyset cursors. Already-issued v1 offset cursors remain
+    accepted and stay on their historical OFFSET execution paths so an in-flight
+    traversal is not silently reinterpreted after upgrade.
     """
 
     def _paging_state(
@@ -109,8 +111,6 @@ class SQLiteKeysetEngineeringKnowledgeRepository(SQLiteEngineeringKnowledgeRepos
                 or not isinstance(state.key[0], str)
                 or not isinstance(state.key[1], str)
             ):
-                from .knowledge_paging import LifecycleKnowledgeCursorError
-
                 raise LifecycleKnowledgeCursorError(
                     "invalid revision-outcomes keyset cursor"
                 )
@@ -238,8 +238,6 @@ class SQLiteKeysetEngineeringKnowledgeRepository(SQLiteEngineeringKnowledgeRepos
                 or not isinstance(state.key[1], int)
                 or not isinstance(state.key[2], str)
             ):
-                from .knowledge_paging import LifecycleKnowledgeCursorError
-
                 raise LifecycleKnowledgeCursorError(
                     "invalid equipment-history keyset cursor"
                 )
@@ -280,6 +278,197 @@ class SQLiteKeysetEngineeringKnowledgeRepository(SQLiteEngineeringKnowledgeRepos
             )
         return KnowledgePage(
             items=tuple(self._equipment_history_entry(row) for row in visible_rows),
+            next_cursor=next_cursor,
+            snapshot_version=self.snapshot_version,
+        )
+
+    def failure_patterns_page(
+        self,
+        *,
+        part_id: Optional[str] = None,
+        revision_id: Optional[str] = None,
+        limit: int = DEFAULT_KNOWLEDGE_PAGE_LIMIT,
+        cursor: Optional[str] = None,
+    ) -> KnowledgePage[FailurePatternSummary]:
+        """Page grouped failure patterns with aggregate-aware keyset continuation.
+
+        The primary sort key is the derived occurrence count in descending order.
+        New v2 traversals therefore continue with an outer CTE predicate over the
+        grouped result. A null-rank plus normalized cause string provide a total
+        deterministic tie-break without changing the factual grouping itself.
+        """
+        page_limit = validate_page_limit(limit)
+        filters = {"part_id": part_id, "revision_id": revision_id}
+        fingerprint, state = self._paging_state(
+            query_name="failure_patterns_page",
+            filters=filters,
+            cursor=cursor,
+        )
+
+        clauses: list[str] = []
+        filter_parameters: list[object] = []
+        if part_id is not None:
+            clauses.append("r.part_id = ?")
+            filter_parameters.append(part_id)
+        if revision_id is not None:
+            clauses.append("f.revision_id = ?")
+            filter_parameters.append(revision_id)
+        where_clause = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+
+        if isinstance(state, KnowledgeCursorState):
+            # Preserve the exact historical v1 ordering/execution contract for an
+            # already-issued offset cursor. New traversals never enter this path.
+            parameters = [*filter_parameters, page_limit + 1, state.offset]
+            rows = self.connection.execute(
+                f"""
+                SELECT f.failure_type,
+                       f.damage_location,
+                       f.confirmed_cause,
+                       COUNT(*) AS occurrence_count,
+                       COUNT(DISTINCT f.revision_id) AS revision_count,
+                       COUNT(DISTINCT f.instance_id) AS instance_count,
+                       MIN(f.failed_at) AS first_failed_at,
+                       MAX(f.failed_at) AS last_failed_at
+                FROM lifecycle_failures AS f
+                JOIN lifecycle_revisions AS r
+                  ON r.revision_id = f.revision_id
+                {where_clause}
+                GROUP BY f.failure_type, f.damage_location, f.confirmed_cause
+                ORDER BY occurrence_count DESC,
+                         f.failure_type,
+                         f.damage_location,
+                         COALESCE(f.confirmed_cause, '')
+                LIMIT ? OFFSET ?
+                """,
+                tuple(parameters),
+            ).fetchall()
+            return page_from_rows(
+                tuple(self._failure_pattern(row) for row in rows),
+                limit=page_limit,
+                offset=state.offset,
+                query_fingerprint_value=fingerprint,
+                snapshot_version=self.snapshot_version,
+            )
+
+        continuation_clause = ""
+        continuation_parameters: list[object] = []
+        if isinstance(state, KnowledgeKeysetCursorState):
+            if (
+                len(state.key) != 5
+                or isinstance(state.key[0], bool)
+                or not isinstance(state.key[0], int)
+                or not isinstance(state.key[1], str)
+                or not isinstance(state.key[2], str)
+                or isinstance(state.key[3], bool)
+                or not isinstance(state.key[3], int)
+                or state.key[3] not in (0, 1)
+                or not isinstance(state.key[4], str)
+            ):
+                raise LifecycleKnowledgeCursorError(
+                    "invalid failure-pattern keyset cursor"
+                )
+            (
+                occurrence_count,
+                failure_type,
+                damage_location,
+                cause_null_rank,
+                cause_sort,
+            ) = state.key
+            continuation_clause = """
+            WHERE occurrence_count < ?
+               OR (occurrence_count = ? AND failure_type > ?)
+               OR (occurrence_count = ? AND failure_type = ?
+                   AND damage_location > ?)
+               OR (occurrence_count = ? AND failure_type = ?
+                   AND damage_location = ? AND cause_null_rank > ?)
+               OR (occurrence_count = ? AND failure_type = ?
+                   AND damage_location = ? AND cause_null_rank = ?
+                   AND cause_sort > ?)
+            """
+            continuation_parameters.extend(
+                (
+                    occurrence_count,
+                    occurrence_count,
+                    failure_type,
+                    occurrence_count,
+                    failure_type,
+                    damage_location,
+                    occurrence_count,
+                    failure_type,
+                    damage_location,
+                    cause_null_rank,
+                    occurrence_count,
+                    failure_type,
+                    damage_location,
+                    cause_null_rank,
+                    cause_sort,
+                )
+            )
+
+        parameters = [
+            *filter_parameters,
+            *continuation_parameters,
+            page_limit + 1,
+        ]
+        rows = self.connection.execute(
+            f"""
+            WITH patterns AS (
+                SELECT f.failure_type AS failure_type,
+                       f.damage_location AS damage_location,
+                       f.confirmed_cause AS confirmed_cause,
+                       COUNT(*) AS occurrence_count,
+                       COUNT(DISTINCT f.revision_id) AS revision_count,
+                       COUNT(DISTINCT f.instance_id) AS instance_count,
+                       MIN(f.failed_at) AS first_failed_at,
+                       MAX(f.failed_at) AS last_failed_at,
+                       CASE WHEN f.confirmed_cause IS NULL THEN 0 ELSE 1 END
+                           AS cause_null_rank,
+                       COALESCE(f.confirmed_cause, '') AS cause_sort
+                FROM lifecycle_failures AS f
+                JOIN lifecycle_revisions AS r
+                  ON r.revision_id = f.revision_id
+                {where_clause}
+                GROUP BY f.failure_type, f.damage_location, f.confirmed_cause
+            )
+            SELECT failure_type,
+                   damage_location,
+                   confirmed_cause,
+                   occurrence_count,
+                   revision_count,
+                   instance_count,
+                   first_failed_at,
+                   last_failed_at,
+                   cause_null_rank,
+                   cause_sort
+            FROM patterns
+            {continuation_clause}
+            ORDER BY occurrence_count DESC,
+                     failure_type,
+                     damage_location,
+                     cause_null_rank,
+                     cause_sort
+            LIMIT ?
+            """,
+            tuple(parameters),
+        ).fetchall()
+
+        visible_rows = rows[:page_limit]
+        next_cursor = None
+        if len(rows) > page_limit and visible_rows:
+            last = visible_rows[-1]
+            next_cursor = encode_knowledge_keyset_cursor(
+                query_fingerprint_value=fingerprint,
+                snapshot_version=self.snapshot_version,
+                key=(
+                    int(last[3]),
+                    str(last[0]),
+                    str(last[1]),
+                    int(last[8]),
+                    str(last[9]),
+                ),
+            )
+        return KnowledgePage(
+            items=tuple(self._failure_pattern(row[:8]) for row in visible_rows),
             next_cursor=next_cursor,
             snapshot_version=self.snapshot_version,
         )
