@@ -1,55 +1,47 @@
-# ORCHESTRATOR HANDOFF — Chat 3 — Pass 15
+# ORCHESTRATOR HANDOFF — Chat 3 — Pass 16
 
 **From:** Chat 3 — Geometry & Semi-Automatic Sketch  
-**Branch:** `chat-3/pass-15`  
-**Central base:** `main` @ `99d8c6d9322f3669a43226e4fd2675fe683ab9f6`  
-**Implementation head:** `e736936f62e8e48b933ce872da435e18ce51e11c`  
-**Directive:** `OD-2026-10-01-008`  
-**Date:** 2026-10-01  
-**Status:** `READY_FOR_PASS15_INTEGRATOR_REVIEW`
+**Branch:** `chat-3/pass-16`  
+**Worker base:** `chat-3/pass-15` @ `4d4a7a4f3b4b17680dc6eb2c97d337c29ae848ac`  
+**Central main observed at start:** `99d8c6d9322f3669a43226e4fd2675fe683ab9f6`  
+**Directive observed:** `OD-2026-10-01-008`  
+**Date:** 2026-10-02  
+**Status:** `READY_FOR_PASS16_INTEGRATOR_REVIEW`
+
+## Coordination note
+
+Central `main` was still at the Round-14 closure when Pass 16 started, while `chat-3/pass-15` already contained the published Chat-3 Pass-15 work. Pass 16 is therefore a cumulative Chat-3 worker candidate extending the exact Pass-15 head; it does not write or merge directly to `main`.
 
 ## Delivered
 
-Pass 15 adds a read-only global constraint-system diagnostic layer:
+Pass 16 adds read-only local constraint-freedom diagnosis:
 
-- `ConstraintSystemStatus`;
-- `ConstraintSystemIssue`;
-- `ConstraintSystemDiagnosis`;
-- `ConstraintSystemAnalyzer`.
+- `ConstraintFreedomStatus`;
+- `ConstraintFreedomIssue`;
+- `ConstraintFreedomDiagnosis`;
+- `ConstraintFreedomAnalyzer`.
 
-The analyzer reports deterministic `CONSISTENT`, `REDUNDANT`, or `CONFLICTING` status without claiming a fully-constrained sketch.
+For supported geometry, accepted constraints and verified dimensions, it computes local Jacobian rank and reports total remaining DOF, rigid-frame DOF, and internal shape DOF. It distinguishes fully constrained, constrained-up-to-frame, under-constrained, indeterminate and conflicting states.
 
-Supported diagnosis includes direct/transitive line-orientation parity across HORIZONTAL/VERTICAL/PARALLEL/PERPENDICULAR, semantic duplicates, EQUAL/CONCENTRIC cycle redundancy, transitive CONCENTRIC + TANGENT conflict, duplicate constraint IDs, and missing entity references.
+The implementation is fail-closed: unresolved measurement binding, unsupported verified semantics, ambiguous topology witness, unsupported accepted relation, global constraint conflict, physical measurement conflict, or numerical degeneracy cannot silently become a positive fully-constrained claim.
 
-No geometry, constraint set, verified measurement, provenance, confidence, or tolerance is rewritten. No numerical solver or entity movement is introduced.
+Line-Line `COINCIDENT` uses a unique endpoint topology witness. Arc-contact DOF semantics remain intentionally unsupported until an explicit witness is available.
 
-Package version: `0.12.0`.
+No geometry movement, numerical solver mutation, shared-contract change, canonical-fixture change, CI-workflow change, CAD-vendor change, or cross-slice edit is included.
 
-## Verification
+Package version: `0.13.0`.
 
-Implementation-head workflow:
-
-```text
-MREA CI run: 36815732621
-head:        e736936f62e8e48b933ce872da435e18ce51e11c
-result:      SUCCESS
-```
-
-Observed required jobs:
+## Code verification
 
 ```text
-Chat 3 / Geometry                 SUCCESS — 130 passed in 0.35s
-Contracts / canonical fixtures   SUCCESS
-Chat 2 / Measurement             SUCCESS
-Chat 4 / Generic CAD gate        SUCCESS
-Integration / Chat 2 -> Chat 3   SUCCESS
-Integration / Chat 3 -> Chat 4   SUCCESS
+code head:    dd5595e3961979cc42f71135c99b5cf1ac616b54
+MREA CI run:  36933857622
+result:       SUCCESS
+Chat 3 tests: 141 passed in 0.51s
 ```
 
-## Ownership
+The complete exact-code-head workflow also passed canonical contract validation and the adjacent Chat-2/Chat-4/integration gates.
 
-Pass 15 changes no shared contracts, canonical shared fixtures, shared integration tests, CI workflows, CAD-vendor logic, or other chat-owned directories.
+## Freeze rule
 
-## Freeze
-
-This handoff is the final normal worker commit for Pass 15. After publication, `chat-3/pass-15` is frozen for integrator review.
+After the final documentation-only exact-head CI is green, `chat-3/pass-16` is ready for integrator review and should be treated as frozen worker output.
