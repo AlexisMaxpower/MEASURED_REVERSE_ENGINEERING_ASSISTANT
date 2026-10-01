@@ -15,6 +15,11 @@ CURRENT_CONTROL_PATHS = (
     "chat_5_lifecycle_engineering_knowledge/ORCHESTRATOR_DIRECTIVE.md",
 )
 
+CURRENT_STATUS_GLOBS = (
+    "chat_*/README.md",
+    "chat_*/docs/IMPLEMENTATION_STATE.md",
+)
+
 LEGACY_ROUND_ASSIGNMENTS = (
     "REAL_SOLIDWORKS_2026_HOST = EXTERNAL_GATE_UNVERIFIED",
     "PRODUCTION_CSHARP_INTEROP_BUILD = UNVERIFIED",
@@ -26,11 +31,21 @@ def _read(relative: str) -> str:
     return (REPO_ROOT / relative).read_text(encoding="utf-8")
 
 
+def _current_status_paths() -> tuple[Path, ...]:
+    paths = {REPO_ROOT / relative for relative in CURRENT_CONTROL_PATHS}
+    for pattern in CURRENT_STATUS_GLOBS:
+        paths.update(path for path in REPO_ROOT.glob(pattern) if path.is_file())
+    return tuple(sorted(paths))
+
+
 def test_legacy_solidworks_external_flags_cannot_return_to_current_round_authority() -> None:
-    for relative in CURRENT_CONTROL_PATHS:
-        text = _read(relative)
+    for path in _current_status_paths():
+        text = path.read_text(encoding="utf-8")
         for legacy in LEGACY_ROUND_ASSIGNMENTS:
-            assert legacy not in text, f"legacy per-round SOLIDWORKS gate returned in {relative}: {legacy}"
+            assert legacy not in text, (
+                "legacy per-round SOLIDWORKS gate returned in current status surface "
+                f"{path.relative_to(REPO_ROOT)}: {legacy}"
+            )
 
 
 def test_standing_qualification_uses_dynamic_workflow_authority() -> None:
