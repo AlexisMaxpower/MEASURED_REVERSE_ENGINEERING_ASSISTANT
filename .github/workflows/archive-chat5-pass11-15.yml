@@ -1,0 +1,129 @@
+name: Archive Chat 5 Pass 11-15
+
+on:
+  push:
+    branches:
+      - archive/chat5-pass11-15-20261001
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout archive branch with full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build changes-only archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import zipfile
+
+          FINAL = "70ac1fa5331df47525e42ad4f2d848abddb268fe"
+          passes = [
+              (11, "c034f7583d4e1f130f827d94a43762f3cad1a7e5", "fe6038bd6f709d38c299b36b979ead78a86d8734"),
+              (12, "c888704b37e88b68c055f1095e6e9a4fc3650f7e", "1c627173888b768bab46809c1b795c0dcece085e"),
+              (13, "4edde5c644755734a2ccf6e8f1c1b6ab9a63424d", "2ea11745e365f0e454c08e2e8ca89c1aa76846e3"),
+              (14, "d6758d3a4c5eb2116ac2e48c3a77e65c10688b12", "515d6a37777bcfbf0ec971c684d10eba4797ac7d"),
+              (15, "99d8c6d9322f3669a43226e4fd2675fe683ab9f6", "70ac1fa5331df47525e42ad4f2d848abddb268fe"),
+          ]
+
+          def out(*args: str) -> str:
+              return subprocess.check_output(args, text=True).strip()
+
+          per_pass = {}
+          union = set()
+          for number, base, head in passes:
+              raw = out("git", "diff", "--name-only", base, head)
+              files = [
+                  p for p in raw.splitlines()
+                  if p.startswith("chat_5_lifecycle_engineering_knowledge/")
+              ]
+              per_pass[number] = files
+              union.update(files)
+
+          root = Path("archive_payload")
+          root.mkdir(exist_ok=True)
+          present = []
+          deleted_or_absent = []
+
+          for rel in sorted(union):
+              probe = subprocess.run(
+                  ["git", "cat-file", "-e", f"{FINAL}:{rel}"],
+                  stdout=subprocess.DEVNULL,
+                  stderr=subprocess.DEVNULL,
+              )
+              if probe.returncode != 0:
+                  deleted_or_absent.append(rel)
+                  continue
+              data = subprocess.check_output(["git", "show", f"{FINAL}:{rel}"])
+              dest = root / rel
+              dest.parent.mkdir(parents=True, exist_ok=True)
+              dest.write_bytes(data)
+              present.append(rel)
+
+          lines = [
+              "# MREA Chat 5 — changes-only backup for this chat",
+              "",
+              f"Final source tree: `chat-5/pass-15` @ `{FINAL}`",
+              "",
+              "Scope: unique repository files changed by Chat 5 during Pass 11–15,",
+              "stored in their final state at the frozen Pass 15 HEAD.",
+              "Overlapping files are included once in their latest form.",
+              "",
+              "## Pass heads",
+              "",
+          ]
+          for number, base, head in passes:
+              lines += [
+                  f"- Pass {number}: base `{base}` -> frozen HEAD `{head}`",
+              ]
+          lines += ["", "## Files by pass", ""]
+          for number, _, _ in passes:
+              lines.append(f"### Pass {number}")
+              lines.append("")
+              for rel in per_pass[number]:
+                  lines.append(f"- `{rel}`")
+              lines.append("")
+          lines += ["## Final archive file set", ""]
+          for rel in present:
+              lines.append(f"- `{rel}`")
+          if deleted_or_absent:
+              lines += ["", "## Changed earlier but absent at final Pass 15 HEAD", ""]
+              for rel in deleted_or_absent:
+                  lines.append(f"- `{rel}`")
+          lines += [
+              "",
+              "## Verification",
+              "",
+              "Final frozen Pass 15 CI: MREA CI 36816396907 — SUCCESS.",
+              "Chat 5 / Lifecycle, canonical contracts, Chat 4 generic gate, and Chat 4 -> Chat 5 integration were green.",
+              "",
+          ]
+          (root / "CHAT5_PASSES_11_15_MANIFEST.md").write_text("\n".join(lines), encoding="utf-8")
+
+          zip_path = Path("MREA_CHAT5_PASSES_11_15_CHANGES_ONLY_2026-10-01.zip")
+          with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+              for path in sorted(root.rglob("*")):
+                  if path.is_file():
+                      zf.write(path, path.relative_to(root))
+
+          print(f"files={len(present)}")
+          print(f"missing_final={len(deleted_or_absent)}")
+          print(f"archive={zip_path} size={zip_path.stat().st_size}")
+          PY
+
+      - name: Upload changes-only backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: MREA_CHAT5_PASSES_11_15_CHANGES_ONLY_2026-10-01
+          path: MREA_CHAT5_PASSES_11_15_CHANGES_ONLY_2026-10-01.zip
+          if-no-files-found: error
+          retention-days: 1
