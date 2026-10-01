@@ -1,82 +1,40 @@
 # ORCHESTRATOR DIRECTIVE — Chat 2
 
-**Revision:** `OD-2026-09-30-004`  
-**Owner:** Chat 6  
-**Central round:** 4  
-**Selected worker cut:** `chat-2/pass-6` @ `539d58567046fd29ccf2d42b629227ffe8da6546`
+**Revision:** `OD-2026-10-01-005`  
+**Control owner:** central orchestration  
+**Issued as:** Round-12 final control-plane repair by Orchestrator 2  
+**Status:** `READY_FOR_NEXT_FULL_WORKER_PASS_FROM_CURRENT_MAIN`
 
-## Accepted central baseline
+This directive supersedes `OD-2026-09-30-004` and every historical instruction that pins Chat 2 to `chat-2/pass-6` or forbids work beyond the old Round-4 selected cut.
 
-Round 3 is closed. Chat 2 Pass 3 is accepted in `main`.
+## Required baseline
 
-Round-4 plan:
+Before starting the next worker pass:
 
-`chat_6_orchestrator/PASS_4_PLAN_2026-09-30.md`
+1. read `chat_6_orchestrator/ORCHESTRATION_STATE.md`;
+2. require `ROUND_12_CLOSED = TRUE` and `NEXT_FULL_WORKER_PASS = READY`;
+3. branch the new worker pass from the then-current shared `main`;
+4. do not reuse `chat-2/pass-6`, verification-only Pass 10/11/12 branches, or another historical pass as the implementation base.
 
-## Selected cumulative input
+Round 12 imported no Chat-2 product delta; `chat-2/pass-12-readiness` was diagnostic/control evidence only. The current integrated Chat-2 product/test surface on `main` remains authoritative.
 
-Chat 6 selects the existing frozen `chat-2/pass-6` branch as the cumulative Chat-2 input for Round-4 Stage 1.
+## Slice ownership
 
-This cumulative cut contains worker Pass 4 -> Pass 5 -> Pass 6:
+Chat 2 owns Physical Measurement: measurement types/units, raw anchors, manual/device/OCR/voice proposals, explicit confirmation/verification, uncertainty and physical-measurement provenance within the existing shared contract.
 
-- measurement-type unit semantics;
-- unit-neutral uncertainty;
-- canonical 1..3 anchor cardinality.
+Preserve these invariants:
 
-The Pass-6 handoff is treated as the freeze point pending independent Chat-6 review.
+- raw measurement anchors remain attributable to their capture/reference evidence;
+- candidates do not become verified without explicit allowed confirmation;
+- uncertainty remains in the measurement's own canonical unit and is never fabricated;
+- verified physical values/provenance are not silently rewritten by AI, geometry or CAD;
+- downstream coordinate normalization remains outside Chat 2;
+- canonical contracts/shared CI are not changed without an approved central change.
 
-## OD-004 task
+## Next pass rule
 
-No new normal worker implementation is requested now.
+This control document intentionally does not invent the next feature. Execute the active worker-round/user task for Chat 2 after resolving the current certified `main`. If no current task exists, stop rather than reviving an old OD-004 task.
 
-Keep `chat-2/pass-6` frozen unless Chat 6 returns an explicit `FIX_REQUIRED`.
+## Delivery rule
 
-Chat 6 will independently review and replay accepted Chat-2-owned changes onto the current shared baseline rather than merging worker history wholesale.
-
-## Required truth invariants under review
-
-- raw measurement anchors remain `IMAGE_PX` in Chat 2;
-- `ANGLE` uses canonical `deg`;
-- length-like measurements use canonical `mm`;
-- uncertainty is expressed in the measurement's own unit;
-- one, two and three canonical anchors remain ordered and provenance-preserving;
-- invalid anchor combinations fail closed;
-- voice/OCR/device candidates remain unverified until explicit confirmation;
-- verified physical measurement values are not modified by downstream geometry/AI.
-
-## Round-4 boundary focus
-
-Chat2->Chat3 must prove:
-
-```text
-1/2/3 raw IMAGE_PX anchors
-+ mm/deg semantics
-+ unit-neutral uncertainty
--> downstream normalization/binding
-```
-
-A valid upstream package must either be supported downstream or rejected explicitly. Silent anchor rewriting or unit coercion is forbidden.
-
-## Required gates
-
-During central review/replay the selected cut must keep green:
-
-- `Chat 2 / Measurement`;
-- `Integration / Chat 1 -> Chat 2`;
-- `Integration / Chat 2 -> Chat 3`;
-- canonical contracts/fixtures.
-
-## Do not
-
-- push Pass 7 work onto the frozen selected cut;
-- modify shared integration tests to hide downstream incompatibility;
-- move normalization into Chat 2;
-- change canonical contracts without approved CR;
-- merge directly to `main`.
-
-## Current state
-
-```text
-CHAT_2_PASS_6 = FROZEN_SELECTED_FOR_ROUND4_STAGE1
-ROUND_4_STAGE1_ACCEPTANCE = PENDING_CHAT6
-```
+Use a new pass branch from current `main`, run Chat-2 plus Chat1->Chat2/Chat2->Chat3 and contract gates as applicable, publish a truthful handoff with exact SHA/CI evidence, and do not merge directly to `main`.
