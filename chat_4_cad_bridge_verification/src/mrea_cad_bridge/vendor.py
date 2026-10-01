@@ -61,6 +61,41 @@ class CadReadBack:
         return {item.dimension_id: item.unit for item in self.dimensions}
 
 
+_ARTIFACT_REFERENCE_FIELDS = frozenset(
+    {"artifact_id", "kind", "uri", "media_type", "sha256", "metadata"}
+)
+_ARTIFACT_REFERENCE_REQUIRED_FIELDS = ("artifact_id", "kind", "uri")
+
+
+def _validate_artifact_reference(artifact: Mapping[str, Any], *, index: int) -> str:
+    if not isinstance(artifact, Mapping):
+        raise ValueError(f"artifact[{index}] must be a mapping")
+
+    extra_fields = set(artifact) - _ARTIFACT_REFERENCE_FIELDS
+    if extra_fields:
+        raise ValueError(
+            f"artifact[{index}] contains unsupported fields: {sorted(extra_fields)!r}"
+        )
+
+    for field in _ARTIFACT_REFERENCE_REQUIRED_FIELDS:
+        value = artifact.get(field)
+        if not isinstance(value, str) or not value:
+            raise ValueError(f"artifact[{index}].{field} must be a non-empty string")
+
+    media_type = artifact.get("media_type")
+    if media_type is not None and not isinstance(media_type, str):
+        raise ValueError(f"artifact[{index}].media_type must be string or null")
+
+    sha256 = artifact.get("sha256")
+    if sha256 is not None and not isinstance(sha256, str):
+        raise ValueError(f"artifact[{index}].sha256 must be string or null")
+
+    if "metadata" in artifact and not isinstance(artifact["metadata"], Mapping):
+        raise ValueError(f"artifact[{index}].metadata must be an object")
+
+    return artifact["artifact_id"]
+
+
 @dataclass(frozen=True, slots=True)
 class CadAdapterResult:
     adapter_name: str
@@ -90,6 +125,13 @@ class CadAdapterResult:
             raise ValueError(
                 f"constraint conflicts contain unbound dimensions: {sorted(unknown_conflicts)!r}"
             )
+
+        artifact_ids = [
+            _validate_artifact_reference(artifact, index=index)
+            for index, artifact in enumerate(self.artifacts)
+        ]
+        if len(artifact_ids) != len(set(artifact_ids)):
+            raise ValueError("artifact_id values must be unique")
 
 
 class CadAdapter(Protocol):

@@ -16,6 +16,11 @@ from .hands_free import (
     normalize_measurement_number,
 )
 from .models import FeatureAnchor, MeasurementSession, MeasurementType, PhysicalMeasurement, ProvenanceSource
+from .recovery import (
+    AmbiguousPendingMeasurementRecovery,
+    HandsFreeRecoveryError,
+    resume_hands_free_controller,
+)
 from .repository import (
     InMemoryMeasurementSessionRepository,
     MeasurementSessionPage,
@@ -28,11 +33,13 @@ from .type_registry import MeasurementTypeRegistry, MeasurementTypeSemantics
 
 __all__ = [
     "AmbiguousMeasurementCommand",
+    "AmbiguousPendingMeasurementRecovery",
     "CanonicalMeasurementAdapter",
     "FeatureAnchor",
     "HandsFreeMeasurementController",
     "HandsFreeMeasurementState",
     "HandsFreePhase",
+    "HandsFreeRecoveryError",
     "HandsFreeTransition",
     "InMemoryMeasurementSessionRepository",
     "InvalidMeasurementTransition",
@@ -53,4 +60,5 @@ __all__ = [
     "ProvenanceSource",
     "SqliteMeasurementSessionRepository",
     "normalize_measurement_number",
+    "resume_hands_free_controller",
 ]
