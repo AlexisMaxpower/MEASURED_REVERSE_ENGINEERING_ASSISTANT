@@ -44,6 +44,10 @@ class FrameKind(StrEnum):
     MEASUREMENT = "MEASUREMENT"
 
 
+class VoiceCaptureCommand(StrEnum):
+    CAPTURE_MEASUREMENT_FRAME = "CAPTURE_MEASUREMENT_FRAME"
+
+
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
@@ -127,6 +131,22 @@ class CameraMetadata(StrictModel):
     exposure_time_us: int | None = Field(default=None, gt=0)
 
 
+class VoiceCaptureEvent(StrictModel):
+    """Attributable provenance for a voice command that triggered image capture."""
+
+    voice_event_id: UUID = Field(default_factory=uuid4)
+    command: VoiceCaptureCommand = VoiceCaptureCommand.CAPTURE_MEASUREMENT_FRAME
+    triggered_at: datetime = Field(default_factory=utc_now)
+    transcript: NonBlank | None = None
+    locale: NonBlank | None = None
+
+    @model_validator(mode="after")
+    def validate_triggered_at(self) -> "VoiceCaptureEvent":
+        if self.triggered_at.tzinfo is None:
+            raise ValueError("voice trigger timestamp must be timezone-aware")
+        return self
+
+
 class ArtifactRecord(StrictModel):
     artifact_id: UUID = Field(default_factory=uuid4)
     relative_path: NonBlank
@@ -147,6 +167,7 @@ class FrameRecord(StrictModel):
     camera: CameraMetadata
     source_clean_reference_frame_id: UUID | None = None
     supersedes_frame_id: UUID | None = None
+    voice_event: VoiceCaptureEvent | None = None
 
     @model_validator(mode="after")
     def validate_frame_lineage_fields(self) -> "FrameRecord":
@@ -154,6 +175,8 @@ class FrameRecord(StrictModel):
             raise ValueError("captured_at must be timezone-aware")
         if self.kind is FrameKind.CLEAN_REFERENCE and self.source_clean_reference_frame_id is not None:
             raise ValueError("clean reference cannot point to source_clean_reference_frame_id")
+        if self.kind is FrameKind.CLEAN_REFERENCE and self.voice_event is not None:
+            raise ValueError("voice capture event may only be attached to a measurement frame")
         if self.kind is FrameKind.MEASUREMENT and self.supersedes_frame_id is not None:
             raise ValueError("measurement frame cannot supersede another frame")
         return self
@@ -356,6 +379,13 @@ class CaptureSession(StrictModel):
         frames_by_id = {frame.frame_id: frame for frame in self.frames}
         if len(frames_by_id) != len(self.frames):
             raise ValueError("capture session cannot contain duplicate frame ids")
+        voice_event_ids = [
+            frame.voice_event.voice_event_id
+            for frame in self.frames
+            if frame.voice_event is not None
+        ]
+        if len(voice_event_ids) != len(set(voice_event_ids)):
+            raise ValueError("capture session cannot contain duplicate voice event ids")
 
         progress_by_view = {item.view: item for item in self.views}
         clean_by_view: dict[CaptureViewType, list[FrameRecord]] = {view: [] for view in values}
