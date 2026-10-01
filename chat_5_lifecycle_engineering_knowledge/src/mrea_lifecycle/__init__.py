@@ -112,6 +112,13 @@ from .revision_comparison import (
     RevisionTestFact,
     SQLiteRevisionComparisonEngineeringKnowledgeRepository,
 )
+from .revision_explanation import (
+    RevisionChangeExplanation,
+    RevisionChangeFact,
+    RevisionChangeSource,
+    build_revision_change_explanation,
+    explain_revision_changes,
+)
 from .services import (
     CADRevisionPreparationService,
     FailureService,
@@ -198,6 +205,9 @@ __all__ = [
     "ReadOnlyLifecycleHttpAPI",
     "ReplacementChainEntry",
     "Revision",
+    "RevisionChangeExplanation",
+    "RevisionChangeFact",
+    "RevisionChangeSource",
     "RevisionComparison",
     "RevisionComparisonDetailsResult",
     "RevisionComparisonResult",
@@ -223,5 +233,7 @@ __all__ = [
     "TestRecord",
     "TestService",
     "build_read_only_lifecycle_http_app",
+    "build_revision_change_explanation",
+    "explain_revision_changes",
     "inspect_lifecycle_database",
 ]
