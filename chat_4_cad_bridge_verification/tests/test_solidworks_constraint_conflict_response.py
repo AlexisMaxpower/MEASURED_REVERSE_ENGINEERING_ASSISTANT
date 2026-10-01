@@ -46,7 +46,16 @@ def _ok_response(sketch_package: dict, *, conflicts=()) -> dict:
             ],
             "constraint_conflicts": list(conflicts),
         },
-        "artifacts": [],
+        "artifacts": [
+            {
+                "artifact_id": f"SWPART-{sketch_package['sketch_package_id']}",
+                "kind": "SOLIDWORKS_PART",
+                "uri": f"file:///C:/mrea/{sketch_package['sketch_package_id']}.SLDPRT",
+                "media_type": "application/octet-stream",
+                "sha256": "pass15-conflict-test-sha256",
+                "metadata": {"adapter": "SOLIDWORKS_2026"},
+            }
+        ],
     }
 
 
