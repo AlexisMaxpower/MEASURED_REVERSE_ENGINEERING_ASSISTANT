@@ -8,6 +8,8 @@ import tempfile
 from typing import Any, Mapping, Protocol
 
 from .contracts import MappedSketchPackage
+from .solidworks_capabilities import evaluate_solidworks_constraint_support_v1
+from .solidworks_constraint_handshake import SOLIDWORKS_CONSTRAINT_CAPABILITIES_SHA256
 from .vendor import (
     CadAdapterError,
     CadAdapterResult,
@@ -111,6 +113,19 @@ def _verified_dimension_contracts(package: MappedSketchPackage) -> tuple[Mapping
     )
 
 
+def _validate_constraint_support(
+    constraint: Mapping[str, Any],
+    entities_by_id: Mapping[str, Mapping[str, Any]],
+) -> None:
+    decision = evaluate_solidworks_constraint_support_v1(constraint, entities_by_id)
+    if decision.supported:
+        return
+    raise CadAdapterError(
+        "SOLIDWORKS constraint preflight failed "
+        f"[{decision.code}] {decision.constraint_id}: {decision.message}"
+    )
+
+
 def _validate_dimension_support(
     dimension: Mapping[str, Any],
     entities_by_id: Mapping[str, Mapping[str, Any]],
@@ -155,12 +170,6 @@ def _validate_dimension_support(
 
 
 def _preflight(package: MappedSketchPackage) -> None:
-    if package.constraints:
-        raise CadAdapterError(
-            "SOLIDWORKS vendor slice does not yet implement canonical constraints; "
-            "non-empty constraints must not be silently ignored"
-        )
-
     verified_dimensions = _verified_dimension_contracts(package)
     verified_entity_ids = {
         entity_id
@@ -214,6 +223,8 @@ def _preflight(package: MappedSketchPackage) -> None:
     entities_by_id = {
         str(entity.get("entity_id")): entity for entity in package.entity_contracts
     }
+    for constraint in package.constraints:
+        _validate_constraint_support(constraint, entities_by_id)
     for dimension in verified_dimensions:
         _validate_dimension_support(dimension, entities_by_id)
 
@@ -230,6 +241,7 @@ def build_solidworks_agent_request(
     return {
         "protocol_version": SOLIDWORKS_AGENT_PROTOCOL,
         "adapter_name": SOLIDWORKS_ADAPTER_NAME,
+        "constraint_capabilities_sha256": SOLIDWORKS_CONSTRAINT_CAPABILITIES_SHA256,
         "sketch_package_id": package.sketch_package_id,
         "output_directory": str(config.output_directory.resolve()),
         "part_template_path": (
@@ -240,6 +252,7 @@ def build_solidworks_agent_request(
         "attach_to_running": config.attach_to_running,
         "allow_launch": config.allow_launch,
         "entities": [dict(entity) for entity in package.entity_contracts],
+        "constraints": [dict(constraint) for constraint in package.constraints],
         "dimensions": [dict(dimension) for dimension in verified_dimensions],
     }
 

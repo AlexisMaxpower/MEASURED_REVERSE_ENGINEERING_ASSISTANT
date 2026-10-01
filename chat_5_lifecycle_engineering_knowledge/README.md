@@ -1,11 +1,11 @@
 # Chat 5 — Lifecycle & Engineering Knowledge
 
-Статус: **Pass 8 snapshot-bound engineering knowledge pagination implemented**  
+Статус: **Pass 11 aggregate keyset pagination implemented**  
 Проект: **MREA — Measured Reverse Engineering Assistant**  
-Источник истины: **MREA SSOT v0.1 + orchestration addendum v0.2**  
-Запуск Pass 8: **direct user instruction; newer Chat-5-specific directive was absent on `main`**  
-Рабочая ветка: `chat-5/pass-8`  
-База ветки: `d9bed012eb8bbcea338522847a46572bb5415026` (frozen Pass 7 handoff)
+Источник истины: **repository/GitHub + MREA SSOT**  
+Авторизация Pass 11: **direct user instruction**  
+Рабочая ветка: `chat-5/pass-11`  
+Центральный baseline: текущий `main` `c034f7583d4e1f130f827d94a43762f3cad1a7e5`
 
 ## Назначение области
 
@@ -15,104 +15,81 @@ Chat 5 ведёт инженерную историю ревизии и факт
 Revision
 → ManufacturingRecord
 → PhysicalPartInstance
-→ Installed
-→ Tested
-→ Active / In service
-→ Failed
-→ Removed
-→ Superseded by replacement
+→ Installed / Tested / Active
+→ Failed / Removed / Superseded
 → deterministic engineering knowledge queries
-→ bounded snapshot-consistent pages
+→ snapshot-bound keyset pagination
+→ local/internal read-only HTTP transport
+→ optional authenticated HTTP cursor boundary
 ```
+
+## Актуальная cumulative линия
+
+Pass 11 собран file-level replay поверх текущего `main`, а не продолжением stale shared ancestry.
+
+В него сведены:
+
+- cumulative Chat-5 state Pass 3–10.1;
+- corrected Round-4 runtime truth из `chat-5/pass-8`;
+- Pass-11 aggregate keyset pagination.
+
+`chat-5/pass-8` не изменён.
 
 ## Реализовано
 
-### Pass 1–3
+### Lifecycle / persistence
 
 - Revision / Manufacturing / Installation / Test / Failure domain;
-- canonical LifecycleEvent v1 adapter;
-- CAD verification → manufacturing gate;
 - PhysicalPartInstance identity/state machine;
-- exact installation/test/failure evidence linkage;
-- removal/replacement/supersession.
+- exact failure/evidence linkage;
+- lifecycle repository + unit of work;
+- SQLite authoritative snapshot;
+- normalized relational read model;
+- backup/restore and read-only session.
 
-### Pass 4–6
+### CAD → lifecycle truth
 
-- LifecycleRepository + LifecycleUnitOfWork;
-- SQLite durable snapshot and atomic rollback;
-- stale-writer protection;
-- normalized relational schema and migration/backfill;
-- SQL-native lifecycle queries;
-- verified backup/restore;
-- read-only SQLite session.
+- canonical numerical CAD verification remains independent from runtime evidence;
+- runtime `VERIFIED | FAILED | UNVERIFIED` survives persistence/read model;
+- runtime-gated manufacturing eligibility fails closed;
+- numerical VERIFIED never upgrades runtime UNVERIFIED.
 
-### Pass 7
+### Engineering knowledge
 
-- deterministic revision lineage;
-- factual revision outcome summaries;
+- revision lineage/outcomes;
 - equipment/position history;
-- exact recurring failure-pattern groups;
-- explicit replacement chains;
-- fail-closed graph integrity checks.
+- exact failure-pattern groups;
+- replacement chains;
+- snapshot/query-bound pagination;
+- GET-only WSGI read transport;
+- optional HMAC-SHA256 cursor authentication.
 
-### Pass 8
+### Keyset pagination
 
-Added opaque snapshot-bound knowledge pagination:
-
-```python
-page = session.knowledge.revision_outcomes_page(
-    "PART-0042",
-    limit=100,
-)
-
-while page.next_cursor is not None:
-    page = session.knowledge.revision_outcomes_page(
-        "PART-0042",
-        limit=100,
-        cursor=page.next_cursor,
-    )
-```
-
-Cursor guarantees:
+`mrea.knowledge-cursor.v2` is used by new traversals for:
 
 ```text
-format = mrea.knowledge-cursor.v1
-query/filter fingerprint must match
-cursor snapshot_version must equal current read-only snapshot
-checksum must match
-limit must be 1..500
+revision outcomes:
+(created_at, revision_id)
+
+equipment history:
+(occurred_at, sequence, event_id)
+
+failure patterns:
+(occurrence_count DESC,
+ failure_type,
+ damage_location,
+ cause_null_rank,
+ cause_sort)
 ```
 
-Paginated surfaces:
+New v2 continuation uses key predicates + `LIMIT`, not OFFSET.
 
-- `revision_outcomes_page()`;
-- `equipment_position_history_page()`;
-- `failure_patterns_page()`.
+Already-issued v1 cursors remain accepted and continue on their historical OFFSET paths.
 
-Equipment history pagination also supports exact filters for:
+## Orchestration truth
 
-- position;
-- event type;
-- revision ID;
-- physical instance ID.
-
-`revision_lineage()` and `replacement_chain()` deliberately remain whole-graph/whole-chain integrity operations instead of being split into unsafe partial traversals.
-
-## Backward compatibility
-
-All Pass-7 tuple-returning knowledge queries remain unchanged.
-
-No SQLite migration or shared MREA contract change was needed.
-
-## Verification
-
-Independent GitHub-hosted Chat 5 CI on implementation SHA `1a6803bff00eeaa43ffb18fb18c86695c59403d2`:
-
-```text
-40 passed in 1.51s
-```
-
-Required canonical contract and `Integration / Chat 4 -> Chat 5` gates are rechecked on the final documented pre-handoff state before branch freeze.
+Current `main` still carries `OD-2026-09-30-004` and centrally selects corrected Pass 8 for Round-4 handling. Pass 11 is a direct-user-authorized worker continuation and is not represented as centrally accepted or merged.
 
 ## Documentation
 
@@ -122,15 +99,21 @@ Required canonical contract and `Integration / Chat 4 -> Chat 5` gates are reche
 - `docs/PASS_6_BACKUP_RESTORE_READ_ONLY.md`
 - `docs/PASS_7_ENGINEERING_KNOWLEDGE_QUERIES.md`
 - `docs/PASS_8_KNOWLEDGE_PAGINATION.md`
+- `docs/PASS_9_READ_ONLY_HTTP_API.md`
+- `docs/PASS_10_AUTHENTICATED_HTTP_CURSORS.md`
+- `docs/PASS_10_1_KEYSET_PAGINATION.md`
+- `docs/BUILD_REUSE_CHECK_PASS11_FAILURE_PATTERN_KEYSET.md`
+- `docs/PASS_11_FAILURE_PATTERN_KEYSET_PAGINATION.md`
 - `docs/IMPLEMENTATION_STATE.md`
 - `ORCHESTRATOR_HANDOFF.md`
 
 ## Still intentionally out of scope
 
-- REST/API transport;
-- cryptographically authenticated cursors across an external trust boundary;
-- keyset pagination for very large datasets;
 - materialized analytical aggregates;
+- client authentication/authorization;
+- TLS / reverse-proxy / CORS / rate-limiting policy;
+- secret provisioning/storage policy;
+- framework-specific application shell;
 - AI / semantic interpretation;
 - field-device synchronization;
 - shared contract expansion for physical-only events.
