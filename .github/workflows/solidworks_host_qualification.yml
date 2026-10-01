@@ -1,0 +1,71 @@
+name: MREA SOLIDWORKS 2026 Host Qualification
+
+on:
+  workflow_dispatch:
+    inputs:
+      solidworks_install_dir:
+        description: "Optional SOLIDWORKS 2026 install directory. Leave empty for auto-detect."
+        required: false
+        type: string
+      part_template:
+        description: "Optional explicit .prtdot path on the self-hosted runner."
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-solidworks-host:
+    name: SOLIDWORKS 2026 / real host qualification
+    runs-on: [self-hosted, Windows, X64, solidworks-2026]
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Run one-shot SOLIDWORKS host qualification
+        shell: powershell
+        env:
+          SW_INSTALL_INPUT: ${{ inputs.solidworks_install_dir }}
+          SW_TEMPLATE_INPUT: ${{ inputs.part_template }}
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP "mrea-solidworks-host-qualification"
+          if (Test-Path -LiteralPath $out) { Remove-Item -LiteralPath $out -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+
+          $args = @(
+            "-OutputDir", $out
+          )
+          if ($env:SW_INSTALL_INPUT) { $args += @("-SolidWorksInstallDir", $env:SW_INSTALL_INPUT) }
+          if ($env:SW_TEMPLATE_INPUT) { $args += @("-PartTemplate", $env:SW_TEMPLATE_INPUT) }
+
+          & .\chat_4_cad_bridge_verification\scripts\qualify_solidworks_host.ps1 @args
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          $manifest = Join-Path $out "solidworks_host_qualification.json"
+          if (-not (Test-Path -LiteralPath $manifest -PathType Leaf)) {
+            throw "qualification manifest missing: $manifest"
+          }
+          $payload = Get-Content -LiteralPath $manifest -Raw | ConvertFrom-Json
+          if ($payload.status -ne "VERIFIED") { throw "qualification status is not VERIFIED" }
+          if ($payload.gates.PRODUCTION_CSHARP_INTEROP_BUILD -ne "VERIFIED") { throw "production C# interop build gate not verified" }
+          if ($payload.gates.REAL_SOLIDWORKS_2026_HOST -ne "VERIFIED") { throw "real SOLIDWORKS host gate not verified" }
+          if ($payload.gates.NATIVE_SLDPRT_GENERATION_READBACK -ne "VERIFIED") { throw "native SLDPRT/read-back gate not verified" }
+
+          "## SOLIDWORKS 2026 host qualification" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          "" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          "- Source SHA: ``$env:GITHUB_SHA``" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          "- Host-boundary fingerprint: ``$($payload.host_boundary_fingerprint)``" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          "- Production C# interop build: **VERIFIED**" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          "- Real SOLIDWORKS 2026 host: **VERIFIED**" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          "- Native SLDPRT generation/read-back: **VERIFIED**" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: solidworks-host-qualification-${{ github.sha }}
+          path: ${{ runner.temp }}\mrea-solidworks-host-qualification\
+          if-no-files-found: warn
+          retention-days: 90
