@@ -1,6 +1,12 @@
 """Deterministic geometry core and canonical v1 bridge owned by MREA Chat 3."""
 
 from .constraint_confidence import ConstraintConfidence, ConstraintConfidenceModel
+from .constraint_freedom import (
+    ConstraintFreedomDiagnosis,
+    ConstraintFreedomIssue,
+    ConstraintFreedomStatus,
+)
+from .constraint_freedom_policy import ConstraintFreedomAnalyzer
 from .constraint_satisfaction import ConstraintSatisfaction, ConstraintSatisfactionAnalyzer
 from .constraint_system import (
     ConstraintSystemAnalyzer,
@@ -57,6 +63,10 @@ __all__ = [
     "ConstraintCandidateEngine",
     "ConstraintConfidence",
     "ConstraintConfidenceModel",
+    "ConstraintFreedomAnalyzer",
+    "ConstraintFreedomDiagnosis",
+    "ConstraintFreedomIssue",
+    "ConstraintFreedomStatus",
     "ConstraintIssue",
     "ConstraintResolution",
     "ConstraintResolver",

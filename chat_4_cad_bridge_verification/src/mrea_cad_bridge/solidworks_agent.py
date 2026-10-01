@@ -328,15 +328,104 @@ def parse_solidworks_agent_response(response: Mapping[str, Any]) -> CadAdapterRe
     except (KeyError, TypeError, ValueError) as exc:
         raise CadAdapterError("invalid SOLIDWORKS CAD Agent response shape") from exc
 
-    return CadAdapterResult(
-        adapter_name=SOLIDWORKS_ADAPTER_NAME,
-        bindings=bindings,
-        read_back=CadReadBack(
-            dimensions=dimensions,
-            constraint_conflicts=conflicts,
-        ),
-        artifacts=artifacts,
-    )
+    try:
+        return CadAdapterResult(
+            adapter_name=SOLIDWORKS_ADAPTER_NAME,
+            bindings=bindings,
+            read_back=CadReadBack(
+                dimensions=dimensions,
+                constraint_conflicts=conflicts,
+            ),
+            artifacts=artifacts,
+        )
+    except ValueError as exc:
+        raise CadAdapterError("invalid SOLIDWORKS CAD Agent response shape") from exc
+
+
+def _validate_success_response_against_request(
+    request: Mapping[str, Any],
+    result: CadAdapterResult,
+) -> None:
+    """Require an OK worker response to prove complete request-correlated transfer evidence."""
+
+    expected_by_id = {
+        dimension["dimension_id"]: dimension
+        for dimension in request.get("dimensions", ())
+    }
+    expected_ids = frozenset(expected_by_id)
+
+    bindings_by_id = {
+        binding.dimension_id: binding
+        for binding in result.bindings
+    }
+    binding_ids = frozenset(bindings_by_id)
+    missing_bindings = expected_ids - binding_ids
+    unexpected_bindings = binding_ids - expected_ids
+    if missing_bindings or unexpected_bindings:
+        raise CadAdapterError(
+            "SOLIDWORKS CAD Agent successful response binding set does not match request; "
+            f"missing={sorted(missing_bindings)!r}, "
+            f"unexpected={sorted(unexpected_bindings)!r}"
+        )
+
+    for dimension_id, expected in expected_by_id.items():
+        actual_measurement_id = bindings_by_id[dimension_id].measurement_id
+        expected_measurement_id = expected.get("measurement_id")
+        if actual_measurement_id != expected_measurement_id:
+            raise CadAdapterError(
+                "SOLIDWORKS CAD Agent successful response lost measurement traceability for "
+                f"{dimension_id}: expected {expected_measurement_id!r}, "
+                f"got {actual_measurement_id!r}"
+            )
+
+    read_back_units = result.read_back.units()
+    read_back_ids = frozenset(read_back_units)
+    unexpected_read_back = read_back_ids - expected_ids
+    if unexpected_read_back:
+        raise CadAdapterError(
+            "SOLIDWORKS CAD Agent successful response contains unexpected read-back dimensions: "
+            f"{sorted(unexpected_read_back)!r}"
+        )
+
+    for dimension_id, unit in read_back_units.items():
+        expected_unit = expected_by_id[dimension_id].get("unit")
+        if unit != expected_unit:
+            raise CadAdapterError(
+                "SOLIDWORKS CAD Agent successful response unit mismatch for "
+                f"{dimension_id}: expected {expected_unit!r}, got {unit!r}"
+            )
+
+    evidence_ids = read_back_ids | result.read_back.constraint_conflicts
+    missing_evidence = expected_ids - evidence_ids
+    if missing_evidence:
+        raise CadAdapterError(
+            "SOLIDWORKS CAD Agent successful response omitted read-back/conflict evidence for "
+            f"{sorted(missing_evidence)!r}"
+        )
+
+    native_parts = [
+        artifact
+        for artifact in result.artifacts
+        if artifact.get("kind") == "SOLIDWORKS_PART"
+    ]
+    if len(native_parts) != 1:
+        raise CadAdapterError(
+            "SOLIDWORKS CAD Agent successful response must contain exactly one "
+            f"SOLIDWORKS_PART artifact; got {len(native_parts)}"
+        )
+
+    native_part = native_parts[0]
+    required_artifact_fields = ("artifact_id", "uri", "media_type", "sha256")
+    malformed_fields = [
+        field
+        for field in required_artifact_fields
+        if not isinstance(native_part.get(field), str) or not native_part.get(field)
+    ]
+    if malformed_fields:
+        raise CadAdapterError(
+            "SOLIDWORKS CAD Agent successful response contains incomplete native artifact "
+            f"metadata: {sorted(malformed_fields)!r}"
+        )
 
 
 class SolidWorksAgentAdapter:
@@ -355,4 +444,6 @@ class SolidWorksAgentAdapter:
     def transfer(self, package: MappedSketchPackage) -> CadAdapterResult:
         request = build_solidworks_agent_request(package, self._config)
         response = self._runner.run(request)
-        return parse_solidworks_agent_response(response)
+        result = parse_solidworks_agent_response(response)
+        _validate_success_response_against_request(request, result)
+        return result
