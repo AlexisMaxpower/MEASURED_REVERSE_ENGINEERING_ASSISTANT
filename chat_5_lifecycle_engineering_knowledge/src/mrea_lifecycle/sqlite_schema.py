@@ -5,7 +5,7 @@ import sqlite3
 from typing import Callable, Tuple
 
 
-SQLITE_RELATIONAL_SCHEMA_VERSION = 3
+SQLITE_RELATIONAL_SCHEMA_VERSION = 4
 
 
 @dataclass(frozen=True, slots=True)
@@ -287,6 +287,182 @@ def _add_cad_runtime_truth_columns(connection: sqlite3.Connection) -> None:
     )
 
 
+def _add_materialized_knowledge_aggregates(connection: sqlite3.Connection) -> None:
+    connection.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS lifecycle_revision_outcomes_materialized (
+            revision_id TEXT PRIMARY KEY,
+            part_id TEXT NOT NULL,
+            revision_code TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            manufacturing_records INTEGER NOT NULL CHECK (manufacturing_records >= 0),
+            physical_instances INTEGER NOT NULL CHECK (physical_instances >= 0),
+            activated_instances INTEGER NOT NULL CHECK (activated_instances >= 0),
+            failed_instances INTEGER NOT NULL CHECK (failed_instances >= 0),
+            removed_instances INTEGER NOT NULL CHECK (removed_instances >= 0),
+            superseded_instances INTEGER NOT NULL CHECK (superseded_instances >= 0),
+            failure_records INTEGER NOT NULL CHECK (failure_records >= 0)
+        );
+        CREATE INDEX IF NOT EXISTS ix_lifecycle_revision_outcomes_materialized_part
+            ON lifecycle_revision_outcomes_materialized(
+                part_id, created_at, revision_id
+            );
+
+        CREATE TABLE IF NOT EXISTS lifecycle_failure_patterns_materialized (
+            scope_type TEXT NOT NULL
+                CHECK (scope_type IN ('GLOBAL', 'PART', 'REVISION')),
+            scope_id TEXT NOT NULL,
+            part_id TEXT,
+            revision_id TEXT,
+            failure_type TEXT NOT NULL,
+            damage_location TEXT NOT NULL,
+            confirmed_cause TEXT,
+            occurrence_count INTEGER NOT NULL CHECK (occurrence_count > 0),
+            revision_count INTEGER NOT NULL CHECK (revision_count > 0),
+            instance_count INTEGER NOT NULL CHECK (instance_count >= 0),
+            first_failed_at TEXT NOT NULL,
+            last_failed_at TEXT NOT NULL,
+            cause_null_rank INTEGER NOT NULL CHECK (cause_null_rank IN (0, 1)),
+            cause_sort TEXT NOT NULL,
+            PRIMARY KEY (
+                scope_type,
+                scope_id,
+                failure_type,
+                damage_location,
+                cause_null_rank,
+                cause_sort
+            )
+        );
+        CREATE INDEX IF NOT EXISTS ix_lifecycle_failure_patterns_materialized_scope
+            ON lifecycle_failure_patterns_materialized(
+                scope_type,
+                scope_id,
+                occurrence_count DESC,
+                failure_type,
+                damage_location,
+                cause_null_rank,
+                cause_sort
+            );
+
+        UPDATE lifecycle_read_model_meta
+        SET snapshot_version = -1
+        WHERE singleton = 1;
+
+        CREATE TRIGGER IF NOT EXISTS trg_lifecycle_refresh_materialized_knowledge
+        AFTER UPDATE OF snapshot_version ON lifecycle_read_model_meta
+        FOR EACH ROW
+        BEGIN
+            DELETE FROM lifecycle_revision_outcomes_materialized;
+            INSERT INTO lifecycle_revision_outcomes_materialized(
+                revision_id,
+                part_id,
+                revision_code,
+                created_at,
+                manufacturing_records,
+                physical_instances,
+                activated_instances,
+                failed_instances,
+                removed_instances,
+                superseded_instances,
+                failure_records
+            )
+            SELECT r.revision_id,
+                   r.part_id,
+                   r.revision_code,
+                   r.created_at,
+                   COUNT(DISTINCT m.manufacturing_id),
+                   COUNT(DISTINCT pi.instance_id),
+                   COUNT(DISTINCT CASE WHEN pe.event_type = 'ACTIVATED'
+                                       THEN pe.instance_id END),
+                   COUNT(DISTINCT CASE WHEN pe.event_type = 'FAILED'
+                                       THEN pe.instance_id END),
+                   COUNT(DISTINCT CASE WHEN pe.event_type = 'REMOVED'
+                                       THEN pe.instance_id END),
+                   COUNT(DISTINCT CASE WHEN pe.event_type = 'SUPERSEDED'
+                                       THEN pe.instance_id END),
+                   COUNT(DISTINCT f.failure_id)
+            FROM lifecycle_revisions AS r
+            LEFT JOIN lifecycle_manufacturing AS m
+                   ON m.revision_id = r.revision_id
+            LEFT JOIN lifecycle_physical_instances AS pi
+                   ON pi.revision_id = r.revision_id
+            LEFT JOIN lifecycle_physical_events_relational AS pe
+                   ON pe.instance_id = pi.instance_id
+            LEFT JOIN lifecycle_failures AS f
+                   ON f.revision_id = r.revision_id
+            GROUP BY r.revision_id, r.part_id, r.revision_code, r.created_at;
+
+            DELETE FROM lifecycle_failure_patterns_materialized;
+
+            INSERT INTO lifecycle_failure_patterns_materialized(
+                scope_type, scope_id, part_id, revision_id,
+                failure_type, damage_location, confirmed_cause,
+                occurrence_count, revision_count, instance_count,
+                first_failed_at, last_failed_at, cause_null_rank, cause_sort
+            )
+            SELECT 'GLOBAL', '*', NULL, NULL,
+                   f.failure_type, f.damage_location, f.confirmed_cause,
+                   COUNT(*),
+                   COUNT(DISTINCT f.revision_id),
+                   COUNT(DISTINCT f.instance_id),
+                   MIN(f.failed_at),
+                   MAX(f.failed_at),
+                   CASE WHEN f.confirmed_cause IS NULL THEN 0 ELSE 1 END,
+                   COALESCE(f.confirmed_cause, '')
+            FROM lifecycle_failures AS f
+            GROUP BY f.failure_type, f.damage_location, f.confirmed_cause;
+
+            INSERT INTO lifecycle_failure_patterns_materialized(
+                scope_type, scope_id, part_id, revision_id,
+                failure_type, damage_location, confirmed_cause,
+                occurrence_count, revision_count, instance_count,
+                first_failed_at, last_failed_at, cause_null_rank, cause_sort
+            )
+            SELECT 'PART', r.part_id, r.part_id, NULL,
+                   f.failure_type, f.damage_location, f.confirmed_cause,
+                   COUNT(*),
+                   COUNT(DISTINCT f.revision_id),
+                   COUNT(DISTINCT f.instance_id),
+                   MIN(f.failed_at),
+                   MAX(f.failed_at),
+                   CASE WHEN f.confirmed_cause IS NULL THEN 0 ELSE 1 END,
+                   COALESCE(f.confirmed_cause, '')
+            FROM lifecycle_failures AS f
+            JOIN lifecycle_revisions AS r
+              ON r.revision_id = f.revision_id
+            GROUP BY r.part_id,
+                     f.failure_type,
+                     f.damage_location,
+                     f.confirmed_cause;
+
+            INSERT INTO lifecycle_failure_patterns_materialized(
+                scope_type, scope_id, part_id, revision_id,
+                failure_type, damage_location, confirmed_cause,
+                occurrence_count, revision_count, instance_count,
+                first_failed_at, last_failed_at, cause_null_rank, cause_sort
+            )
+            SELECT 'REVISION', f.revision_id, r.part_id, f.revision_id,
+                   f.failure_type, f.damage_location, f.confirmed_cause,
+                   COUNT(*),
+                   COUNT(DISTINCT f.revision_id),
+                   COUNT(DISTINCT f.instance_id),
+                   MIN(f.failed_at),
+                   MAX(f.failed_at),
+                   CASE WHEN f.confirmed_cause IS NULL THEN 0 ELSE 1 END,
+                   COALESCE(f.confirmed_cause, '')
+            FROM lifecycle_failures AS f
+            JOIN lifecycle_revisions AS r
+              ON r.revision_id = f.revision_id
+            GROUP BY f.revision_id,
+                     r.part_id,
+                     f.failure_type,
+                     f.damage_location,
+                     f.confirmed_cause;
+        END;
+        """
+    )
+
+
 SQLITE_MIGRATIONS: Tuple[SQLiteSchemaMigration, ...] = (
     SQLiteSchemaMigration(
         version=2,
@@ -297,6 +473,11 @@ SQLITE_MIGRATIONS: Tuple[SQLiteSchemaMigration, ...] = (
         version=3,
         name="cad_runtime_truth",
         apply=_add_cad_runtime_truth_columns,
+    ),
+    SQLiteSchemaMigration(
+        version=4,
+        name="materialized_engineering_knowledge",
+        apply=_add_materialized_knowledge_aggregates,
     ),
 )
 
