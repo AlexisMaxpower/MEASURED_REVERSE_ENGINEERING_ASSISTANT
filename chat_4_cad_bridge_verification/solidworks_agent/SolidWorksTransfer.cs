@@ -75,7 +75,7 @@ namespace Mrea.SolidWorksCadAgent
             }
 
             sketchManager.InsertSketch(true);
-            model.EditRebuild3();
+            RequireSuccessfulRebuild(model, "final sketch before native save/read-back");
 
             var outputPath = Path.Combine(
                 Path.GetFullPath(request.output_directory),
@@ -308,7 +308,7 @@ namespace Mrea.SolidWorksCadAgent
 
                     var before = (int)relationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swAll);
                     model.SketchAddConstraints(RelationId(constraint.type));
-                    model.EditRebuild3();
+                    RequireSuccessfulRebuild(model, "constraint " + constraint.constraint_id);
                     var after = (int)relationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swAll);
                     if (after <= before)
                         throw new InvalidOperationException(
@@ -541,6 +541,13 @@ namespace Mrea.SolidWorksCadAgent
             var dy = entity.end.y - entity.start.y;
             if (dx * dx + dy * dy <= 1e-24)
                 throw new InvalidDataException("LINE must have distinct endpoints: " + name);
+        }
+
+        private static void RequireSuccessfulRebuild(dynamic model, string context)
+        {
+            var rebuilt = (bool)model.EditRebuild3();
+            if (!rebuilt)
+                throw new InvalidOperationException("SOLIDWORKS rebuild failed: " + context);
         }
 
         private static void SaveNativePart(dynamic model, string outputPath)
