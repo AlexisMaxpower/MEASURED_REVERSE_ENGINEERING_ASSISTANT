@@ -131,11 +131,11 @@ class SolidWorksWorkerCapabilityHandshakeTests(unittest.TestCase):
             validate_body.index("request.constraint_capabilities_sha256"),
         )
         self.assertLess(
-            program.index("ValidateRequestEnvelope(request);"),
-            program.index("SolidWorksSession.Open(request)"),
+            validate_body.index("request.constraint_capabilities_sha256"),
+            validate_body.index("ValidateDimensionEnvelope(request);"),
         )
         self.assertLess(
-            program.index("ValidateDimensionEnvelope(request);"),
+            program.index("ValidateRequestEnvelope(request);"),
             program.index("SolidWorksSession.Open(request)"),
         )
 
@@ -149,8 +149,13 @@ class SolidWorksWorkerCapabilityHandshakeTests(unittest.TestCase):
         envelope_end = program.index("private static void RequireDimensionUnit")
         envelope = program[envelope_start:envelope_end]
 
-        for dimension_type in rules["types"]:
+        self.assertEqual(
+            set(rules["types"]),
+            {"DISTANCE", "DIAMETER", "RADIUS", "ANGLE"},
+        )
+        for dimension_type in ("DISTANCE", "DIAMETER", "RADIUS"):
             self.assertIn(f'dimension.type == "{dimension_type}"', envelope)
+        self.assertIn('dimension.type != "ANGLE"', envelope)
         self.assertIn("Dimension contains duplicate entity_ids", envelope)
         self.assertIn("DISTANCE supports one LINE or two CIRCLE/ARC entities", envelope)
         self.assertIn("DIAMETER requires exactly one CIRCLE", envelope)
