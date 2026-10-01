@@ -1,209 +1,96 @@
 # ORCHESTRATOR HANDOFF — Chat 1
 
-**Pass:** 3  
-**Directive:** `OD-2026-09-29-003`  
-**Branch:** `chat-1/pass-3`  
-**Baseline main SHA:** `c3452d7fa68c9c5c3716db5fef71172e9c3b9532`  
-**Implementation / pre-handoff SHA:** `13241df21ed501e6697d773e5c672be0e3c8359e`  
-**Final branch SHA:** the branch HEAD containing this handoff; this commit freezes the branch  
-**Date:** 2026-09-29  
-**From:** Chat 1 — Project & Guided Capture  
-**To:** Chat 6 — Orchestrator / Repository Integrator  
+**Pass:** 15  
+**Directive:** `OD-2026-10-01-008`  
+**Branch:** `chat-1/pass-15`  
+**Certified baseline main SHA:** `99d8c6d9322f3669a43226e4fd2675fe683ab9f6`  
+**Implementation / pre-handoff SHA:** `2ee70bb3c4001a5f2b79872c9d35bcfb90567245`  
+**Date:** 2026-10-01  
+**Role:** Chat 1 — Project & Guided Capture  
 **Contract baseline:** `mrea.contracts.v1`
+
+## Completion state
+
+```text
+CHAT_1_PASS_15 = VOICE_TRIGGER_CAPTURE_PROVENANCE_PUBLISHED_AND_FROZEN
+PRODUCT_SCOPE = VOICE_TRIGGER_TO_MEASUREMENT_FRAME_PROVENANCE
+SHARED_CONTRACT_DELTA = NONE
+```
 
 ## Delivered
 
-Pass 3 implements the first deterministic Guided Capture Quality baseline required by OD-003:
+Pass 15 implements the first voice-trigger capture provenance slice using the already-existing canonical `MeasurementCaptureFrame.voice_event` field.
 
-```text
-immutable clean reference
-+ optional calibration evidence
-+ optional MeasurementMatProfile
-→ deterministic OpenCV diagnostic metrics
-→ machine-readable quality findings
-→ ACCEPT / WARN / REJECT
-→ persisted internal quality analysis
-→ optional Russian actionable guidance
-```
+Added internal `VoiceCaptureEvent` / `VoiceCaptureCommand` and `CaptureSessionService.capture_measurement_frame_from_voice_trigger(...)`.
 
-## Ownership and contract boundary
+A voice event records only:
 
-No shared contract, canonical fixture, Chat-6-owned CI file or integration test was modified.
+- opaque event identity;
+- `CAPTURE_MEASUREMENT_FRAME` command;
+- timezone-aware trigger timestamp;
+- optional transcript;
+- optional locale.
 
-Quality analysis remains internal to Chat 1 and is explicitly diagnostic. It does not:
+The event is attached only to a `MEASUREMENT` frame and remains tied to that frame's active clean-reference provenance. Manual measurement capture remains backward-compatible with `voice_event = null`.
 
-- create or alter `PhysicalMeasurement`;
-- claim metric/dimensional truth;
-- infer sketch/CAD geometry;
-- overwrite clean-reference evidence;
-- add fields to `CapturePackage v1`.
+The canonical adapter now serializes non-null voice-trigger provenance into the existing field. No shared schema change was required.
 
-`CanonicalContractBuilder` continues to ignore internal quality state, preserving the accepted Chat 1 → Chat 2 boundary.
+## Truth / ownership boundary
 
-## Domain/result model
+Voice-trigger provenance is a capture-control event only. It does **not**:
 
-Added:
+- create a `PhysicalMeasurement`;
+- assign `VOICE_REPORTED` measurement truth;
+- parse or infer dimensions from speech;
+- change calibration, geometry, CAD or downstream lifecycle truth;
+- rewrite historical frames or recapture lineage;
+- modify shared contracts, canonical fixtures, root CI or adjacent slice source.
 
-- `CaptureQualityVerdict`: `ACCEPT`, `WARN`, `REJECT`;
-- `QualitySeverity`;
-- `QualityReasonCode`;
-- `CaptureQualityMetrics`;
-- `CaptureQualityFinding`;
-- `CaptureQualityResult`.
+Historical voice-triggered measurement frames remain persisted. Canonical active output continues to include only measurement frames linked to the active clean-reference attempt.
 
-`CaptureSession` now persists `quality_analyses` and validates:
+## Regression coverage
 
-- one current-baseline result per immutable source frame;
-- source frame exists in the session;
-- result view matches source frame view.
+`tests/test_voice_trigger.py` covers:
 
-## Analyzer and policy
+1. persistent attributable voice-trigger provenance;
+2. canonical `CapturePackage v1` schema validation with non-null `voice_event`;
+3. UTC/RFC3339 trigger serialization;
+4. backward-compatible manual capture with null voice event;
+5. immutable recapture lineage and exclusion of superseded-attempt voice frames from active canonical output;
+6. fail-closed behavior when no clean reference exists;
+7. explicit failure for naive trigger timestamps.
 
-Added `quality.py` with:
+## Authoritative pre-handoff CI
 
-- `CaptureQualityPolicy` (`chat1.capture-quality.v1`);
-- `CaptureQualityAnalyzer` protocol;
-- `OpenCvCaptureQualityAnalyzer`;
-- `CaptureQualityService`;
-- `CaptureQualityError`;
-- `RussianQualityGuidanceAdapter`.
+Exact implementation SHA:
 
-Signals:
+`2ee70bb3c4001a5f2b79872c9d35bcfb90567245`
 
-1. blur/focus proxy — variance of Laplacian;
-2. mean luma;
-3. dark clipping fraction;
-4. bright clipping fraction;
-5. localized glare/highlight proxy;
-6. edge density / low-scene-detail proxy;
-7. border-edge ratio / framing proxy;
-8. optional ChArUco corner visibility from existing calibration evidence.
+MREA CI run:
 
-Framing deliberately does not perform object segmentation. Glare deliberately remains a conservative image proxy rather than photometric/specular truth.
+`36815528699` — **SUCCESS**
 
-## Verdict behavior
+Required gates:
 
-Every finding contains:
-
-- machine-readable reason code;
-- severity (`WARN` / `REJECT`);
-- metric name;
-- observed value;
-- threshold;
-- comparison operator.
-
-Aggregation is deterministic:
-
-```text
-any REJECT finding -> REJECT
-else any finding    -> WARN
-else                -> ACCEPT
-```
-
-Russian guidance is produced by a presentation adapter from reason codes; user-facing text is not hidden inside the decision logic.
-
-## Provenance / persistence
-
-Each result records:
-
-- deterministic `analysis_id`;
-- immutable source `frame_id`;
-- view;
-- calibration ID when used;
-- mat ID when available;
-- policy version.
-
-`CaptureQualityService` reads source bytes through `ArtifactStore`, preserves them unchanged and is idempotent for the same source/calibration/mat context. A conflicting reanalysis context is explicit rather than silently replacing provenance.
-
-## Deterministic fixture coverage
-
-New tests cover:
-
-- sharp/balanced/centered image → `ACCEPT`;
-- strong Gaussian blur → `REJECT` / `BLUR`;
-- severe underexposure → `REJECT` / `UNDEREXPOSED`;
-- severe overexposure → `REJECT` / `OVEREXPOSED`;
-- localized highlights → `WARN` / `GLARE_RISK`;
-- full-frame border activity → `WARN` / `FRAMING_BORDER_ACTIVITY`;
-- low ChArUco corner visibility → `REJECT` / `LOW_MARKER_VISIBILITY`;
-- deterministic repeated analysis;
-- service persistence and idempotency;
-- immutable original source bytes;
-- unchanged canonical CapturePackage before/after quality analysis;
-- explicit decode failure for invalid bytes.
-
-## Local tests executed
-
-Focused Pass 3 quality suite:
-
-```text
-pytest -q tests/test_quality.py
-........                                                                 [100%]
-8 passed
-```
-
-Quality + baseline capture subset:
-
-```text
-pytest -q tests/test_quality.py tests/test_project_service.py tests/test_capture_plan.py tests/test_manual_capture.py
-..................                                                       [100%]
-18 passed
-```
-
-The archive-restored local workspace lacks repository-root `core/contracts`, so three pre-existing schema-loading tests cannot complete there. This limitation is environmental to that local workspace; full branch CI below ran against the complete repository and is authoritative.
-
-## GitHub Actions evidence before handoff freeze
-
-Workflow: `MREA CI`  
-Run ID: `36619586794`  
-Run number: `107`  
-Head SHA: `13241df21ed501e6697d773e5c672be0e3c8359e`
-
-Required Pass 3 gates:
-
-- `Contracts / canonical fixtures` — **SUCCESS**;
 - `Chat 1 / Capture` — **SUCCESS**;
-- `Integration / Chat 1 -> Chat 2` — **SUCCESS**.
+- `Contracts / canonical fixtures` — **SUCCESS**;
+- `Integration / Chat 1 -> Chat 2` — **SUCCESS** and the real Capture -> Measurement boundary test executed.
 
-Other executable slice jobs on the same run also completed successfully. Integration gates unrelated to the Chat 1 branch were conditionally skipped as intended by CI policy.
+## Files changed before this handoff
 
-Per Pass 3 process, this handoff is the final branch mutation. Chat 6 owns independent post-handoff/PR CI evidence and acceptance review.
+- `chat_1_project_guided_capture/src/mrea_capture/models.py`;
+- `chat_1_project_guided_capture/src/mrea_capture/services.py`;
+- `chat_1_project_guided_capture/src/mrea_capture/contracts.py`;
+- `chat_1_project_guided_capture/src/mrea_capture/__init__.py`;
+- `chat_1_project_guided_capture/tests/test_voice_trigger.py`;
+- `chat_1_project_guided_capture/docs/PASS15_VOICE_TRIGGER_CAPTURE.md`.
 
-## Files changed in Pass 3
+This `ORCHESTRATOR_HANDOFF.md` is the final branch mutation.
 
-- `src/mrea_capture/models.py`;
-- `src/mrea_capture/quality.py`;
-- `src/mrea_capture/__init__.py`;
-- `tests/test_quality.py`;
-- `docs/BUILD_REUSE_CHECK_PASS3_GUIDED_QUALITY.md`;
-- `docs/IMPLEMENTATION_REPORT_PASS3_GUIDED_QUALITY_2026-09-29.md`;
-- `docs/IMPLEMENTATION_STATE.md`;
-- `README.md`;
-- `ORCHESTRATOR_HANDOFF.md` (this final freeze commit).
+## Known boundaries
 
-## Known limitations
+- this pass does not implement microphone/audio acquisition or speech recognition runtime;
+- transcript/locale are optional caller-provided trigger metadata and carry no metrology semantics;
+- physical/device validation remains a later environment/product concern.
 
-- policy thresholds are deterministic software defaults, not yet calibrated on a real phone-camera dataset;
-- Laplacian blur score depends on scene content and resolution;
-- glare detection is a proxy, not photometric/specular modeling;
-- framing is edge-based, not object segmentation;
-- no lens-distortion-aware quality normalization yet;
-- no native/mobile runtime validation yet;
-- current persisted baseline keeps one quality result per immutable source frame/context;
-- quality verdict does not automatically mutate existing `CaptureViewStatus` transitions.
-
-## Open Change Requests
-
-None.
-
-## Acceptance requested from Chat 6
-
-Please verify:
-
-1. `OD-2026-09-29-003` Guided Capture Quality requirements are satisfied;
-2. ownership/truth boundaries remain intact;
-3. `CapturePackage v1` compatibility and Chat 1 → Chat 2 gate remain accepted;
-4. branch/PR CI remains green after the frozen handoff commit;
-5. if accepted, integrate Pass 3 and issue the next Chat 1 directive.
-
-**Branch freeze:** no further Chat 1 commits will be pushed to `chat-1/pass-3` unless Chat 6 explicitly returns `FIX_REQUIRED`.
+**Freeze:** `chat-1/pass-15` must not be mutated after this handoff unless central orchestration explicitly returns `FIX_REQUIRED` or authorizes a correction. A later pass starts from then-current certified `main`, not from this frozen worker branch.
