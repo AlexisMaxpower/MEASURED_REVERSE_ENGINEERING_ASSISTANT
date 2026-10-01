@@ -13,7 +13,7 @@ from .models import (
     ProvenanceSource,
     decimal_value,
 )
-from .repository import InMemoryMeasurementSessionRepository
+from .repository import MeasurementSessionRepository
 from .type_registry import MeasurementTypeRegistry
 
 
@@ -34,7 +34,7 @@ class MeasurementSessionService:
 
     def __init__(
         self,
-        repository: InMemoryMeasurementSessionRepository,
+        repository: MeasurementSessionRepository,
         *,
         id_factory: Callable[[str], str] | None = None,
         clock: Callable[[], datetime] | None = None,
