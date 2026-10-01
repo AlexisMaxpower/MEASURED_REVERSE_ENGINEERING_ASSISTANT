@@ -1,10 +1,12 @@
 # Chat 1 — Implementation State
 
-**Date:** 2026-09-29  
+**Date:** 2026-09-30  
 **Role:** Chat 1 — Project & Guided Capture  
-**Current pass:** 2  
-**Directive:** `OD-2026-09-29-002`  
-**Working branch:** `chat-1/pass-2`
+**Current pass:** 4  
+**Directive:** `OD-2026-09-30-004`  
+**Working branch:** `chat-1/pass-4`  
+**Accepted Round-3 baseline SHA:** `bffc1dec2fe63c12b69a50c4bf348ef7df4cf662`  
+**Pass-4 state:** completion / handoff preparation; Stage-1 acceptance pending Chat 6
 
 ## Source-of-truth order
 
@@ -14,106 +16,193 @@
 4. product SSOT + Chat 6 orchestration state/directive;
 5. Chat 1 local docs.
 
-Chat 1 does not modify shared contracts or canonical fixtures.
+Chat 1 does not modify shared contracts, canonical fixtures or Chat-6-owned CI/integration tests.
 
-## Accepted baseline — Pass 1
+## Accepted baseline
 
-Chat 6 accepted:
+### Pass 1 — accepted
 
 - Project/Capture domain;
 - manual capture baseline;
-- stable project/part linkage;
-- canonical `ProjectContract v1` / `CapturePackage v1` adapters;
-- ChArUco calibration baseline;
-- schema-valid FRONT CapturePackage with calibration.
+- canonical Project/Capture adapters;
+- ChArUco calibration baseline.
 
-## Pass 2 implemented
+### Pass 2 — accepted/integrated
 
-### Stable calibration provenance
+- stable calibration provenance;
+- deterministic perspective normalization;
+- immutable rectified artifact;
+- source/calibration/mat provenance;
+- canonical CapturePackage backward compatibility.
 
-- `CalibrationResult.calibration_id` added as an internal identifier;
-- legacy calibration records without the field receive deterministic UUIDv5 backfill from source frame + mat identity.
+## Pass 3 — Guided Capture Quality baseline
 
-### Perspective normalization
+### Domain/result model
 
 Added:
 
-- `RectifiedReferenceRecord`;
-- `CaptureSession.rectified_references` persistence;
-- `PerspectiveNormalizer` protocol;
-- `OpenCvPerspectiveNormalizer`;
-- `RectificationService`;
-- explicit `RectificationError` failures.
+- `CaptureQualityVerdict`: `ACCEPT`, `WARN`, `REJECT`;
+- `QualitySeverity`;
+- `QualityReasonCode`;
+- `CaptureQualityMetrics`;
+- `CaptureQualityFinding`;
+- `CaptureQualityResult`.
 
-Flow:
+`CaptureSession.quality_analyses` persists one current-baseline analysis per immutable source frame and validates source-frame/view consistency.
 
-```text
-clean reference artifact
-+ stored calibration homography
-+ MeasurementMatProfile
-+ pixels_per_mm
--> deterministic MAT-space raster
--> new content-addressed artifact
--> RectifiedReferenceRecord
-```
+### Analyzer
 
-Invariants:
+`OpenCvCaptureQualityAnalyzer` produces deterministic image diagnostics:
 
-- source clean artifact is never overwritten;
-- derived artifact has independent artifact ID/SHA;
-- source frame ID is preserved in provenance;
-- exact calibration ID and mat ID are preserved;
-- one rectified reference per view in current baseline;
-- singular/non-finite homographies fail explicitly;
-- existing calibration is reused; no second calibration representation exists.
+- `laplacian_variance` — focus/blur proxy;
+- `mean_luma`;
+- dark clipping fraction;
+- bright clipping fraction;
+- localized glare/highlight proxy fraction;
+- edge density;
+- border-edge ratio;
+- optional ChArUco corner visibility ratio.
 
-### Canonical boundary
+### Policy / verdict
 
-No shared contract change.
+`CaptureQualityPolicy` version:
 
-`CapturePackage v1` has no rectified-artifact property. Rectification therefore stays internal while the canonical package continues to expose original clean reference + calibration homography. Canonical serialization before and after internal rectification remains unchanged.
+`chat1.capture-quality.v1`
 
-## Verification
+Rules are explicit and machine-readable. Each finding stores reason code, severity, observed metric, threshold and comparison operator.
 
-Latest full local Chat 1 regression:
+Verdict aggregation:
 
 ```text
-16 passed in 1.17s
+any REJECT finding -> REJECT
+else any finding    -> WARN
+else                -> ACCEPT
 ```
 
-Pass 2 synthetic perspective test verifies:
+### Orchestration
 
-- known perspective distortion of a 5x7 ChArUco board;
-- calibration of the distorted reference;
-- deterministic repeated encoded output;
-- preserved source bytes;
-- distinct derived artifact identity/hash;
-- source/calibration/mat provenance;
-- 1000x1400 raster at 10 px/mm for 100x140 mm mat geometry;
-- mean absolute image error `< 8` against known canonical raster;
-- canonical CapturePackage remains schema-valid and unchanged;
-- singular homography explicit failure;
-- stable legacy calibration-ID backfill.
+`CaptureQualityService`:
+
+- reads immutable clean-reference bytes through `ArtifactStore`;
+- reuses existing calibration evidence when present;
+- persists analysis result in CaptureSession;
+- keeps source bytes unchanged;
+- is idempotent for the same source/calibration/mat context;
+- rejects conflicting reanalysis context rather than silently replacing provenance.
+
+`RussianQualityGuidanceAdapter` converts reason codes into actionable Russian capture instructions without embedding presentation text into the quality policy itself.
+
+## Ownership/truth boundary
+
+Quality metrics are diagnostic proxies only.
+
+They do **not**:
+
+- create PhysicalMeasurement;
+- alter verified measurement values;
+- infer geometry;
+- claim dimensional accuracy;
+- alter canonical `CapturePackage v1`.
+
+`CanonicalContractBuilder` ignores `quality_analyses`, preserving the accepted Chat 1 -> Chat 2 wire boundary.
+
+## Local verification
+
+New quality suite:
+
+```text
+8 passed in 0.21s
+```
+
+Verified generated cases:
+
+- good sharp/balanced/centered image -> `ACCEPT`;
+- strong blur -> `REJECT` / `BLUR`;
+- severe underexposure -> `REJECT` / `UNDEREXPOSED`;
+- severe overexposure -> `REJECT` / `OVEREXPOSED`;
+- localized bright highlights -> `WARN` / `GLARE_RISK`;
+- significant border activity -> `WARN` / `FRAMING_BORDER_ACTIVITY`;
+- low ChArUco corner visibility -> `REJECT` / `LOW_MARKER_VISIBILITY`;
+- repeated analysis produces equal deterministic result;
+- persisted quality result does not change canonical CapturePackage;
+- invalid image bytes fail explicitly.
+
+A local all-tests run from the archive-restored workspace reached 21 passing tests and 3 failures solely because repository-root `core/contracts/mrea_contracts_v1.schema.json` is not present in that archive workspace. Those three tests fail at schema file loading, not Chat 1 behavior. Full branch CI is required as the authoritative complete regression.
 
 ## Current limitations
 
-- no real printed-mat accuracy validation;
-- no camera lens-distortion/intrinsics compensation;
-- deterministic raster policy is pinned to current OpenCV behavior, not promised across arbitrary future versions;
-- rectified artifact is internal until/if Chat 6 creates a canonical exposure path;
-- no rectified-reference replacement/versioning policy;
-- no Guided Quality implementation yet;
-- native/mobile runtime and CI are not verified.
+- policy thresholds are not yet calibrated on a real phone-camera dataset;
+- blur metric is scene/resolution dependent;
+- glare is a proxy, not physical specular modeling;
+- framing is edge-based, not object segmentation;
+- no lens-distortion-aware quality normalization;
+- no native/mobile runtime validation;
+- one persisted quality result per source frame/context in this baseline;
+- quality verdict does not automatically mutate `CaptureViewStatus`.
 
-## Integration readiness
+## Pass 3 acceptance readiness
 
-Ready for Chat 6 Pass 2 acceptance review:
+Before handoff freeze, require:
 
-- deterministic perspective normalization;
-- immutable derived artifact;
-- explicit source/calibration provenance;
-- source evidence preservation;
-- canonical backward compatibility;
-- full local regression passing.
+- Chat 1 branch tests green in GitHub Actions;
+- `Integration / Chat 1 -> Chat 2` green;
+- shared contract checks green;
+- no shared-contract changes;
+- final `ORCHESTRATOR_HANDOFF.md` published once, then branch frozen.
 
-Next work must follow the next Chat 6 directive after Pass 2 acceptance.
+
+## Pass 4 work package — Guided Capture Readiness
+
+Round 3 is closed and Chat 1 Pass 3 is accepted. Under `OD-2026-09-30-004`, `chat-1/pass-4` is now the selected Round-4 worker cut. The implementation below is **not yet Stage-1 accepted or merged**; this pass is being completed for review and branch freeze.
+
+Added `guidance.py` with versioned deterministic readiness orchestration over existing capture evidence. It derives the first remaining required view and next action across clean reference, calibration, quality, measurement frame and explicit acceptance. Quality `REJECT` blocks progression; WARN handling is policy-controlled. Optional views do not block required completion.
+
+This layer is pure/read-only and does not change `CapturePackage v1`, physical measurements, geometry, or persisted evidence.
+
+Local schema-independent regression: `24 passed`. Full repository CI is required after upload.
+
+
+## Pass 4 extension — immutable recapture / supersession lineage
+
+The readiness flow previously had a dead-end after `QUALITY_REJECTED`: evidence was immutable, while the session allowed only one clean reference per view. Pass 4 resolves that gap without deleting history.
+
+Added lineage fields:
+
+- `CaptureViewProgress.active_clean_reference_frame_id`;
+- `FrameRecord.supersedes_frame_id` for clean-reference recapture chains;
+- `FrameRecord.source_clean_reference_frame_id` for measurement-frame provenance.
+
+Added `CaptureSessionService.recapture_clean_reference(...)`. It creates a new content-addressed clean artifact, links it to the previous active clean frame, updates only the active pointer, and preserves all previous evidence.
+
+Calibration, rectification, quality, guided readiness and canonical serialization now resolve the active clean attempt by exact `source_frame_id`. Historical evidence remains persisted but is excluded from the active canonical package.
+
+Backward compatibility:
+
+- legacy sessions with one clean reference per view backfill `active_clean_reference_frame_id`;
+- legacy measurement frames backfill their clean-reference provenance when it is unambiguous;
+- existing canonical contracts remain unchanged.
+
+Guided `QUALITY_REJECTED` / strict-WARN handling now returns the executable `RECAPTURE_CLEAN_REFERENCE` action.
+
+Local schema-independent regression after this extension: `28 passed`. The remaining three full-suite failures in the patch workspace are only missing root-schema file loads; calibration/rectification/canonical behavior reaches those final validation calls successfully.
+
+## Pass 4 work package — Explicit accepted-view revision
+
+Added an explicit reopen/revision gate on top of immutable recapture lineage.
+
+- `CaptureViewRevisionEvent` persists why/when an accepted view was reopened and which clean frame was active at that moment.
+- `CaptureViewProgress.recapture_required` prevents silently reusing the previously accepted attempt.
+- `CaptureSessionService.reopen_view(...)` only accepts `ACCEPTED` views, clears completion and records audit provenance.
+- `accept_view(...)` fails while a fresh clean reference is still required.
+- `recapture_clean_reference(...)` clears the gate only after a new immutable clean artifact is active.
+- Guided Capture returns `RECAPTURE_CLEAN_REFERENCE` / `VIEW_REOPENED_RECAPTURE_REQUIRED` until recapture occurs.
+
+Local schema-independent regression including quality: `33 passed`.
+
+## Pass 4 extension — capture attempt history projection
+
+Added `history.py` with a deterministic read-only projection of immutable per-view capture attempts. The projection groups calibration, quality, rectification, measurement and revision evidence by the exact clean-reference source frame and marks the active attempt explicitly. It preserves persisted view order and does not mutate session state.
+
+`CaptureAttemptHistoryService` fails closed when a view history has multiple roots, missing predecessors, disconnected components, branches or cycles, rather than guessing lineage order.
+
+Schema-independent regression after this extension: `37 passed`. A wider run reached 39 passes; its only 2 failures were missing repository-root canonical schema file loads in the patch workspace.

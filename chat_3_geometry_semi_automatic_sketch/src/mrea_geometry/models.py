@@ -5,12 +5,15 @@ from typing import Literal, Union
 
 PrimitiveKind = Literal["POINT", "LINE", "CIRCLE", "ARC"]
 ConstraintKind = Literal[
+    "COINCIDENT",
     "HORIZONTAL",
     "VERTICAL",
     "PARALLEL",
     "PERPENDICULAR",
+    "TANGENT",
     "CONCENTRIC",
     "EQUAL",
+    "SYMMETRIC",
 ]
 
 
@@ -164,6 +167,7 @@ class MeasurementRef:
     verified: bool
     source: str
     anchors: tuple[AnchorRef, ...]
+    uncertainty: float | None = None
 
     def __post_init__(self) -> None:
         if not self.measurement_id.strip():
@@ -201,6 +205,7 @@ class DimensionBinding:
     source: str
     target_entity_ids: tuple[str, ...]
     geometry_estimate: float | None
+    uncertainty: float | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -215,6 +220,7 @@ class DimensionBinding:
             "geometry_estimate": (
                 None if self.geometry_estimate is None else float(self.geometry_estimate)
             ),
+            "uncertainty": None if self.uncertainty is None else float(self.uncertainty),
         }
 
 

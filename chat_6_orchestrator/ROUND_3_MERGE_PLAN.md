@@ -1,57 +1,67 @@
 # MREA — Round 3 Merge Plan
 
 **Owner:** Chat 6 — Primary Orchestrator  
-**Status:** `BLOCKED_PENDING_CHAT4_FIX`  
-**Stage:** preparation for Deputy 1, no final merge authority
+**Status:** `READY_FOR_DEPUTY1`  
+**Stage:** handoff to Deputy 1; no final merge authority for Chat 6
 
-## Preconditions
+## Stage-1 prerequisite status
 
-This plan is not executable until Chat 4 becomes `PROVISIONALLY_ACCEPTED`.
+The previous Chat-4 blocker is closed by `ROUND_3_STAGE1_CHAT4_REREVIEW_2026-09-30.md`.
 
-Required first:
-
-1. `chat-4b/pass-3` contains the assigned host-readiness implementation.
-2. `chat_4_cad_bridge_verification/SOLIDWORKS_SIDE_HANDOFF.md` exists remotely.
-3. Primary `chat-4/pass-3` reconciles the side result.
-4. Primary `ORCHESTRATOR_HANDOFF.md` is updated to a real Pass-3 handoff.
-5. Refreshed Chat-4 review CI is green against current shared baseline.
-6. Chat 6 performs targeted re-review and publishes `READY_FOR_DEPUTY1`.
-
-## Frozen worker candidates currently preserved
+Verified final worker set:
 
 - Chat 1: `55918486d49a28ac85bf83a95e9917e40add79e2`
 - Chat 2: `7311d95000d457e1010c95dbefe6ed0ad588203d`
 - Chat 3: `08e716161a8c9173b7583d6ad87c84c10ddc4221`
-- Chat 4: pending corrected final head after FIX_REQUIRED
+- Chat 4: `08beb9c45cdc1bbbcdebe220059a64288a880095`
 - Chat 5: `cdc5baceb281b657680d1e38cc49ea8094669ad8`
+
+All five are `PROVISIONALLY_ACCEPTED` by Chat 6 Stage 1.
+
+## Chat-4 correction evidence
+
+Side Chat 4B:
+
+- frozen head `9b37d023ea7b6355c752982e36b774c2fd96e358`
+- `SOLIDWORKS_SIDE_HANDOFF.md` present
+- exact FIX_REQUIRED delta contains the declared 13 side-owned files
+
+Primary Chat 4:
+
+- frozen head `08beb9c45cdc1bbbcdebe220059a64288a880095`
+- genuine Pass-3 `ORCHESTRATOR_HANDOFF.md` present
+- Side reconcile integrated without transferring final runtime-status authority to Side 4B
+- final MREA CI run `36632747977` SUCCESS
+
+Real Windows/SOLIDWORKS runtime remains `EXTERNAL_GATE_UNVERIFIED` / `REAL_HOST = UNVERIFIED` and must remain so until actual supported-host evidence exists.
 
 ## Shared baseline change during Stage 1
 
-Chat 6 repaired the canonical integration test on `main`:
+Chat 6 repaired the canonical Chat-3 -> Chat-4 integration test on `main` at:
 
 `1a54ef40f84119d7482d971deb1e58749bf657b0`
 
 Reason: Chat-6-owned test used stale `CADVerificationReport["dimensions"]`; canonical schema/code uses `items`.
 
-This emergency shared repair invalidated stale PR evidence, so all worker review PRs were reopened/created against the corrected baseline and rerun.
+Current `main` also contains Stage-1 orchestration records. Deputy 1 must start from the then-current `main`, not from the original Round-3 worker baseline.
 
-## Draft review PRs
+## Review PRs
 
 - #20 Chat 1
 - #21 Chat 2
 - #22 Chat 3
-- #23 Chat 4 primary — currently partial/FIX_REQUIRED
+- #23 Chat 4
 - #24 Chat 5
 
-Chat 6 must not merge these into `main` under the deputy-orchestrator protocol.
+These are review inputs. Chat 6 does not merge them directly under the deputy-orchestrator protocol.
 
-## Recommended Deputy 1 integration strategy
+## Deputy 1 integration target
 
-After Chat 4 is corrected, Chat 7 should independently review Stage 1 findings and build:
+Deputy 1 should independently review Stage-1 findings and build:
 
 `integration/pass-3-candidate`
 
-from the then-current accepted shared `main`.
+from current accepted shared `main`.
 
 Recommended logical integration order:
 
@@ -63,7 +73,7 @@ Chat 1
   -> Chat 5
 ```
 
-The exact Git merge order may be changed by Chat 7 if dependency/conflict analysis shows a safer order, but all five accepted worker SHAs must be explicitly recorded.
+The exact Git merge/cherry-pick strategy may be changed by Deputy 1 if conflict analysis shows a safer method, but the final candidate must explicitly record the exact accepted worker SHAs above.
 
 ## Required candidate gates
 
@@ -80,7 +90,7 @@ On `integration/pass-3-candidate`, require:
 - Integration Chat 3 -> Chat 4;
 - Integration Chat 4 -> Chat 5.
 
-Chat 7 should additionally create/execute the most complete available golden software flow:
+Deputy 1 should additionally create/execute the most complete available golden software flow:
 
 ```text
 Capture
@@ -96,12 +106,16 @@ Real Windows 11 + SOLIDWORKS 2026 COM execution may remain:
 
 `EXTERNAL_GATE_UNVERIFIED`
 
-It must not be converted to PASS by mocks, generic CAD tests, source presence or protocol-level evidence.
+It must not be converted to PASS by mocks, generic CAD tests, source presence, protocol-level evidence or synthetic runtime-input bundles.
 
-## Handoff to Deputy 1
+## Pass-4 isolation
 
-Chat 6 must not issue the Deputy-1 handoff while Chat 4 remains `FIX_REQUIRED`.
+Branches `chat-3/pass-4`, `chat-4/pass-4`, `chat-4b/pass-4` and `chat-5/pass-4` already exist remotely, but the official shared `main` does not contain the next round directive at the Stage-1 handoff point.
 
-Once corrected, Chat 6 will append a targeted review result identifying the exact final Chat-4 head and CI run, then mark Stage 1:
+Deputy 1 must **not** mix Pass-4 commits into the Round-3 integration candidate. Preserve them for later explicit orchestration.
 
-`READY_FOR_DEPUTY1`
+## Handoff status
+
+`ROUND_3_STAGE_1 = READY_FOR_DEPUTY1`
+
+Deputy 1 now owns independent integration-candidate construction and verification. Round 3 is not closed until the remaining deputy stage(s) required by the protocol complete successfully.

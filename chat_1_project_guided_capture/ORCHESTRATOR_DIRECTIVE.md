@@ -1,44 +1,83 @@
 # ORCHESTRATOR DIRECTIVE — Chat 1
-**Revision:** OD-2026-09-29-003  
+
+**Revision:** `OD-2026-09-30-004`  
 **Owner:** Chat 6  
-**Pass:** 3  
-**Branch:** `chat-1/pass-3`
+**Central round:** 4  
+**Worker target branch:** `chat-1/pass-4`
 
-Read before coding.
+Read before further work.
 
-## Accepted baseline
-Pass 2 is `ACCEPTED`. Perspective normalization/rectification is integrated in `main`. Clean reference evidence remains immutable. The real repository-level `Chat 1 -> Chat 2` integration gate is now canonical CI.
+## Accepted central baseline
 
-## Pass 3 priority
-Implement the first useful **guided capture quality baseline**.
+Round 3 is closed on the certified software baseline. Chat 1 Pass 3 is accepted in `main`.
 
-Required:
-- deterministic capture-quality analysis for blur/focus;
-- exposure clipping / underexposure-overexposure signal;
-- glare/highlight proxy;
-- framing/working-area quality where feasible with current architecture;
-- reuse calibration-marker visibility/quality where appropriate;
-- explicit internal acceptance result such as ACCEPT/WARN/REJECT with machine-readable reasons;
-- no conversion of image-quality inference into metric truth;
-- deterministic good/bad fixtures and tests;
-- keep CapturePackage v1 compatible unless Chat 6 approves a Change Request.
+Current Round-4 plan:
 
-## Canonical integration gates
-Your pass must keep green:
+`chat_6_orchestrator/PASS_4_PLAN_2026-09-30.md`
+
+## Observed Pass-4 state
+
+Observed branch head:
+
+`beed09508c8cba294b1e78d7b6b7f3226f72d734`
+
+Observed implementation includes immutable clean-reference recapture lineage and source/supersession relationships.
+
+Problem:
+
+`chat-1/pass-4` still contains an `ORCHESTRATOR_HANDOFF.md` that identifies Pass 3 / `chat-1/pass-3`.
+
+Therefore the current Pass-4 branch is not yet a protocol-valid frozen Stage-1 input.
+
+## OD-004 task
+
+Do **not** start another feature pass.
+
+Finish the existing Pass 4 as a reviewable worker result:
+
+1. inspect the current Pass-4 implementation against the accepted Round-3 baseline and current canonical contracts;
+2. correct only defects necessary for a truthful Pass-4 result;
+3. run the required Chat-1 slice and Chat1->Chat2 boundary gates against the current repository/shared baseline where possible;
+4. publish a new Pass-4 `ORCHESTRATOR_HANDOFF.md` that records:
+   - exact branch;
+   - exact implementation/pre-handoff SHA;
+   - CI run IDs/results;
+   - exact delivered scope;
+   - changed files;
+   - provenance/immutability invariants;
+   - known limitations;
+   - explicit freeze state;
+5. after that handoff commit, freeze `chat-1/pass-4`.
+
+## Required truth invariants
+
+- clean-reference recapture must be explicit lineage, not silent replacement;
+- measurement/reference provenance must remain attributable to the correct clean-reference generation;
+- existing verified physical facts must not be mutated by a later recapture;
+- `CapturePackage v1` compatibility must remain intact unless Chat 6 approves a Change Request;
+- no measurement, geometry or CAD ownership moves into Chat 1.
+
+## Required gates
+
+Keep green:
+
 - `Chat 1 / Capture`;
 - `Integration / Chat 1 -> Chat 2`;
-- shared contract checks.
+- canonical contracts/fixtures.
 
 ## Do not
-- implement measurement semantics, OCR or caliper interpretation;
-- move geometry ownership into Capture;
+
+- start Pass 5;
 - modify Chat-6-owned CI/shared integration tests;
 - modify `core/contracts` without approved CR;
-- commit directly to `main`.
+- merge to `main`;
+- claim Stage-1 acceptance before Chat 6 review.
 
-## Process
-Work only in `chat-1/pass-3`.
+## Completion state
 
-Finish by publishing `ORCHESTRATOR_HANDOFF.md`. **Handoff freezes the branch.** After handoff do not push any code or documentation, even to record later CI evidence, until Chat 6 explicitly returns `FIX_REQUIRED`.
+Expected final worker state:
 
-See `chat_6_orchestrator/PASS_3_PLAN_2026-09-29.md` and `DEVELOPMENT_WORKFLOW.md`.
+```text
+CHAT_1_PASS_4 = HANDOFF_PUBLISHED_AND_FROZEN
+ROUND_4_STAGE1_ACCEPTANCE = PENDING_CHAT6
+```

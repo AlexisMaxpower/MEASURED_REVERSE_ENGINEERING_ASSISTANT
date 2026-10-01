@@ -1,197 +1,126 @@
 # Chat 3 — Implementation State
 
-**Дата:** 2026-09-29  
+**Date:** 2026-09-30  
 **Repository:** `AlexisMaxpower/MEASURED_REVERSE_ENGINEERING_ASSISTANT`  
-**Active branch:** `chat-3/pass-2`  
+**Active branch:** `chat-3/pass-7`  
 **Role:** Chat 3 — Geometry & Semi-Automatic Sketch  
-**Active directive:** `OD-2026-09-29-002`  
-**Ring:** 2
+**Ring:** 7  
+**Authorization:** explicit user-requested continuation; no newer Chat 3 worker directive than OD-2026-09-29-003 was present on `main` when Ring 7 started.
 
-## Current status
+## Baseline
 
-Round 1 deterministic FRONT pipeline retained. Chat 6 identified the real Chat 2 → Chat 3 integration gap: Chat 2 legitimately emits canonical anchors in `IMAGE_PX`, while Ring 1 `CanonicalInputAdapter` accepted only `MAT_XY_MM`.
+Ring 7 branches from frozen Ring 6 head:
 
-Ring 2 closes that boundary before any OpenCV / primitive-extraction expansion.
+`28d4373b0e9cfdb25a1a833e9ca646c2a06f9d14`
 
-## Canonical inputs / output
+## Capabilities through Ring 6
 
-Inputs remain Integrator-owned:
+Chat 3 already provides:
 
-- `/core/contracts/mrea_contracts_v1.schema.json`;
-- `/core/contracts/POLICIES_V1.md`;
-- `CapturePackage v1`;
-- `MeasurementPackage v1`.
+- canonical CapturePackage / MeasurementPackage adapter;
+- `IMAGE_PX -> MAT_XY_MM` normalization;
+- POINT / LINE / CIRCLE / ARC models;
+- deterministic GeometryGraph;
+- measurement binding and geometry conflict visibility;
+- deterministic SketchPackage v1 generation;
+- OpenCV-backed LINE/CIRCLE/ARC extraction with `VISION_DETECTED` provenance;
+- fail-closed ambiguous geometry handling;
+- `ConstraintResolver` confidence, verified-measurement and redundancy gates;
+- COINCIDENT / HORIZONTAL / VERTICAL / PARALLEL / PERPENDICULAR / TANGENT / CONCENTRIC / EQUAL / SYMMETRIC candidates;
+- deterministic SVG Dimensioned View.
 
-Output remains:
+## Ring 7 — Constraint Satisfaction Diagnostics
 
-- `SketchPackage v1` in `MAT_XY_MM`.
+New module:
 
-Shared contracts/fixtures are not modified by Chat 3.
+`src/mrea_geometry/constraint_satisfaction.py`
 
-## Implemented through Ring 1
+Public API:
 
-- POINT / LINE / CIRCLE / ARC internal primitives;
-- `GeometryGraph`;
-- deterministic constraint candidates;
-- measurement binding;
-- verified-vs-derived conflict visibility;
-- canonical `SketchPackageBuilder`;
-- deterministic entity/dimension ordering;
-- exact FRONT golden comparison;
-- JSON Schema validation;
-- preservation of canonical `measurement_id` links.
+- `ConstraintSatisfaction`;
+- `ConstraintSatisfactionAnalyzer`.
 
-## Ring 2 coordinate normalization
+### Purpose
 
-`CanonicalInputAdapter` now supports both v1 coordinate spaces.
+A candidate relation is no longer publishable solely because detection once emitted it. Before canonical promotion, current geometry must still satisfy the relation within explicit tolerances.
 
-### MAT_XY_MM
+### Residuals
 
-- passed through unchanged;
-- does not require homography lookup.
+Normalized angular residual (`1e-3` default):
 
-### IMAGE_PX
+- HORIZONTAL;
+- VERTICAL;
+- PARALLEL;
+- PERPENDICULAR.
 
-Adapter:
+Linear residual (`0.05 mm` default):
 
-1. verifies anchor view;
-2. verifies `reference_frame_id` equals selected view clean-reference `artifact_id`;
-3. requires calibration with `coordinate_system = MAT_XY_MM`;
-4. validates exactly 9 finite homography coefficients;
-5. rejects degenerate 3x3 matrix;
-6. applies projective homogeneous transform;
-7. performs safe divide by `w`;
-8. rejects non-finite/degenerate output;
-9. returns internal `Point2D` in `MAT_XY_MM`.
+- COINCIDENT;
+- TANGENT;
+- CONCENTRIC;
+- EQUAL;
+- SYMMETRIC.
 
-No scale is guessed.
+### Resolver order
 
-## Traceability
+1. entity existence;
+2. confidence gate;
+3. geometric satisfaction;
+4. redundancy filter;
+5. verified measurement conflict checks;
+6. canonical publication.
 
-Internal `AnchorRef` now retains:
+Unsatisfied candidates become canonical unresolved with code:
 
-- `anchor_id`;
-- normalized point;
-- `feature_id`;
-- `reference_frame_id`;
-- `source_coordinate_space`.
+`UNSATISFIED_CONSTRAINT`
 
-Physical `measurement_id`, value/unit, `verified` and source/provenance remain unchanged by coordinate normalization.
+No geometry is moved and no verified measurement is changed.
 
-## Chat 2 integration specimen
+## Runtime / dependencies
 
-Added:
+Package version:
 
-`tests/fixtures/internal/chat2_image_px_measurement_package.json`
+`0.7.0`
 
-It uses the same essential wire characteristics as actual Chat 2 canonical adapter output:
-
-- `IMAGE_PX`;
-- `feature_id = null`;
-- clean-reference `reference_frame_id`;
-- verified `MANUAL_MEASURED` measurement.
-
-The specimen itself validates against canonical `MeasurementPackage` schema.
-
-## Acceptance path now implemented
-
-```text
-Chat-2-style IMAGE_PX MeasurementPackage
-        +
-CapturePackage with calibration/homography
-        ↓
-CanonicalInputAdapter
-        ↓
-MAT_XY_MM AnchorRef / MeasurementRef
-        ↓
-GeometryPipeline
-        ↓
-SketchPackageBuilder
-        ↓
-schema-valid deterministic SketchPackage v1
-```
+New Ring 7 dependencies: **none**.
 
 ## Verification
 
-Executed full Chat 3 suite against a reconstructed local repository context using exact current Integrator contract blobs:
+GitHub Actions implementation run:
 
-```text
-python -m pytest -q
-```
+- run: `36645593928`;
+- implementation head: `8527a4ad9c711b18c6fc1bcd61dbfe537c6d53d5`;
+- Chat 3 / Geometry: **56 passed in 0.44s**;
+- Contracts: SUCCESS;
+- Chat 2 -> Chat 3: SUCCESS;
+- Chat 4 generic CAD: SUCCESS.
 
-Result:
-
-```text
-20 passed in 0.85s
-```
-
-Inventory:
-
-- 6 Phase 1 geometry tests;
-- 4 canonical FRONT tests;
-- 10 Ring 2 coordinate-normalization tests.
-
-Also executed:
-
-```text
-python -m compileall -q src tests
-```
-
-Result: success.
-
-## Ring 2 explicit failure behavior
-
-Rejected explicitly:
-
-- wrong clean-reference frame;
-- missing calibration for IMAGE_PX;
-- wrong calibration target coordinate system;
-- wrong homography length;
-- non-finite coefficients;
-- degenerate matrix;
-- zero/degenerate homogeneous divisor;
-- non-finite homogeneous output;
-- unsupported coordinate space.
-
-## Not implemented / intentionally deferred
-
-Per active directive, still deferred:
-
-- raw image contour extraction;
-- OpenCV primitive detector;
-- detector breadth beyond deterministic fixture output;
-- general `ConstraintResolver`;
-- inferred-constraint promotion policy;
-- Dimensioned View renderer;
-- multi-view geometry;
-- CAD runtime integration/read-back.
+The worker branch's Chat 3 -> Chat 4 gate still inherits the old shared test lookup `cad_verification_report["dimensions"]`; current `main` already uses canonical `cad_verification_report["items"]`. Ring 7 does not modify shared integration infrastructure.
 
 ## Shared ownership
 
-Chat 3 does not modify:
+Ring 7 modifies no:
 
-- `/core/contracts/`;
-- `/core/domain/shared/`;
-- `/tests/fixtures/contracts/`;
-- directories owned by Chat 1/2/4/5/6.
+- shared contracts;
+- canonical shared fixtures;
+- repository integration tests;
+- CI workflow;
+- other chat directories.
 
-## Current gate
+## Deferred Chat 3 work
 
-Requested from Chat 6:
+- numerical constraint solving/entity movement;
+- global over-constrained-system diagnosis;
+- uncertainty-aware/noisy-vision tolerance models;
+- multi-view geometry relationships;
+- CAD-native logic.
 
-```text
-Chat 2 IMAGE_PX output
-→ Chat 3 homography normalization
-→ MAT_XY_MM geometry pipeline
-→ schema-valid SketchPackage
-```
+## Current status
 
-Status from Chat 3 side: `READY_FOR_RING2_INTEGRATOR_GATE`.
+`READY_FOR_RING7_INTEGRATOR_REVIEW`
 
-OpenCV / primitive extraction must not start until Chat 6 accepts this gate.
+## Ring 7 documents
 
-## Ring 2 documents
-
-- `BUILD_REUSE_CHECK_RING2_COORDINATE_NORMALIZATION.md`;
-- `IMPLEMENTATION_REPORT_RING2_COORDINATE_NORMALIZATION_2026-09-29.md`;
+- `BUILD_REUSE_CHECK_RING7_CONSTRAINT_SATISFACTION.md`;
+- `IMPLEMENTATION_REPORT_RING7_CONSTRAINT_SATISFACTION_2026-09-30.md`;
 - `ORCHESTRATOR_HANDOFF.md`.

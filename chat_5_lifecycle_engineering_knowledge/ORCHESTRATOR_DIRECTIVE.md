@@ -1,42 +1,78 @@
 # ORCHESTRATOR DIRECTIVE — Chat 5
-**Revision:** OD-2026-09-29-003  
+
+**Revision:** `OD-2026-09-30-004`  
 **Owner:** Chat 6  
-**Pass:** 3  
-**Branch:** `chat-5/pass-3`
+**Central round:** 4  
+**Selected worker cut:** `chat-5/pass-8` @ `82e2203aaeb69ee1fe9f89fd42d0aea451b8690f`
 
-## Accepted baseline
-Pass 2 is `ACCEPTED`. CAD verification now controls manufacturing eligibility and the real `Chat 4 -> Chat 5` integration gate is green on accepted `main`.
+## Accepted central baseline
 
-## Pass 3 priority
-Extend lifecycle to the **physical manufactured part instance** and its real-world use.
+Round 3 is closed. Chat 5 Pass 3 is accepted in `main`.
 
-Required:
-- introduce physical part instance identity tied to revision and manufacturing record;
-- deterministic lifecycle transitions for manufactured, installed, tested, active/in-service, failed, removed and replaced/superseded where appropriate;
-- installation must identify equipment/position or equivalent location context;
-- preserve failure evidence and relationship to the exact physical instance and revision;
-- explicitly reject invalid transitions;
-- keep CAD verification/manufacturing eligibility invariant intact;
-- add deterministic state-transition and timeline tests;
-- keep facts structured; no AI analysis in this pass.
+Round-4 plan:
 
-## Canonical integration gates
-Your pass must keep green:
+`chat_6_orchestrator/PASS_4_PLAN_2026-09-30.md`
+
+## Selected cumulative input
+
+Chat 6 selects the frozen `chat-5/pass-8` cumulative branch for Round-4 Stage-1 review.
+
+The cumulative worker stack advances lifecycle/persistence/read-only engineering knowledge through snapshot-bound deterministic pagination.
+
+The Pass-8 handoff is treated as the freeze point pending independent Chat-6 review.
+
+## OD-004 task
+
+No new normal worker implementation is requested now.
+
+Keep `chat-5/pass-8` frozen unless Chat 6 returns explicit `FIX_REQUIRED`.
+
+Chat 6 will independently review and replay only accepted Chat-5-owned changes onto the current shared baseline.
+
+## Required truth invariants under review
+
+- manufacturing eligibility remains derived from canonical CAD verification facts;
+- CAD mismatch/unverified states cannot be promoted to eligible by lifecycle or knowledge code;
+- physical-instance lifecycle transitions remain deterministic and fail closed;
+- failure evidence remains tied to exact physical instances/revisions;
+- read-only/knowledge projections operate on committed factual lifecycle state;
+- query aggregation/pagination does not invent engineering conclusions or quality rankings;
+- snapshot-bound cursors cannot silently continue against another snapshot/filter set;
+- historical facts are not silently rewritten by later projections.
+
+## Round-4 boundary focus
+
+Chat4->Chat5 must prove:
+
+```text
+CAD VERIFIED/MISMATCH/UNVERIFIED
+-> manufacturing eligibility
+-> physical lifecycle facts
+-> read-only/knowledge projections
+```
+
+Vendor success alone is not sufficient input for manufacturing eligibility.
+
+## Required gates
+
+During central review/replay the selected cut must keep green:
+
 - `Chat 5 / Lifecycle`;
 - `Integration / Chat 4 -> Chat 5`;
-- shared contract checks.
+- canonical contracts/fixtures.
 
 ## Do not
-- import SOLIDWORKS-specific types;
-- bypass failed/unverified CAD eligibility;
-- add AI conclusions before physical lifecycle facts are stable;
+
+- push Pass 9 work onto the selected frozen cut;
+- import SOLIDWORKS-specific types into lifecycle/knowledge models;
+- convert factual counts/patterns into unsupported recommendations or rankings;
 - modify Chat-6-owned CI/shared integration tests;
-- change canonical shared contracts without approved CR;
-- commit directly to `main`.
+- change canonical contracts without approved CR;
+- merge directly to `main`.
 
-## Process
-Work only in `chat-5/pass-3`.
+## Current state
 
-Finish with `ORCHESTRATOR_HANDOFF.md`. **Handoff freezes the branch.** No post-handoff commits until Chat 6 explicitly returns `FIX_REQUIRED`.
-
-See `chat_6_orchestrator/PASS_3_PLAN_2026-09-29.md` and `DEVELOPMENT_WORKFLOW.md`.
+```text
+CHAT_5_PASS_8 = FROZEN_SELECTED_FOR_ROUND4_STAGE1
+ROUND_4_STAGE1_ACCEPTANCE = PENDING_CHAT6
+```

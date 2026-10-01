@@ -1,6 +1,10 @@
 """Deterministic geometry core and canonical v1 bridge owned by MREA Chat 3."""
 
+from .constraint_confidence import ConstraintConfidence, ConstraintConfidenceModel
+from .constraint_satisfaction import ConstraintSatisfaction, ConstraintSatisfactionAnalyzer
+from .constraints import ConstraintIssue, ConstraintResolution, ConstraintResolver, ResolvedConstraint
 from .contracts import CanonicalGeometryInput, CanonicalInputAdapter
+from .dimensioned_view import DimensionedViewArtifact, DimensionedViewRenderer, ReferenceImageLayer
 from .core import (
     AnchorEntityMatcher,
     ConstraintCandidateEngine,
@@ -24,6 +28,8 @@ from .models import (
     UnresolvedBinding,
 )
 from .sketch_package import SketchPackageBuilder
+from .vision import CandidateIssue, GeometryExtractionResult, ImageGeometryExtractor
+from .vision_pipeline import VisionGeometryPipeline
 
 __all__ = [
     "AnchorEntityMatcher",
@@ -31,20 +37,35 @@ __all__ = [
     "Arc",
     "CanonicalGeometryInput",
     "CanonicalInputAdapter",
+    "CandidateIssue",
     "Circle",
     "ConstraintCandidate",
     "ConstraintCandidateEngine",
+    "ConstraintConfidence",
+    "ConstraintConfidenceModel",
+    "ConstraintIssue",
+    "ConstraintResolution",
+    "ConstraintResolver",
+    "ConstraintSatisfaction",
+    "ConstraintSatisfactionAnalyzer",
     "DimensionBinder",
+    "DimensionedViewArtifact",
+    "DimensionedViewRenderer",
     "DimensionBinding",
     "GeometryConflict",
     "GeometryConflictDetector",
     "GeometryDraft",
     "GeometryGraph",
+    "GeometryExtractionResult",
     "GeometryPipeline",
+    "ImageGeometryExtractor",
     "Line",
     "MeasurementRef",
     "Point2D",
     "PointEntity",
+    "ReferenceImageLayer",
+    "ResolvedConstraint",
     "SketchPackageBuilder",
     "UnresolvedBinding",
+    "VisionGeometryPipeline",
 ]

@@ -1,114 +1,150 @@
 # MREA Orchestration State
 
 **Owner:** Chat 6 — Orchestrator / Repository Integrator  
-**Directive revision:** `OD-2026-09-29-003`  
+**Directive revision:** `OD-2026-09-30-004`  
 **Contract baseline:** `mrea.contracts.v1`  
-**Status:** Round 2 ACCEPTED — software integration GREEN; Pass 3 preparation active
+**Status:** `ROUND_4_BLOCKED_BY_CHAT3_CHAT5_FIX_REQUIRED`
 
-## Source-of-truth hierarchy
-1. Current accepted repository state on `main`.
-2. Canonical shared contracts in `core/contracts/`.
-3. Canonical fixtures and Chat-6 integration tests under `tests/`.
-4. Chat 6 ADR/review/workflow/CI documents.
-5. Product SSOT v0.1 plus orchestration addendum.
-6. Slice-local documentation.
+## Final Review finding
 
-If slice-local documentation conflicts with canonical contracts or an active Chat 6 directive, the canonical/Chat 6 source wins.
+Chat 8 returned:
 
-## Round 2 review
+`FINAL_REVIEW_FIX_REQUIRED`
 
-Detailed report:
+Finding:
 
-`chat_6_orchestrator/ROUND_2_REVIEW_2026-09-29.md`
+`chat_8_deputy_orchestrator/ROUND_4_FINAL_REVIEW_FINDING_001_CROSS_SLICE_COVERAGE.md`
 
-Final accepted product-code main SHA for Round 2:
+Chat 6 accepted the finding and added Round-4-specific shared boundary/golden-path coverage.
 
-`d999af158310d3d872098a42691b2edc3ff5ebcb`
+## Corrected shared infrastructure
 
-Final assembled Round 2 CI run:
-
-`36611690909` — `success`
-
-Overall verdict:
-
-**GREEN FOR SOFTWARE INTEGRATION — ROUND 2 ACCEPTED**
-
-## Current slice status
-
-- Chat 1: Pass 2 `ACCEPTED`. Perspective-normalized derived reference/rectification baseline integrated.
-- Chat 2: Pass 2 `ACCEPTED`. Raw `IMAGE_PX` measurement/evidence boundary integrated.
-- Chat 3: Pass 2 `ACCEPTED`. Round 1 IMAGE_PX -> MAT_XY_MM integration blocker fixed and integrated.
-- Chat 4: Pass 2 `ACCEPTED_WITH_RUNTIME_GATE`. Generic CAD + SOLIDWORKS-agent architecture integrated; real SOLIDWORKS 2026 host execution remains `UNVERIFIED`.
-- Chat 5: Pass 2 `ACCEPTED`. CAD verification -> lifecycle/manufacturing eligibility linkage integrated.
-
-## Integration status
+Shared code/CI baseline before the control-document commit containing this state:
 
 ```text
-Chat 1 -> Chat 2    PASS / canonical-static; dedicated real CI gate still required
-Chat 2 -> Chat 3    PASS / automated on final main
-Chat 3 -> Chat 4    PASS / canonical-generic; dedicated real CI gate still required
-Chat 4 -> Chat 5    PASS / automated on final main
+main: 6157c7154e3cd08d3e4d60b05c65b5445888ba24
+tree: 0cb7b15abb1553654f009be6dbbe73029e046a88
 ```
 
-## CI baseline
+Evidence:
 
-Canonical workflow:
+```text
+36751841476  MREA Round 4 Truth CI  SUCCESS
+36751841522  MREA CI                SUCCESS
+```
 
-`.github/workflows/ci.yml`
+Added shared gates:
 
-Policy:
+- `tests/integration/test_round4_chat1_to_chat2_truth.py`
+- `tests/integration/test_round4_chat2_to_chat3_truth.py`
+- `tests/integration/test_round4_chat3_to_chat4_truth.py`
+- `tests/integration/test_round4_chat4_to_chat5_truth.py`
+- `tests/integration/test_round4_golden_path.py`
+- `.github/workflows/round4_truth.yml`
 
-`chat_6_orchestrator/CI_POLICY.md`
+## Diagnostic replay candidate
 
-Current independent checks include:
+Same accepted Round-4 worker replay content was rebuilt over corrected main:
 
-- canonical contract/fixture validation;
-- Chat 1 tests;
-- Chat 2 tests;
-- Chat 3 tests;
-- Chat 4 generic CAD tests;
-- Chat 5 tests;
-- real Chat 2 -> Chat 3 integration gate;
-- real Chat 4 -> Chat 5 integration gate;
-- full post-merge run on `main`.
+```text
+branch: integration/pass-4-candidate
+base:   6157c7154e3cd08d3e4d60b05c65b5445888ba24
+SHA:    b5fdcd6324efd1396a3d57a28fc11e0dd0ba4afd
+tree:   feaa4de6f84bda514e92d5bbf9939f1187da35a3
+```
 
-A worker-local claim is not sufficient when the same gate is executable in GitHub Actions.
+Regression:
 
-## Active architectural decisions
+`36752208418` — `MREA CI` — `SUCCESS`
 
-- `ADR_001_SOLIDWORKS_2026_CAD_AGENT.md` defines the SOLIDWORKS adapter environment.
-- Pass 2+ uses per-chat worker branches and Chat 6-controlled integration.
-- Pass 3+ uses branch freeze after handoff; see `DEVELOPMENT_WORKFLOW.md`.
-- Chat 6 shared infrastructure must be complete before worker branches are created.
+Round-4 truth:
 
-## Shared rules
+`36752208521` — `FAILURE`
 
-- IDs are opaque non-empty strings. UUIDs are recommended but not required by wire contracts.
-- Timestamps are UTC/RFC3339.
-- v1 length unit is `mm`; angle unit is `deg`.
-- Verified physical measurements are never silently modified by CV/AI.
-- Raw measurement anchors may legitimately remain `IMAGE_PX` until geometry normalization uses calibration to obtain `MAT_XY_MM`.
-- CAD transfer verification is numerical transfer verification, not manufacturing tolerance verification.
-- Default CAD transfer tolerance: `1e-6 mm` / `1e-6 deg`.
-- SketchPackage v1 mandatory geometry subset: POINT, LINE, CIRCLE, ARC.
-- Unsupported/ambiguous geometry is explicit in `unresolved`.
-- Worker chats do not modify canonical shared contracts without a Chat 6-approved Change Request.
-- Publishing `ORCHESTRATOR_HANDOFF.md` freezes the worker branch until Chat 6 verdict.
+The candidate is diagnostic evidence only and is not authorized for merge/final acceptance.
 
-## SOLIDWORKS runtime gate
+## Boundary results
 
-Generic CAD logic is independently verified in GitHub-hosted CI.
+```text
+Round 4 Chat 1 -> Chat 2 truth  SUCCESS
+Round 4 Chat 2 -> Chat 3 truth  FAILURE
+Round 4 Chat 3 -> Chat 4 truth  SUCCESS
+Round 4 Chat 4 -> Chat 5 truth  FAILURE
+Round 4 golden path             SKIPPED (blocked by failed dependencies)
+```
 
-Real SOLIDWORKS 2026 COM integration remains a separate environment gate because GitHub-hosted runners do not provide installed SOLIDWORKS. It remains `UNVERIFIED` until a controlled Windows 11 + SOLIDWORKS 2026 golden run produces evidence.
+## Confirmed blocker A — Chat 3
 
-## Pass 3 orchestration priorities
+Canonical physical uncertainty from Chat 2 is silently lost by Chat 3 normalization/binding.
 
-1. Add real Chat 1 -> Chat 2 automated boundary coverage.
-2. Add real Chat 3 -> Chat 4 automated boundary coverage.
-3. Build a complete golden software path across the currently implemented slices.
-4. Advance each worker slice without weakening provenance/fail-closed rules.
-5. Prepare, but do not fake, the real SOLIDWORKS host validation path.
+Observed failure:
 
-## Change control
+```text
+MeasurementPackage uncertainty = 0.5
+MeasurementRef has no uncertainty
+```
 
-Any backward-incompatible shared contract change requires a Change Request to Chat 6. Slice-local internal models may evolve independently as long as adapters preserve canonical contracts and active integration invariants.
+Action:
+
+`chat_3_geometry_semi_automatic_sketch/ORCHESTRATOR_FIX_REQUIRED_ROUND4_001.md`
+
+`chat-3/pass-8` is explicitly reopened only for that correction.
+
+## Confirmed blocker B — Chat 5
+
+Chat 5 cannot consume Chat-4 runtime evidence/status.
+
+Observed failure:
+
+```text
+CADRevisionPreparationService.prepare()
+got an unexpected keyword argument 'runtime_evidence'
+```
+
+Therefore runtime `UNVERIFIED` cannot currently be persisted/enforced as a manufacturing blocker for runtime-gated CAD origins.
+
+Action:
+
+`chat_5_lifecycle_engineering_knowledge/ORCHESTRATOR_FIX_REQUIRED_ROUND4_001.md`
+
+`chat-5/pass-8` is explicitly reopened only for that correction.
+
+## Frozen slices not reopened
+
+```text
+Chat 1  chat-1/pass-4 @ a7d607f8cdd281749ae40529de15c2d84dfda78e  ACCEPTED / FROZEN
+Chat 2  chat-2/pass-6 @ 539d58567046fd29ccf2d42b629227ffe8da6546  ACCEPTED / FROZEN
+Chat 4  chat-4/pass-7 @ 61f37a4dd46921b7fe9145bcbe5242bc3f6417b3  ACCEPTED / FROZEN
+```
+
+Chat 3 previous frozen handoff:
+
+`d786e1d49b5c8f2837a3ce936f7f1c0d93336d49`
+
+Chat 5 previous frozen handoff:
+
+`82e2203aaeb69ee1fe9f89fd42d0aea451b8690f`
+
+## Next state transition
+
+```text
+CHAT3_FIX_REQUIRED + CHAT5_FIX_REQUIRED
+    -> corrected worker re-handoffs
+    -> Chat6 independent review
+    -> replay corrected Chat3/Chat5 slice content over current shared main
+    -> MREA CI SUCCESS
+    -> all Round4 Truth boundary jobs SUCCESS
+    -> Round4 golden path ACTUALLY EXECUTED + SUCCESS
+    -> new exact candidate to Chat8
+    -> Chat8 Final Review
+```
+
+No merge to main is authorized before Chat 8 returns an exact-SHA acceptance verdict.
+
+## External environment truth
+
+```text
+REAL_SOLIDWORKS_2026_HOST = EXTERNAL_GATE_UNVERIFIED
+PRODUCTION_CSHARP_INTEROP_BUILD = UNVERIFIED
+NATIVE_SLDPRT_GENERATION_READBACK = UNVERIFIED
+```

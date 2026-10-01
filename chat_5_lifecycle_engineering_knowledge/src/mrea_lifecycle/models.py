@@ -18,7 +18,7 @@ class LifecycleEventType(str, Enum):
 
 
 class LifecycleState(str, Enum):
-    """Internal projection; not a shared contract."""
+    """Revision-level internal projection; not a shared contract."""
 
     DRAFT = "DRAFT"
     MANUFACTURED = "MANUFACTURED"
@@ -37,6 +37,45 @@ class CADVerificationStatus(str, Enum):
     """Internal snapshot of canonical CADVerificationReport.overall_status."""
 
     VERIFIED = "VERIFIED"
+    FAILED = "FAILED"
+
+
+class CADRuntimeStatus(str, Enum):
+    """Vendor-neutral snapshot of explicit CAD runtime evidence status."""
+
+    VERIFIED = "VERIFIED"
+    FAILED = "FAILED"
+    UNVERIFIED = "UNVERIFIED"
+
+
+class PhysicalPartState(str, Enum):
+    """Internal state of one real manufactured part instance."""
+
+    MANUFACTURED = "MANUFACTURED"
+    INSTALLED = "INSTALLED"
+    TESTED = "TESTED"
+    ACTIVE = "ACTIVE"
+    FAILED = "FAILED"
+    REMOVED = "REMOVED"
+    SUPERSEDED = "SUPERSEDED"
+
+
+class PhysicalLifecycleEventType(str, Enum):
+    """Internal physical-instance event vocabulary; never exported as LifecycleEvent v1."""
+
+    MANUFACTURED = "MANUFACTURED"
+    INSTALLED = "INSTALLED"
+    TESTED = "TESTED"
+    ACTIVATED = "ACTIVATED"
+    FAILED = "FAILED"
+    REMOVED = "REMOVED"
+    SUPERSEDED = "SUPERSEDED"
+
+
+class PhysicalTestOutcome(str, Enum):
+    """Explicit result used by the physical-instance activation gate."""
+
+    PASSED = "PASSED"
     FAILED = "FAILED"
 
 
@@ -62,6 +101,9 @@ class CADRevisionLink:
     cad_adapter: str
     verification_status: CADVerificationStatus
     artifacts: Tuple[CADArtifactReference, ...] = ()
+    runtime_status: Optional[CADRuntimeStatus] = None
+    runtime_evidence_schema_version: Optional[str] = None
+    runtime_real_host_executed: Optional[bool] = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -93,6 +135,22 @@ class ManufacturingRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class PhysicalPartInstance:
+    """Identity snapshot for one real item produced by one manufacturing record."""
+
+    instance_id: str
+    part_id: str
+    revision_id: str
+    manufacturing_id: str
+    material: str
+    method: str
+    manufactured_at: datetime
+    batch: Optional[str] = None
+    machine: Optional[str] = None
+    print_profile: Optional[str] = None
+
+
+@dataclass(frozen=True, slots=True)
 class Installation:
     installation_id: str
     revision_id: str
@@ -102,6 +160,7 @@ class Installation:
     installed_at: datetime
     technician: Optional[str] = None
     notes: Optional[str] = None
+    instance_id: Optional[str] = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,6 +175,7 @@ class TestRecord:
     manufacturing_id: Optional[str] = None
     installation_id: Optional[str] = None
     artifact_ids: Tuple[str, ...] = ()
+    instance_id: Optional[str] = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -132,6 +192,7 @@ class FailureRecord:
     estimated_cause: Optional[str] = None
     confirmed_cause: Optional[str] = None
     related_feature: Optional[str] = None
+    instance_id: Optional[str] = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -145,3 +206,24 @@ class LifecycleEvent:
     installation_id: Optional[str] = None
     test_id: Optional[str] = None
     failure_id: Optional[str] = None
+
+
+@dataclass(frozen=True, slots=True)
+class PhysicalLifecycleEvent:
+    """Internal event for one concrete manufactured instance."""
+
+    event_id: str
+    event_type: PhysicalLifecycleEventType
+    occurred_at: datetime
+    sequence: int
+    instance_id: str
+    revision_id: str
+    manufacturing_id: str
+    installation_id: Optional[str] = None
+    test_id: Optional[str] = None
+    failure_id: Optional[str] = None
+    equipment_id: Optional[str] = None
+    position: Optional[str] = None
+    test_outcome: Optional[PhysicalTestOutcome] = None
+    replacement_instance_id: Optional[str] = None
+    notes: Optional[str] = None
