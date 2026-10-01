@@ -27,6 +27,7 @@ HOST_BOUNDARY_FILES = (
     "chat_4_cad_bridge_verification/src/mrea_cad_bridge/solidworks_agent.py",
     "chat_4_cad_bridge_verification/src/mrea_cad_bridge/solidworks_capabilities.py",
     "chat_4_cad_bridge_verification/src/mrea_cad_bridge/solidworks_constraint_handshake.py",
+    "chat_4_cad_bridge_verification/src/mrea_cad_bridge/solidworks_dimension_capabilities.py",
     "chat_4_cad_bridge_verification/src/mrea_cad_bridge/solidworks_worker_handshake.py",
     "chat_4_cad_bridge_verification/src/mrea_cad_bridge/solidworks_runtime_inputs.py",
     "chat_4_cad_bridge_verification/src/mrea_cad_bridge/runtime_evidence.py",

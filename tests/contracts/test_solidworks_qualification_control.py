@@ -57,6 +57,18 @@ def test_qualification_finalizer_is_python_syntax_valid() -> None:
     compile(source, relative, "exec")
 
 
+def test_host_boundary_fingerprint_covers_dimension_shape_capability_contract() -> None:
+    finalizer = _read("chat_4_cad_bridge_verification/scripts/finalize_solidworks_qualification.py")
+    assert (
+        '"chat_4_cad_bridge_verification/src/mrea_cad_bridge/solidworks_dimension_capabilities.py"'
+        in finalizer
+    )
+    assert (
+        '"chat_4_cad_bridge_verification/src/mrea_cad_bridge/solidworks_worker_handshake.py"'
+        in finalizer
+    )
+
+
 def test_one_shot_host_script_freshly_builds_runs_host_and_finalizes() -> None:
     script = _read("chat_4_cad_bridge_verification/scripts/qualify_solidworks_host.ps1")
     required_fragments = (

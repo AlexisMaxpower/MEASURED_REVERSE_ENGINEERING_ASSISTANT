@@ -3,120 +3,95 @@
 ## Snapshot
 
 - Date: **2026-10-01**
-- Branch: `chat-5/pass-12`
+- Branch: `chat-5/pass-13`
 - Slice: **Lifecycle & Engineering Knowledge**
-- Authorization: **direct user instruction — Pass 12**
-- Central baseline checked before work: `main` @ `c888704b37e88b68c055f1095e6e9a4fc3650f7e`
-- Central state at start: **Round 11 closed/accepted; Chat 5 Pass 11 integrated/green; next full worker pass ready**
-- Tested implementation SHA: `0e4b2df0b144fe7116b7e94141be85266a0820fc`
-- MREA CI: `36802306777` — **SUCCESS**
-- Chat-5 test result: **72 passed in 11.64s**
-- State: **Pass 12 implementation verified; documentation published; final handoff/freeze pending**
+- Authorization: **direct user instruction — Pass 13**
+- Central baseline checked before work: `main` @ `4edde5c644755734a2ccf6e8f1c1b6ab9a63424d`
+- Central state at start: **Round 12 closed/accepted; next full worker pass ready**
+- Tested implementation SHA: `a26c1d8f6927e3ebdfcf69d7f759893cd7b139bd`
+- MREA CI: `36806176020` — **SUCCESS**
+- Chat-5 test result: **73 passed in 3.05s**
+- State: **Pass 13 implementation verified; documentation published; final handoff/freeze pending**
 
 ## Baseline discipline
 
-Pass 12 was branched directly from the then-current shared `main` rather than from `chat-5/pass-11` history.
+Pass 13 was branched directly from the then-current shared `main`. No historical Chat-5 worker branch was used as a baseline.
 
-This preserves central Round-11 integration/control changes and prevents a worker-local replay from overwriting newer shared state.
+All implementation changes remain under `chat_5_lifecycle_engineering_knowledge/`.
 
-No file outside `chat_5_lifecycle_engineering_knowledge/` is modified by Pass 12.
+## Root cause closed in Pass 13
 
-## Preserved truths
-
-Unchanged:
-
-- revision/manufacturing/physical-instance lifecycle semantics;
-- Round-4 numerical-vs-runtime verification separation;
-- runtime fail-closed manufacturing eligibility;
-- authoritative SQLite snapshot + normalized relational projection;
-- stale-writer protection and transactional rollback;
-- backup/restore/read-only consistency checks;
-- deterministic engineering knowledge semantics;
-- v2 keyset cursor ordering/fingerprint/snapshot binding;
-- v1 cursor continuity;
-- GET-only HTTP surface and optional HMAC cursor wrapper;
-- shared canonical contracts.
-
-## Pass 12 architecture
-
-### Schema migration v4
-
-`SQLITE_RELATIONAL_SCHEMA_VERSION` is now `4`.
-
-Migration `materialized_engineering_knowledge` adds:
+`SQLiteLifecycleReadOnlySession` previously validated this invariant only at open time:
 
 ```text
-lifecycle_revision_outcomes_materialized
-lifecycle_failure_patterns_materialized
+authoritative snapshot version == normalized read-model version
 ```
 
-Migration invalidates the previous read-model version (`snapshot_version = -1`) so opening an existing v3 database deterministically rebuilds the normalized projection and the new aggregates before it can be served as current.
+The underlying SQLite handle used autocommit. Across separate SELECT statements, an already-open connection could observe a later writer commit. The Python session object would still retain its old `snapshot_version`, so a later knowledge/lifecycle query could return newer rows under an older generation label.
 
-### Atomic refresh
+That is incompatible with the existing snapshot-bound cursor/read contract.
 
-The materialized tables are refreshed by a SQLite trigger attached to the publication update of `lifecycle_read_model_meta.snapshot_version`.
+## Pass 13 architecture
 
-Existing persistence order is preserved:
+### Snapshot-guarded connection facade
 
-```text
-authoritative snapshot write
-→ normalized read-model replace
-→ publish read_model snapshot_version
-→ trigger rebuilds materialized aggregates
-→ transaction commit
-```
+The session now injects `_SnapshotGuardedConnection` into both SQL repository surfaces.
 
-The trigger executes inside the same transaction. There is no separately committed cache epoch and no possibility for `SQLiteLifecycleReadOnlySession` to accept a materialized generation different from the committed normalized snapshot generation.
+For every repository `execute()` it validates:
 
-### Materialized repository
+- lifecycle snapshot schema version;
+- authoritative `lifecycle_store.version`;
+- `lifecycle_read_model_meta.snapshot_version`;
+- current relational migration version.
 
-Added `SQLiteMaterializedEngineeringKnowledgeRepository`, extending the existing keyset repository rather than replacing factual definitions.
+The metadata must still equal the generation accepted when the session opened.
 
-Materialized paths:
+### Post-fetch validation
 
-- `revision_outcomes()`;
-- `revision_outcomes_page()` for new/v2 traversal;
-- `failure_patterns()`;
-- `failure_patterns_page()` for new/v2 traversal.
+`_SnapshotGuardedCursor` checks the same generation after `fetchone()` and `fetchall()`.
 
-Unchanged paths remain inherited.
+This closes the window where a generation could advance after the pre-statement check but before rows are returned to the caller. Drift raises `LifecycleReadOnlyStaleError`; callers must use `refresh()` or open a new session.
 
-### Legacy cursor compatibility
+### No long-lived read transaction
 
-For `mrea.knowledge-cursor.v1`, the materialized repository delegates to the exact previous raw OFFSET implementation. This is deliberate: issued cursors retain historical execution/order semantics instead of being silently translated into a different continuation model.
+Pass 13 does not pin the session with `BEGIN`.
 
-New/no-cursor traversal emits/uses v2 state against materialized rows.
+Reason: the current store does not require WAL mode. In the default rollback-journal model, keeping a read transaction open across application calls can block writer commit. The guard keeps completed reads short and lets the writer advance; the old session then fails closed on its next read.
 
-## Semantic equivalence checks
+### No schema / contract change
 
-`tests/test_materialized_knowledge.py` verifies:
+No SQLite migration is added. `SQLITE_RELATIONAL_SCHEMA_VERSION` remains `4`.
 
-1. materialized revision outcomes equal the pre-existing raw aggregate semantics;
-2. materialized failure patterns equal the pre-existing raw aggregate semantics;
-3. GLOBAL, PART and REVISION scopes are generated;
-4. new/v2 pages read materialized tables and do not perform raw grouped aggregation;
-5. v1 failure-pattern cursor remains on historical raw OFFSET path;
-6. a later lifecycle commit atomically refreshes aggregate counts and snapshot version.
+No shared contract, canonical fixture, HTTP schema, cursor encoding, lifecycle domain rule or manufacturing eligibility rule changes.
 
-Existing Pass-10.1 SQL-shape regression was retargeted from the old raw revision table alias to the new materialized execution surface while preserving the original invariant: v2 continuation has key predicates and no OFFSET.
+## Regression coverage
+
+`tests/test_read_only_snapshot_guard.py` verifies one open session across an external commit:
+
+1. session opens on R1 and reads both lifecycle query and materialized knowledge surfaces;
+2. a separate writer successfully commits R2 while the reader object remains open;
+3. the old session rejects both query surfaces with `LifecycleReadOnlyStaleError`;
+4. the cached session generation does not silently advance;
+5. explicit `refresh()` accepts the next generation;
+6. both query surfaces then return R1 and R2.
 
 ## Verification
 
 Tested implementation SHA:
 
 ```text
-0e4b2df0b144fe7116b7e94141be85266a0820fc
+a26c1d8f6927e3ebdfcf69d7f759893cd7b139bd
 ```
 
 Workflow:
 
 ```text
-MREA CI / 36802306777
+MREA CI / 36806176020 — SUCCESS
 ```
 
 Results:
 
-- `Chat 5 / Lifecycle` — **SUCCESS**, `72 passed in 11.64s`;
+- `Chat 5 / Lifecycle` — **SUCCESS**, `73 passed in 3.05s`;
 - `Contracts / canonical fixtures` — **SUCCESS**;
 - `Chat 4 / Generic CAD gate` — **SUCCESS**;
 - `Integration / Chat 4 -> Chat 5` — **SUCCESS**;
@@ -126,8 +101,6 @@ Results:
 ## Shared-contract impact
 
 None.
-
-No change to `core/contracts/**`, canonical fixtures, root integration tests, workflows, or Chat 1–4 code is required.
 
 ## External runtime truth
 
@@ -148,4 +121,4 @@ NATIVE_SLDPRT_GENERATION_READBACK = UNVERIFIED
 
 ## Freeze rule
 
-`ORCHESTRATOR_HANDOFF.md` is the final worker mutation for Pass 12. After that commit, `chat-5/pass-12` is frozen. Final CI is verified on that exact branch HEAD without a follow-up documentation-only mutation.
+`ORCHESTRATOR_HANDOFF.md` is the final worker mutation for Pass 13. After that commit, `chat-5/pass-13` is frozen. Final CI is verified on that exact branch HEAD without a follow-up mutation.

@@ -11,7 +11,7 @@ namespace Mrea.SolidWorksCadAgent
     {
         private const string ProtocolVersion = "mrea.solidworks-agent.v1";
         private const string AdapterName = "SOLIDWORKS_2026";
-        private const string WorkerCapabilitiesSha256 = "1713a8671cc358c54af5664fb1144789ba85b50291d2b02e479aa568a14ae4bd";
+        private const string WorkerCapabilitiesSha256 = "756c37d781e051f0f5b0285a451dc53d2d9d90e98ad3e7b4bfa94924d88dd974";
         private const string ConstraintCapabilitiesSha256 = "02a33af48298669e3563ce467b6cd6d8f2586d073baa3de6baa45749fc92a3d8";
 
         private const int ExitSuccess = 0;
@@ -221,9 +221,130 @@ namespace Mrea.SolidWorksCadAgent
                 throw new InvalidDataException("sketch_package_id is required.");
             if (string.IsNullOrWhiteSpace(request.output_directory))
                 throw new InvalidDataException("output_directory is required.");
+
             request.entities = request.entities ?? new List<EntitySpec>();
             request.constraints = request.constraints ?? new List<ConstraintSpec>();
             request.dimensions = request.dimensions ?? new List<DimensionSpec>();
+            ValidateDimensionEnvelope(request);
+        }
+
+        private static void ValidateDimensionEnvelope(AgentRequest request)
+        {
+            var entitySpecs = new Dictionary<string, EntitySpec>(StringComparer.Ordinal);
+            foreach (var entity in request.entities)
+            {
+                if (entity == null || string.IsNullOrWhiteSpace(entity.entity_id))
+                    throw new InvalidDataException("Every entity requires entity_id.");
+                if (entitySpecs.ContainsKey(entity.entity_id))
+                    throw new InvalidDataException("Duplicate entity_id: " + entity.entity_id);
+                entitySpecs.Add(entity.entity_id, entity);
+            }
+
+            var dimensionIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var dimension in request.dimensions)
+            {
+                if (dimension == null || string.IsNullOrWhiteSpace(dimension.dimension_id))
+                    throw new InvalidDataException("Every verified dimension requires dimension_id.");
+                if (!dimensionIds.Add(dimension.dimension_id))
+                    throw new InvalidDataException("Duplicate dimension_id: " + dimension.dimension_id);
+                if (dimension.type != "DISTANCE" && dimension.type != "DIAMETER" && dimension.type != "RADIUS" && dimension.type != "ANGLE")
+                    throw new NotSupportedException("Unsupported dimension type: " + dimension.type);
+                if (dimension.entity_ids == null || dimension.entity_ids.Count == 0)
+                    throw new InvalidDataException("Dimension has no entity_ids: " + dimension.dimension_id);
+
+                var seenEntityIds = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var entityId in dimension.entity_ids)
+                {
+                    if (!seenEntityIds.Add(entityId))
+                        throw new InvalidDataException("Dimension contains duplicate entity_ids: " + dimension.dimension_id);
+                    if (!entitySpecs.ContainsKey(entityId))
+                        throw new InvalidDataException("Dimension references unknown entity: " + entityId);
+                }
+
+                if (dimension.type == "DISTANCE")
+                {
+                    RequireDimensionUnit(dimension, "mm");
+                    if (dimension.entity_ids.Count == 1 && entitySpecs[dimension.entity_ids[0]].type == "LINE")
+                        continue;
+                    if (dimension.entity_ids.Count == 2 &&
+                        IsCircleOrArc(entitySpecs[dimension.entity_ids[0]]) &&
+                        IsCircleOrArc(entitySpecs[dimension.entity_ids[1]]))
+                        continue;
+                    throw new NotSupportedException(
+                        "DISTANCE supports one LINE or two CIRCLE/ARC entities: " + dimension.dimension_id);
+                }
+
+                if (dimension.type == "DIAMETER")
+                {
+                    RequireDimensionUnit(dimension, "mm");
+                    if (dimension.entity_ids.Count == 1 && entitySpecs[dimension.entity_ids[0]].type == "CIRCLE")
+                        continue;
+                    throw new NotSupportedException(
+                        "DIAMETER requires exactly one CIRCLE: " + dimension.dimension_id);
+                }
+
+                if (dimension.type == "RADIUS")
+                {
+                    RequireDimensionUnit(dimension, "mm");
+                    if (dimension.entity_ids.Count == 1 && IsCircleOrArc(entitySpecs[dimension.entity_ids[0]]))
+                        continue;
+                    throw new NotSupportedException(
+                        "RADIUS requires exactly one CIRCLE/ARC: " + dimension.dimension_id);
+                }
+
+                RequireDimensionUnit(dimension, "deg");
+                if (!(dimension.value > 0.0 && dimension.value < 180.0))
+                    throw new NotSupportedException(
+                        "ANGLE dimension requires 0 < value < 180 deg: " + dimension.dimension_id);
+                if (dimension.entity_ids.Count != 2 ||
+                    entitySpecs[dimension.entity_ids[0]].type != "LINE" ||
+                    entitySpecs[dimension.entity_ids[1]].type != "LINE")
+                    throw new NotSupportedException(
+                        "ANGLE dimension requires exactly two LINE entities: " + dimension.dimension_id);
+                RequireAngularEnvelopeLinePair(
+                    entitySpecs[dimension.entity_ids[0]],
+                    entitySpecs[dimension.entity_ids[1]],
+                    dimension.dimension_id);
+            }
+        }
+
+        private static void RequireDimensionUnit(DimensionSpec dimension, string expectedUnit)
+        {
+            if (dimension.unit != expectedUnit)
+                throw new NotSupportedException(
+                    dimension.type + " dimension requires " + expectedUnit + ": " + dimension.dimension_id);
+        }
+
+        private static bool IsCircleOrArc(EntitySpec entity)
+        {
+            return entity != null && (entity.type == "CIRCLE" || entity.type == "ARC");
+        }
+
+        private static void RequireAngularEnvelopeLinePair(EntitySpec first, EntitySpec second, string dimensionId)
+        {
+            if (first == null || second == null || first.type != "LINE" || second.type != "LINE")
+                throw new NotSupportedException("ANGLE dimension supports LINE/LINE only: " + dimensionId);
+            if (first.start == null || first.end == null || second.start == null || second.end == null)
+                throw new InvalidDataException("ANGLE dimension requires complete LINE geometry: " + dimensionId);
+
+            var rX = first.end.x - first.start.x;
+            var rY = first.end.y - first.start.y;
+            var sX = second.end.x - second.start.x;
+            var sY = second.end.y - second.start.y;
+            if (!IsFinite(rX) || !IsFinite(rY) || !IsFinite(sX) || !IsFinite(sY))
+                throw new InvalidDataException("ANGLE dimension requires finite LINE geometry: " + dimensionId);
+
+            var cross = rX * sY - rY * sX;
+            var scale = Math.Sqrt((rX * rX + rY * rY) * (sX * sX + sY * sY));
+            if (!(scale > 0.0))
+                throw new InvalidDataException("ANGLE dimension requires non-degenerate LINE entities: " + dimensionId);
+            if (Math.Abs(cross) / scale < 1e-10)
+                throw new NotSupportedException("ANGLE dimension requires non-parallel LINE entities: " + dimensionId);
+        }
+
+        private static bool IsFinite(double value)
+        {
+            return !double.IsNaN(value) && !double.IsInfinity(value);
         }
 
         private static string StartupFailureCode(Exception exc)
