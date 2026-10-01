@@ -27,6 +27,10 @@ class MeasurementSessionRepository(Protocol):
 
     def get(self, session_id: str) -> MeasurementSession: ...
 
+    def list_sessions(
+        self, *, project_id: str | None = None
+    ) -> tuple[MeasurementSession, ...]: ...
+
 
 class InMemoryMeasurementSessionRepository:
     """Ephemeral repository retained for unit tests and short-lived workflows."""
@@ -42,6 +46,13 @@ class InMemoryMeasurementSessionRepository:
             return deepcopy(self._sessions[session_id])
         except KeyError as exc:
             raise KeyError(f"measurement session not found: {session_id}") from exc
+
+    def list_sessions(
+        self, *, project_id: str | None = None
+    ) -> tuple[MeasurementSession, ...]:
+        normalized_project_id = _normalize_project_id(project_id)
+        sessions = [deepcopy(session) for session in self._sessions.values()]
+        return _filter_and_sort_sessions(sessions, project_id=normalized_project_id)
 
 
 class SqliteMeasurementSessionRepository:
@@ -91,20 +102,22 @@ class SqliteMeasurementSessionRepository:
             raise KeyError(f"measurement session not found: {session_id}")
 
         schema_version, payload_json = row
-        if schema_version != _LOCAL_SCHEMA_VERSION:
-            raise ValueError(
-                f"unsupported stored measurement-session schema: {schema_version!r}"
-            )
+        return _decode_stored_session(session_id, schema_version, payload_json)
 
-        try:
-            raw = json.loads(payload_json)
-            session = _deserialize_session(raw)
-        except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
-            raise ValueError(f"invalid stored measurement session: {session_id}") from exc
+    def list_sessions(
+        self, *, project_id: str | None = None
+    ) -> tuple[MeasurementSession, ...]:
+        normalized_project_id = _normalize_project_id(project_id)
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT session_id, schema_version, payload_json FROM measurement_sessions"
+            ).fetchall()
 
-        if session.session_id != session_id:
-            raise ValueError("stored measurement session id does not match lookup key")
-        return session
+        sessions = [
+            _decode_stored_session(session_id, schema_version, payload_json)
+            for session_id, schema_version, payload_json in rows
+        ]
+        return _filter_and_sort_sessions(sessions, project_id=normalized_project_id)
 
     def _initialize(self) -> None:
         with self._connect() as connection:
@@ -120,6 +133,44 @@ class SqliteMeasurementSessionRepository:
 
     def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self._database_path, timeout=5.0)
+
+
+def _normalize_project_id(project_id: str | None) -> str | None:
+    if project_id is None:
+        return None
+    normalized = project_id.strip()
+    if not normalized:
+        raise ValueError("project_id filter must not be empty")
+    return normalized
+
+
+def _filter_and_sort_sessions(
+    sessions: list[MeasurementSession], *, project_id: str | None
+) -> tuple[MeasurementSession, ...]:
+    if project_id is not None:
+        sessions = [session for session in sessions if session.project_id == project_id]
+    sessions.sort(key=lambda session: session.session_id)
+    sessions.sort(key=lambda session: session.created_at, reverse=True)
+    return tuple(sessions)
+
+
+def _decode_stored_session(
+    session_id: str, schema_version: str, payload_json: str
+) -> MeasurementSession:
+    if schema_version != _LOCAL_SCHEMA_VERSION:
+        raise ValueError(
+            f"unsupported stored measurement-session schema: {schema_version!r}"
+        )
+
+    try:
+        raw = json.loads(payload_json)
+        session = _deserialize_session(raw)
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+        raise ValueError(f"invalid stored measurement session: {session_id}") from exc
+
+    if session.session_id != session_id:
+        raise ValueError("stored measurement session id does not match lookup key")
+    return session
 
 
 def _format_datetime(value: datetime, field_name: str) -> str:

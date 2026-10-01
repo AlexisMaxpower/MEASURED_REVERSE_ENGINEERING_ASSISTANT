@@ -29,7 +29,7 @@ The request carries two fail-closed compatibility fingerprints:
 - `worker_capabilities_sha256` — the declared Python/C# worker capability projection;
 - `constraint_capabilities_sha256` — the narrower constraint capability contract.
 
-Both are checked before SOLIDWORKS COM startup. Pass 13 also validates the fingerprinted verified-dimension shape rules in the request envelope before COM startup.
+Both are checked before SOLIDWORKS COM startup. The full worker fingerprint covers the Pass-13 verified-dimension rules and the Pass-14 entity-geometry rules.
 
 The response records vendor-runtime facts used by Primary Chat 4 runtime evidence:
 
@@ -63,11 +63,16 @@ Before opening SOLIDWORKS, the worker validates:
 1. protocol and adapter identity;
 2. full worker and constraint capability fingerprints;
 3. required request identity/output fields;
-4. dimension IDs and referenced entity IDs;
-5. no duplicate entity IDs within a dimension;
-6. dimension-specific units;
-7. supported dimension/entity patterns;
-8. ANGLE range and non-parallel LINE geometry.
+4. unique non-empty entity IDs and supported entity types;
+5. required finite point coordinates for `POINT`, `LINE`, `CIRCLE` and `ARC`;
+6. non-degenerate `LINE` geometry (`length_squared_mm2 > 1e-24`);
+7. positive finite `CIRCLE`/`ARC` radius;
+8. finite `ARC` angles and a non-zero/non-full-circle modulo span (`>= 1e-12 deg`);
+9. dimension IDs and referenced entity IDs;
+10. no duplicate entity IDs within a dimension;
+11. dimension-specific units;
+12. supported dimension/entity patterns;
+13. ANGLE range and non-parallel LINE geometry.
 
 Only after those checks does `SolidWorksSession.Open(request)` attach to or launch SOLIDWORKS.
 
@@ -84,10 +89,12 @@ A version mismatch is an agent startup failure, never a successful transfer.
 
 Geometry entities:
 
-- `POINT`;
-- `LINE`;
-- `CIRCLE`;
-- `ARC`.
+- `POINT` with finite `x/y`;
+- `LINE` with finite endpoints and non-degenerate length;
+- `CIRCLE` with finite center and positive finite radius;
+- `ARC` with finite center/radius/angles and non-zero modulo span.
+
+The machine-readable entity source is `src/mrea_cad_bridge/solidworks_entity_capabilities.py`. Python preflight and the C# request envelope are tested against the same fingerprinted rules before COM startup. `SolidWorksTransfer.ValidateSlice(...)` remains an independent deeper guard after the session opens.
 
 Fail-closed verified constraints:
 
@@ -114,7 +121,7 @@ Pass 13 makes the shape rules explicit and fingerprinted:
 
 Duplicate entity IDs inside one verified dimension fail closed.
 
-The machine-readable source is `src/mrea_cad_bridge/solidworks_dimension_capabilities.py`. Python preflight and the C# request envelope are tested against that declared subset.
+The machine-readable dimension source is `src/mrea_cad_bridge/solidworks_dimension_capabilities.py`. Python preflight and the C# request envelope are tested against that declared subset.
 
 ## Build
 
@@ -141,6 +148,6 @@ The local one-command fallback remains:
 .\scripts\qualify_solidworks_host.ps1
 ```
 
-Host qualification is fingerprint-bound. Pass 13 changes the worker capability boundary and introduces `solidworks_dimension_capabilities.py`; that file is included in the standing qualification fingerprint by Orchestrator 1. A qualification produced for an earlier fingerprint must not be reused as positive evidence for this changed boundary.
+Host qualification is fingerprint-bound. `solidworks_entity_capabilities.py` is part of the standing host-boundary fingerprint, so changes to these Pass-14 rules invalidate reuse of qualification produced for an earlier fingerprint.
 
 Software-only CI, mocks and static parity checks never create a positive real-host qualification. When real-host status matters, resolve it from the dedicated qualification workflow and its generated `solidworks_host_qualification.json` manifest rather than copying round-level status text.

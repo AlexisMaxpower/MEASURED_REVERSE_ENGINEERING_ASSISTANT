@@ -62,6 +62,10 @@ from .quality import (
     OpenCvCaptureQualityAnalyzer,
     RussianQualityGuidanceAdapter,
 )
+from .quality_lifecycle import (
+    CaptureQualityLifecycleError,
+    CaptureQualityLifecycleService,
+)
 from .rectification import (
     OpenCvPerspectiveNormalizer,
     PerspectiveNormalizer,
@@ -92,6 +96,8 @@ __all__ = [
     "CaptureQualityAnalyzer",
     "CaptureQualityError",
     "CaptureQualityFinding",
+    "CaptureQualityLifecycleError",
+    "CaptureQualityLifecycleService",
     "CaptureQualityMetrics",
     "CaptureQualityPolicy",
     "CaptureQualityResult",

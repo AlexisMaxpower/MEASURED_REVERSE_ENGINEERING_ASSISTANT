@@ -11,7 +11,7 @@ namespace Mrea.SolidWorksCadAgent
     {
         private const string ProtocolVersion = "mrea.solidworks-agent.v1";
         private const string AdapterName = "SOLIDWORKS_2026";
-        private const string WorkerCapabilitiesSha256 = "756c37d781e051f0f5b0285a451dc53d2d9d90e98ad3e7b4bfa94924d88dd974";
+        private const string WorkerCapabilitiesSha256 = "979a962f6a1a13d674abf0b6c9dcce16eae386e581a5c8597e89a4493b77a4d6";
         private const string ConstraintCapabilitiesSha256 = "02a33af48298669e3563ce467b6cd6d8f2586d073baa3de6baa45749fc92a3d8";
 
         private const int ExitSuccess = 0;
@@ -225,7 +225,49 @@ namespace Mrea.SolidWorksCadAgent
             request.entities = request.entities ?? new List<EntitySpec>();
             request.constraints = request.constraints ?? new List<ConstraintSpec>();
             request.dimensions = request.dimensions ?? new List<DimensionSpec>();
+            ValidateEntityEnvelope(request);
             ValidateDimensionEnvelope(request);
+        }
+
+        private static void ValidateEntityEnvelope(AgentRequest request)
+        {
+            var entityIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var entity in request.entities)
+            {
+                if (entity == null || string.IsNullOrWhiteSpace(entity.entity_id))
+                    throw new InvalidDataException("Every entity requires entity_id.");
+                if (!entityIds.Add(entity.entity_id))
+                    throw new InvalidDataException("Duplicate entity_id: " + entity.entity_id);
+                if (entity.type != "POINT" && entity.type != "LINE" && entity.type != "CIRCLE" && entity.type != "ARC")
+                    throw new NotSupportedException("Vendor agent supports POINT/LINE/CIRCLE/ARC only: " + entity.type);
+
+                if (entity.type == "POINT")
+                {
+                    RequireEnvelopePoint(entity.point, entity.entity_id + ".point");
+                }
+                else if (entity.type == "LINE")
+                {
+                    RequireEnvelopePoint(entity.start, entity.entity_id + ".start");
+                    RequireEnvelopePoint(entity.end, entity.entity_id + ".end");
+                    RequireEnvelopeNonDegenerateLine(entity, entity.entity_id);
+                }
+                else if (entity.type == "CIRCLE")
+                {
+                    RequireEnvelopePoint(entity.center, entity.entity_id + ".center");
+                    RequireEnvelopePositiveFinite(entity.radius, entity.entity_id + ".radius");
+                }
+                else if (entity.type == "ARC")
+                {
+                    RequireEnvelopePoint(entity.center, entity.entity_id + ".center");
+                    RequireEnvelopePositiveFinite(entity.radius, entity.entity_id + ".radius");
+                    if (!IsFinite(entity.start_angle_deg) || !IsFinite(entity.end_angle_deg))
+                        throw new InvalidDataException("ARC start/end angles must be finite: " + entity.entity_id);
+                    var span = PositiveModulo(entity.end_angle_deg - entity.start_angle_deg, 360.0);
+                    if (span < 1e-12)
+                        throw new InvalidDataException(
+                            "ARC start/end angles resolve to a full/zero circle; use CIRCLE instead: " + entity.entity_id);
+                }
+            }
         }
 
         private static void ValidateDimensionEnvelope(AgentRequest request)
@@ -306,6 +348,32 @@ namespace Mrea.SolidWorksCadAgent
                     entitySpecs[dimension.entity_ids[1]],
                     dimension.dimension_id);
             }
+        }
+
+        private static void RequireEnvelopePoint(PointSpec point, string name)
+        {
+            if (point == null || !IsFinite(point.x) || !IsFinite(point.y))
+                throw new InvalidDataException(name + " requires finite x/y coordinates.");
+        }
+
+        private static void RequireEnvelopePositiveFinite(double value, string name)
+        {
+            if (!IsFinite(value) || !(value > 0.0))
+                throw new InvalidDataException(name + " must be finite and > 0.");
+        }
+
+        private static void RequireEnvelopeNonDegenerateLine(EntitySpec entity, string name)
+        {
+            var dx = entity.end.x - entity.start.x;
+            var dy = entity.end.y - entity.start.y;
+            if (dx * dx + dy * dy <= 1e-24)
+                throw new InvalidDataException("LINE must have distinct endpoints: " + name);
+        }
+
+        private static double PositiveModulo(double value, double modulo)
+        {
+            var result = value % modulo;
+            return result < 0.0 ? result + modulo : result;
         }
 
         private static void RequireDimensionUnit(DimensionSpec dimension, string expectedUnit)

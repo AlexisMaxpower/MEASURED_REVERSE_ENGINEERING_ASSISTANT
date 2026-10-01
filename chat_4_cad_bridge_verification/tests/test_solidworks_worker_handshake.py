@@ -20,7 +20,7 @@ from mrea_cad_bridge.solidworks_worker_handshake import (
 )
 
 
-EXPECTED_WORKER_SHA256 = "756c37d781e051f0f5b0285a451dc53d2d9d90e98ad3e7b4bfa94924d88dd974"
+EXPECTED_WORKER_SHA256 = "979a962f6a1a13d674abf0b6c9dcce16eae386e581a5c8597e89a4493b77a4d6"
 
 
 class SolidWorksWorkerCapabilityHandshakeTests(unittest.TestCase):
@@ -36,6 +36,7 @@ class SolidWorksWorkerCapabilityHandshakeTests(unittest.TestCase):
                 "schema_version",
                 "adapter_name",
                 "geometry_entities",
+                "geometry_entity_rules",
                 "verified_dimensions",
                 "verified_dimension_rules",
                 "constraints",
@@ -46,6 +47,14 @@ class SolidWorksWorkerCapabilityHandshakeTests(unittest.TestCase):
         self.assertEqual(
             projection["geometry_entities"]["supported"],
             ["POINT", "LINE", "CIRCLE", "ARC"],
+        )
+        self.assertEqual(
+            projection["geometry_entity_rules"]["schema_version"],
+            "mrea.solidworks-entity-rules.v1",
+        )
+        self.assertEqual(
+            projection["geometry_entity_rules"]["types"]["LINE"]["length_squared_mm2"]["exclusive_min"],
+            1e-24,
         )
         self.assertEqual(
             projection["verified_dimensions"]["supported"],
@@ -65,11 +74,16 @@ class SolidWorksWorkerCapabilityHandshakeTests(unittest.TestCase):
     def test_projection_is_caller_safe(self):
         projection = build_solidworks_worker_capability_projection_v1()
         projection["geometry_entities"]["supported"].append("MUTATED")
+        projection["geometry_entity_rules"]["types"]["LINE"]["required_points"].clear()
         projection["constraints"]["supported"].clear()
         projection["verified_dimension_rules"]["types"]["RADIUS"]["entity_type_patterns"].clear()
 
         fresh = build_solidworks_worker_capability_projection_v1()
         self.assertNotIn("MUTATED", fresh["geometry_entities"]["supported"])
+        self.assertEqual(
+            fresh["geometry_entity_rules"]["types"]["LINE"]["required_points"],
+            ["start", "end"],
+        )
         self.assertIn("TANGENT", fresh["constraints"]["supported"])
         self.assertEqual(
             fresh["verified_dimension_rules"]["types"]["RADIUS"]["entity_type_patterns"],
@@ -121,10 +135,11 @@ class SolidWorksWorkerCapabilityHandshakeTests(unittest.TestCase):
         self.assertEqual(match.group(1), EXPECTED_WORKER_SHA256)
 
         validate_start = program.index("private static void ValidateRequestEnvelope")
-        validate_end = program.index("private static void ValidateDimensionEnvelope")
+        validate_end = program.index("private static void ValidateEntityEnvelope")
         validate_body = program[validate_start:validate_end]
         self.assertIn("request.worker_capabilities_sha256", validate_body)
         self.assertIn("Worker capability fingerprint mismatch", validate_body)
+        self.assertIn("ValidateEntityEnvelope(request);", validate_body)
         self.assertIn("ValidateDimensionEnvelope(request);", validate_body)
         self.assertLess(
             validate_body.index("request.worker_capabilities_sha256"),
@@ -132,12 +147,39 @@ class SolidWorksWorkerCapabilityHandshakeTests(unittest.TestCase):
         )
         self.assertLess(
             validate_body.index("request.constraint_capabilities_sha256"),
+            validate_body.index("ValidateEntityEnvelope(request);"),
+        )
+        self.assertLess(
+            validate_body.index("ValidateEntityEnvelope(request);"),
             validate_body.index("ValidateDimensionEnvelope(request);"),
         )
         self.assertLess(
             program.index("ValidateRequestEnvelope(request);"),
             program.index("SolidWorksSession.Open(request)"),
         )
+
+    def test_csharp_entity_envelope_matches_declared_rules(self):
+        root = Path(__file__).resolve().parents[1]
+        program = (root / "solidworks_agent" / "Program.cs").read_text(encoding="utf-8")
+        projection = build_solidworks_worker_capability_projection_v1()
+        rules = projection["geometry_entity_rules"]
+
+        envelope_start = program.index("private static void ValidateEntityEnvelope")
+        envelope_end = program.index("private static void ValidateDimensionEnvelope")
+        envelope = program[envelope_start:envelope_end]
+
+        self.assertEqual(set(rules["types"]), {"POINT", "LINE", "CIRCLE", "ARC"})
+        for entity_type in rules["types"]:
+            self.assertIn(f'entity.type == "{entity_type}"', envelope)
+        self.assertIn("Duplicate entity_id", envelope)
+        self.assertIn("RequireEnvelopePoint(entity.point", envelope)
+        self.assertIn("RequireEnvelopePoint(entity.start", envelope)
+        self.assertIn("RequireEnvelopePoint(entity.end", envelope)
+        self.assertIn("RequireEnvelopePoint(entity.center", envelope)
+        self.assertIn("RequireEnvelopePositiveFinite(entity.radius", envelope)
+        self.assertIn("PositiveModulo(entity.end_angle_deg - entity.start_angle_deg, 360.0)", envelope)
+        self.assertIn("span < 1e-12", envelope)
+        self.assertIn("dx * dx + dy * dy <= 1e-24", program)
 
     def test_csharp_dimension_envelope_matches_declared_rules(self):
         root = Path(__file__).resolve().parents[1]
@@ -146,7 +188,7 @@ class SolidWorksWorkerCapabilityHandshakeTests(unittest.TestCase):
         rules = projection["verified_dimension_rules"]
 
         envelope_start = program.index("private static void ValidateDimensionEnvelope")
-        envelope_end = program.index("private static void RequireDimensionUnit")
+        envelope_end = program.index("private static void RequireEnvelopePoint")
         envelope = program[envelope_start:envelope_end]
 
         self.assertEqual(

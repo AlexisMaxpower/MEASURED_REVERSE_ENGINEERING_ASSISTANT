@@ -6,6 +6,7 @@ from typing import Any
 
 from .solidworks_capabilities import build_solidworks_capabilities_v1
 from .solidworks_dimension_capabilities import build_solidworks_dimension_rules_v1
+from .solidworks_entity_capabilities import build_solidworks_entity_rules_v1
 
 
 def build_solidworks_worker_capability_projection_v1() -> dict[str, Any]:
@@ -16,6 +17,7 @@ def build_solidworks_worker_capability_projection_v1() -> dict[str, Any]:
         "schema_version": capabilities["schema_version"],
         "adapter_name": capabilities["adapter_name"],
         "geometry_entities": capabilities["geometry_entities"],
+        "geometry_entity_rules": build_solidworks_entity_rules_v1(),
         "verified_dimensions": capabilities["verified_dimensions"],
         "verified_dimension_rules": build_solidworks_dimension_rules_v1(),
         "constraints": capabilities["constraints"],

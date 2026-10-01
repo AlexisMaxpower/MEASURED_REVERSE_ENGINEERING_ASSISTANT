@@ -228,3 +228,10 @@ class MeasurementSessionService:
 
     def get_session(self, session_id: str) -> MeasurementSession:
         return self._repository.get(session_id)
+
+    def list_sessions(
+        self, *, project_id: str | None = None
+    ) -> tuple[MeasurementSession, ...]:
+        """Return durable sessions newest-first, optionally scoped to one project."""
+
+        return self._repository.list_sessions(project_id=project_id)

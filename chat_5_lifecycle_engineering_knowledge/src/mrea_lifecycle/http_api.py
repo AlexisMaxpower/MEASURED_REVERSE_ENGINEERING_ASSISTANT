@@ -261,6 +261,26 @@ class ReadOnlyLifecycleHttpAPI:
                         session.knowledge.revision_lineage(part_id),
                     )
                 )
+            if path == "/v1/knowledge/revision-comparison":
+                _validate_query_keys(
+                    query,
+                    allowed={"left_revision_id", "right_revision_id"},
+                )
+                left_revision_id = _single_query_value(
+                    query, "left_revision_id", required=True
+                )
+                right_revision_id = _single_query_value(
+                    query, "right_revision_id", required=True
+                )
+                return self._with_session(
+                    lambda session: self._success(
+                        session,
+                        session.knowledge.compare_revisions(
+                            left_revision_id,
+                            right_revision_id,
+                        ),
+                    )
+                )
             if path == "/v1/knowledge/revision-outcomes":
                 _validate_query_keys(query, allowed={"part_id", "limit", "cursor"})
                 part_id = _single_query_value(query, "part_id", required=True)
