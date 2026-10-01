@@ -1,84 +1,66 @@
-# ORCHESTRATOR HANDOFF — Chat 4 / Pass 15
+# ORCHESTRATOR HANDOFF — Chat 4 / Pass 16
 
 **Owner:** Chat 4 — CAD Bridge & Verification  
-**Date:** 2026-10-01  
-**Branch:** `chat-4/pass-15`  
-**Shared baseline:** `main@99d8c6d9322f3669a43226e4fd2675fe683ab9f6`
+**Date:** 2026-10-02  
+**Branch:** `chat-4/pass-16`  
+**Worker predecessor:** `chat-4/pass-15@50149cf538af8a9121a2974eb235b9f46ad30c8f`  
+**Shared main ancestor:** `main@99d8c6d9322f3669a43226e4fd2675fe683ab9f6`
 
 ## Status
 
-`PASS_15_WORKER_COMPLETE`
+`PASS_16_WORKER_COMPLETE`
 
-This handoff records the factual final Chat-4 branch state. During Pass 15, two compatible Chat-4-owned changes were published to the same repository branch and were preserved together rather than overwriting one another.
+Pass 16 preserves the completed Pass-15 Chat-4 state and adds one fail-closed SOLIDWORKS response-boundary step. No canonical contract, canonical fixture, shared workflow, or another chat-owned slice is modified.
 
-## Integrated Pass-15 scope
+## Delivered scope
 
-### Constraint-shape capability handshake
+An `OK` SOLIDWORKS worker response is now correlated back to the exact request before `CadAdapterResult` is allowed to leave the vendor boundary.
 
-`build_solidworks_capabilities_v1()["constraints"]["rules"]` now declares the exact fail-closed constraint/entity patterns. Python consumes those machine-readable rules directly, while the C# worker mirrors them in `ValidateConstraintEnvelope(...)` before `SolidWorksSession.Open(request)`.
+The adapter requires:
 
-The pre-COM envelope rejects invalid/duplicate constraint IDs, non-`VERIFIED` status, unsupported types, duplicate/unknown entity references, unsupported arity and unsupported entity-type combinations as request-invalid input (`exit 20`). `SolidWorksTransfer.ValidateSlice(...)` remains an independent downstream guard.
+- the binding dimension-ID set to exactly equal the requested verified-dimension set;
+- every binding to preserve the requested `measurement_id`;
+- numeric read-back units to match the requested units;
+- every requested verified dimension to have numeric read-back or normalized constraint-conflict evidence;
+- exactly one `SOLIDWORKS_PART` artifact with non-empty `artifact_id`, `uri`, `media_type`, and `sha256`;
+- malformed `CadAdapterResult` construction to surface as `CadAdapterError`, not an incidental `ValueError`.
 
-Constraint capability SHA-256:
+Constraint-conflict evidence may intentionally replace numeric read-back evidence for the affected dimension; canonical `CONSTRAINT_CONFLICT` semantics remain unchanged.
 
-```text
-5eac12828b4255e05b17732093bf881e24a64c016abe5828573e4235be665ae4
-```
-
-Full worker capability SHA-256:
-
-```text
-0e1c5ca75945f7a62ac6cbd126a6523bc3b851e1ec051345fc265f89b8c3172f
-```
-
-### Constraint-conflict response normalization
-
-The SOLIDWORKS response parser now validates `read_back.constraint_conflicts` before constructing vendor-neutral `CadReadBack`:
-
-- list/tuple shape is required;
-- IDs must be non-empty strings;
-- duplicate IDs fail closed;
-- conflict IDs must reference worker-bound dimensions;
-- malformed `read_back` values become `CadAdapterError` rather than incidental parser errors.
-
-Valid bound conflict evidence continues through the existing canonical verification path and can produce canonical `CONSTRAINT_CONFLICT` without rewriting measured values. This does not claim new real-host solver-conflict detection coverage in the C# worker.
-
-## Changed files
-
-Relative to shared baseline `99d8c6d9322f3669a43226e4fd2675fe683ab9f6`, the final branch changes exactly these Chat-4-owned files:
+## Changed files relative to Pass 15
 
 1. `ORCHESTRATOR_HANDOFF.md`
-2. `docs/PASS_15_CONSTRAINT_CONFLICT_RESPONSE_NORMALIZATION_2026-10-01.md`
-3. `docs/PASS_15_CONSTRAINT_SHAPE_CAPABILITY_HANDSHAKE_2026-10-01.md`
-4. `solidworks_agent/Program.cs`
-5. `solidworks_agent/README.md`
-6. `src/mrea_cad_bridge/solidworks_agent.py`
-7. `src/mrea_cad_bridge/solidworks_capabilities.py`
-8. `tests/test_solidworks_constraint_capabilities.py`
-9. `tests/test_solidworks_constraint_conflict_response.py`
-10. `tests/test_solidworks_constraint_handshake.py`
-11. `tests/test_solidworks_worker_handshake.py`
-
-No canonical contract, canonical fixture, shared workflow, or another chat-owned slice is modified.
+2. `docs/PASS_16_SOLIDWORKS_SUCCESS_RESPONSE_COMPLETENESS_2026-10-02.md`
+3. `src/mrea_cad_bridge/solidworks_agent.py`
+4. `tests/test_solidworks_constraint_conflict_response.py`
+5. `tests/test_solidworks_success_response_completeness.py`
 
 ## Verification
 
-Constraint-shape implementation CI after parity-test correction:
+Implementation head before this handoff:
 
 ```text
-run = 36815788855
-head = c45be0df566d0649f7d042934b687f4d1f3c841c
+head = c9f914dc18f01fb72c442aa576628a2f82dba492
+MREA CI run = 36933639612
 result = SUCCESS
 ```
 
-The branch then retained the already-published constraint-conflict normalization changes. The final exact-head CI must be read from the repository at the final branch SHA after this handoff commit; acceptance is based on that repository state rather than this historical implementation run.
+Confirmed green gates on that exact implementation head:
+
+- `Contracts / canonical fixtures`;
+- `Chat 4 / Generic CAD gate`;
+- `Integration / Chat 3 -> Chat 4`;
+- `Integration / Chat 4 -> Chat 5`;
+- all ordinary slice jobs executed by the workflow.
+
+The final branch-head CI after this handoff commit is the acceptance evidence for the frozen Pass-16 branch and must be read directly from the repository.
 
 ## Truth boundary
 
-Pass 15 proves deterministic software/request/response compatibility only. It does not claim SOLIDWORKS solver behavior, complete conflict detection, relation creation, rebuild/save/read-back behavior, production C# interop build, or a real-host run.
+Pass 16 proves deterministic software/request/response completeness at the SOLIDWORKS process boundary. It does not claim real SOLIDWORKS 2026 execution, solver behavior, relation creation, native-save correctness, or physical host qualification.
 
-Real-host authority remains the standing `SOLIDWORKS_HOST_QUALIFICATION` dedicated workflow. Pass 15 changes fingerprinted host-boundary files, so any reusable positive qualification must match the resulting current boundary fingerprint.
+`solidworks_agent.py` is part of the standing host-boundary fingerprint. Real-host authority remains exclusively the dedicated `SOLIDWORKS_HOST_QUALIFICATION` workflow; software CI must not be promoted to a real-host result.
 
 ## Freeze
 
-After this reconciled handoff commit and its exact-head repository CI are green, `chat-4/pass-15` is frozen. Integration/acceptance must be derived from the repository state at review time.
+After this handoff commit and its exact-head repository CI are green, `chat-4/pass-16` is frozen. Integration/acceptance must be derived from repository state at review time.
