@@ -244,6 +244,41 @@ def build_solidworks_agent_request(
     }
 
 
+def _parse_constraint_conflicts(
+    read_back_raw: Mapping[str, Any],
+    *,
+    bound_dimension_ids: frozenset[str],
+) -> frozenset[str]:
+    raw_conflicts = read_back_raw.get("constraint_conflicts", ())
+    if not isinstance(raw_conflicts, (list, tuple)):
+        raise CadAdapterError(
+            "invalid SOLIDWORKS CAD Agent response shape: "
+            "read_back.constraint_conflicts must be an array"
+        )
+
+    seen: set[str] = set()
+    for raw_dimension_id in raw_conflicts:
+        if not isinstance(raw_dimension_id, str) or not raw_dimension_id:
+            raise CadAdapterError(
+                "invalid SOLIDWORKS CAD Agent response shape: "
+                "constraint conflict IDs must be non-empty strings"
+            )
+        if raw_dimension_id in seen:
+            raise CadAdapterError(
+                "invalid SOLIDWORKS CAD Agent response shape: "
+                f"duplicate constraint conflict dimension_id {raw_dimension_id!r}"
+            )
+        seen.add(raw_dimension_id)
+
+    unknown = seen - bound_dimension_ids
+    if unknown:
+        raise CadAdapterError(
+            "SOLIDWORKS CAD Agent returned constraint conflicts for unbound dimensions: "
+            f"{sorted(unknown)!r}"
+        )
+    return frozenset(seen)
+
+
 def parse_solidworks_agent_response(response: Mapping[str, Any]) -> CadAdapterResult:
     if response.get("protocol_version") != SOLIDWORKS_AGENT_PROTOCOL:
         raise CadAdapterError(
@@ -271,7 +306,10 @@ def parse_solidworks_agent_response(response: Mapping[str, Any]) -> CadAdapterRe
             )
             for item in response.get("bindings", ())
         )
+        bound_dimension_ids = frozenset(binding.dimension_id for binding in bindings)
         read_back_raw = response["read_back"]
+        if not isinstance(read_back_raw, Mapping):
+            raise TypeError("read_back must be an object")
         dimensions = tuple(
             CadReadBackDimension(
                 dimension_id=item["dimension_id"],
@@ -280,8 +318,13 @@ def parse_solidworks_agent_response(response: Mapping[str, Any]) -> CadAdapterRe
             )
             for item in read_back_raw.get("dimensions", ())
         )
-        conflicts = frozenset(read_back_raw.get("constraint_conflicts", ()))
+        conflicts = _parse_constraint_conflicts(
+            read_back_raw,
+            bound_dimension_ids=bound_dimension_ids,
+        )
         artifacts = tuple(dict(item) for item in response.get("artifacts", ()))
+    except CadAdapterError:
+        raise
     except (KeyError, TypeError, ValueError) as exc:
         raise CadAdapterError("invalid SOLIDWORKS CAD Agent response shape") from exc
 
