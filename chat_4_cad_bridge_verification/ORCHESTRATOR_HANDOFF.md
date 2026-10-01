@@ -4,25 +4,25 @@
 **Date:** 2026-10-01  
 **Branch:** `chat-4/pass-12`  
 **Shared baseline:** `main@c888704b37e88b68c055f1095e6e9a4fc3650f7e`  
-**Implementation SHA before handoff:** `131cb672dc7ce9336c0430bf230c040af37ddfce`
+**Implementation SHA before final handoff:** `cd3574671cc62d912c3bcacb92384aac3c593cfe`
 
 ## Status
 
 `PASS_12_WORKER_COMPLETE`
 
-Round 11 was closed in `main` with `OPEN_SOFTWARE_BLOCKERS = NONE` and the next full worker pass marked ready. Pass 12 starts from that accepted shared baseline and stays entirely inside Chat-4-owned CAD/SOLIDWORKS scope.
+Pass 12 starts from the accepted Round-11 shared `main` and stays entirely inside Chat-4-owned CAD/SOLIDWORKS scope.
 
 ## Delivered scope
 
-Pass 12 closes the remaining Python-adapter/C#-worker capability drift gap left after the Pass-11 constraint-only fingerprint.
+Pass 12 closes the Python-adapter/C#-worker capability drift gap left after the Pass-11 constraint-only fingerprint.
 
-New full worker compatibility SHA-256:
+Full worker compatibility SHA-256:
 
 ```text
 1713a8671cc358c54af5664fb1144789ba85b50291d2b02e479aa568a14ae4bd
 ```
 
-The fingerprint covers exactly the capability facts that must stay synchronized across the process boundary:
+The fingerprint covers the static worker execution surface:
 
 - capability schema version;
 - SOLIDWORKS adapter identity;
@@ -35,11 +35,25 @@ Runtime/external-evidence status and unrelated side protocols are intentionally 
 
 Python sends both `worker_capabilities_sha256` and the existing Pass-11 `constraint_capabilities_sha256`. The C# worker validates the broader worker fingerprint first and the constraint fingerprint second inside `ValidateRequestEnvelope(...)`; both checks occur before `SolidWorksSession.Open(request)`.
 
-Missing or mismatched capability fingerprints therefore fail as request-invalid input before COM startup or CAD mutation.
+Missing or mismatched fingerprints therefore fail as request-invalid input before COM startup or CAD mutation.
+
+## Implementation binding hardening
+
+Audit of the initial Pass-12 implementation found that the compatibility hash was tied to the capability manifest while Python preflight still maintained separate hard-coded entity/dimension sets and CI did not prove that the C# transfer implementation matched the manifest.
+
+The final implementation removes that fail-open maintenance gap:
+
+- Python `_SUPPORTED_ENTITY_TYPES` and `_SUPPORTED_DIMENSION_TYPES` are derived from `build_solidworks_worker_capability_projection_v1()`;
+- tests parse the actual C# `SolidWorksTransfer.cs` entity guard and require exact parity with the declared geometry set;
+- tests parse the actual dimension guard and require exact parity with the declared verified-dimension set;
+- tests verify the C# `mm` / `deg` unit guards against the declared units;
+- tests parse `RelationId(...)` and require exact parity with all declared supported constraints.
+
+A future implementation-only capability change can no longer leave the worker fingerprint tests green merely because the manifest/hash constant was unchanged.
 
 ## Changed files
 
-Relative to the accepted Pass-12 baseline `c888704b37e88b68c055f1095e6e9a4fc3650f7e`, only Chat-4-owned files are changed:
+Relative to shared baseline `c888704b37e88b68c055f1095e6e9a4fc3650f7e`, Pass 12 changes only these seven Chat-4-owned files:
 
 1. `ORCHESTRATOR_HANDOFF.md`
 2. `docs/PASS_12_FULL_WORKER_CAPABILITY_HANDSHAKE_2026-10-01.md`
@@ -49,25 +63,22 @@ Relative to the accepted Pass-12 baseline `c888704b37e88b68c055f1095e6e9a4fc3650
 6. `solidworks_agent/Program.cs`
 7. `tests/test_solidworks_worker_handshake.py`
 
-No shared canonical contract, shared integration test, GitHub workflow, or another chat-owned file is modified.
+No shared canonical contract, canonical fixture, shared integration test, GitHub workflow, or another chat-owned file is modified.
 
 ## Verification
 
-Implementation CI before handoff:
+Final implementation CI before this handoff:
 
 ```text
-run = 36801653930
-head = 131cb672dc7ce9336c0430bf230c040af37ddfce
+run = 36802196483
+head = cd3574671cc62d912c3bcacb92384aac3c593cfe
 result = SUCCESS
+jobs = 11/11 SUCCESS
 ```
 
-Verified repository gates include:
+The exact run includes successful Chat-4 generic tests, canonical contract validation, slice tests, adjacent integration boundaries, and the repository golden path according to the branch workflow policy.
 
-- `Chat 4 / Generic CAD gate` — SUCCESS;
-- `Contracts / canonical fixtures` — SUCCESS;
-- adjacent integration/boundary gates — SUCCESS.
-
-The final handoff commit must also pass repository CI before this branch is treated as frozen.
+The final handoff commit must also pass exact-head repository CI before the branch is treated as frozen.
 
 ## External environment truth
 
@@ -83,4 +94,4 @@ Static/protocol/unit evidence is not promoted to real-host evidence.
 
 ## Freeze
 
-This branch is intended to be frozen after the handoff commit and its exact-head CI are green. Integration/acceptance must be derived from repository state at review time; no blind whole-branch merge is implied.
+After the final handoff commit and its exact-head CI are green, `chat-4/pass-12` is frozen. Integration/acceptance must be derived from repository state at review time; no blind whole-branch merge is implied.
