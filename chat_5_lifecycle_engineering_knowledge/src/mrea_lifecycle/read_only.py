@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import sqlite3
+from typing import Any
 
 from .engineering_knowledge import SQLiteEngineeringKnowledgeRepository
 from .materialized_knowledge import SQLiteMaterializedEngineeringKnowledgeRepository
@@ -22,13 +23,137 @@ def _readonly_uri(database: Path) -> str:
     return f"{database.resolve().as_uri()}?mode=ro"
 
 
+class _SnapshotGuardedCursor:
+    """Cursor facade that refuses to return rows after snapshot drift."""
+
+    def __init__(
+        self,
+        cursor: sqlite3.Cursor,
+        connection: "_SnapshotGuardedConnection",
+    ) -> None:
+        self._cursor = cursor
+        self._connection = connection
+
+    def fetchone(self) -> Any:
+        row = self._cursor.fetchone()
+        self._connection.assert_current()
+        return row
+
+    def fetchall(self) -> list[Any]:
+        rows = self._cursor.fetchall()
+        self._connection.assert_current()
+        return rows
+
+    def __iter__(self):
+        rows = self.fetchall()
+        return iter(rows)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._cursor, name)
+
+
+class _SnapshotGuardedConnection:
+    """Read-only connection facade bound to one accepted lifecycle snapshot.
+
+    SQLite read-only connections opened in autocommit mode do not remain pinned to
+    the database version observed when the session was constructed. A later writer
+    commit can otherwise make the same long-lived session read newer rows while its
+    cached ``snapshot_version`` still identifies the old generation.
+
+    Every repository statement is therefore checked immediately before execution and
+    again after its result rows are fetched. If the authoritative snapshot, normalized
+    read-model generation or relational schema changed at any point, no rows are
+    returned and the caller must refresh/reopen the session. The guard deliberately
+    avoids a long-lived read transaction, so an idle read-only session does not hold a
+    rollback-journal read lock that would block writers.
+    """
+
+    def __init__(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        snapshot_schema_version: str,
+        snapshot_version: int,
+        read_model_version: int,
+        relational_schema_version: int,
+    ) -> None:
+        self._connection = connection
+        self._expected_snapshot_schema_version = snapshot_schema_version
+        self._expected_snapshot_version = snapshot_version
+        self._expected_read_model_version = read_model_version
+        self._expected_relational_schema_version = relational_schema_version
+
+    def _current_metadata(self) -> tuple[str, int, int, int]:
+        try:
+            row = self._connection.execute(
+                """
+                SELECT s.schema_version,
+                       s.version,
+                       m.snapshot_version,
+                       (
+                           SELECT COALESCE(MAX(version), 0)
+                           FROM lifecycle_schema_migrations
+                       )
+                FROM lifecycle_store AS s
+                JOIN lifecycle_read_model_meta AS m
+                  ON m.singleton = 1
+                WHERE s.singleton = 1
+                """
+            ).fetchone()
+        except sqlite3.Error as exc:
+            raise LifecycleReadOnlyError(
+                "cannot verify lifecycle read-only snapshot metadata"
+            ) from exc
+        if row is None:
+            raise LifecycleReadOnlyError(
+                "lifecycle database is missing required persistence metadata"
+            )
+        return str(row[0]), int(row[1]), int(row[2]), int(row[3])
+
+    def assert_current(self) -> None:
+        (
+            snapshot_schema_version,
+            snapshot_version,
+            read_model_version,
+            relational_schema_version,
+        ) = self._current_metadata()
+
+        if (
+            snapshot_schema_version != self._expected_snapshot_schema_version
+            or relational_schema_version != self._expected_relational_schema_version
+            or snapshot_version != self._expected_snapshot_version
+            or read_model_version != self._expected_read_model_version
+            or snapshot_version != read_model_version
+        ):
+            raise LifecycleReadOnlyStaleError(
+                "read-only lifecycle session snapshot changed; refresh required: "
+                f"expected_snapshot={self._expected_snapshot_version}, "
+                f"expected_read_model={self._expected_read_model_version}, "
+                f"current_snapshot={snapshot_version}, "
+                f"current_read_model={read_model_version}, "
+                f"expected_relational_schema={self._expected_relational_schema_version}, "
+                f"current_relational_schema={relational_schema_version}"
+            )
+
+    def execute(
+        self,
+        sql: str,
+        parameters: tuple[object, ...] | list[object] = (),
+    ) -> _SnapshotGuardedCursor:
+        self.assert_current()
+        cursor = self._connection.execute(sql, parameters)
+        return _SnapshotGuardedCursor(cursor, self)
+
+
 class SQLiteLifecycleReadOnlySession:
     """Read-only SQL-native lifecycle and engineering knowledge query session.
 
     The session never opens a writable SQLite handle. It also refuses to serve a
     relational projection that does not represent the current authoritative snapshot.
-    Revision/failure analytical queries use snapshot-synchronized materialized rows;
-    other high-cardinality histories retain the keyset repository semantics.
+    Repository reads are bound to the snapshot accepted at session open and fail closed
+    after external snapshot drift until ``refresh()`` is called. Revision/failure
+    analytical queries use snapshot-synchronized materialized rows; other
+    high-cardinality histories retain the keyset repository semantics.
     """
 
     def __init__(self, database: str | Path) -> None:
@@ -112,10 +237,17 @@ class SQLiteLifecycleReadOnlySession:
                 f"snapshot={snapshot_version}, read_model={read_model_version}"
             )
 
-        self._connection = connection
-        self._queries = SQLiteLifecycleQueryRepository(connection)
-        self._knowledge = SQLiteMaterializedEngineeringKnowledgeRepository(
+        guarded_connection = _SnapshotGuardedConnection(
             connection,
+            snapshot_schema_version=snapshot_schema,
+            snapshot_version=snapshot_version,
+            read_model_version=read_model_version,
+            relational_schema_version=relational_schema_version,
+        )
+        self._connection = connection
+        self._queries = SQLiteLifecycleQueryRepository(guarded_connection)  # type: ignore[arg-type]
+        self._knowledge = SQLiteMaterializedEngineeringKnowledgeRepository(
+            guarded_connection,  # type: ignore[arg-type]
             snapshot_version=snapshot_version,
         )
         self._snapshot_version = snapshot_version

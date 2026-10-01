@@ -2,6 +2,11 @@
 
 from .constraint_confidence import ConstraintConfidence, ConstraintConfidenceModel
 from .constraint_satisfaction import ConstraintSatisfaction, ConstraintSatisfactionAnalyzer
+from .constraint_uncertainty import (
+    ConstraintTolerancePolicy,
+    UncertaintyAwareConstraintResolver,
+    UncertaintyAwareConstraintTolerancePolicy,
+)
 from .constraints import ConstraintIssue, ConstraintResolution, ConstraintResolver, ResolvedConstraint
 from .contracts import CanonicalGeometryInput, CanonicalInputAdapter
 from .dimensioned_view import DimensionedViewArtifact, DimensionedViewRenderer, ReferenceImageLayer
@@ -49,6 +54,7 @@ __all__ = [
     "ConstraintResolver",
     "ConstraintSatisfaction",
     "ConstraintSatisfactionAnalyzer",
+    "ConstraintTolerancePolicy",
     "DimensionBinder",
     "DimensionedViewArtifact",
     "DimensionedViewRenderer",
@@ -67,6 +73,8 @@ __all__ = [
     "ReferenceImageLayer",
     "ResolvedConstraint",
     "SketchPackageBuilder",
+    "UncertaintyAwareConstraintResolver",
+    "UncertaintyAwareConstraintTolerancePolicy",
     "UncertaintyAwareGeometryConflictDetector",
     "UnresolvedBinding",
     "VisionGeometryPipeline",

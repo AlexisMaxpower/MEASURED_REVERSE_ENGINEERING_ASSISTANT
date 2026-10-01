@@ -10,6 +10,7 @@ from typing import Any, Mapping, Protocol
 from .contracts import MappedSketchPackage
 from .solidworks_capabilities import evaluate_solidworks_constraint_support_v1
 from .solidworks_constraint_handshake import SOLIDWORKS_CONSTRAINT_CAPABILITIES_SHA256
+from .solidworks_dimension_capabilities import evaluate_solidworks_dimension_support_v1
 from .solidworks_worker_handshake import (
     SOLIDWORKS_WORKER_CAPABILITIES_SHA256,
     build_solidworks_worker_capability_projection_v1,
@@ -139,43 +140,13 @@ def _validate_dimension_support(
     dimension: Mapping[str, Any],
     entities_by_id: Mapping[str, Mapping[str, Any]],
 ) -> None:
-    dimension_id = str(dimension.get("dimension_id", "<unknown>"))
-    dimension_type = dimension.get("type")
-    unit = dimension.get("unit")
-    entity_ids = tuple(dimension.get("entity_ids") or ())
-
-    if dimension_type == "ANGLE":
-        if unit != "deg":
-            raise CadAdapterError(
-                f"SOLIDWORKS ANGLE dimension {dimension_id} requires canonical unit 'deg'"
-            )
-        if len(entity_ids) != 2:
-            raise CadAdapterError(
-                f"SOLIDWORKS ANGLE dimension {dimension_id} requires exactly two LINE entities"
-            )
-        if any(
-            entities_by_id.get(entity_id, {}).get("type") != "LINE"
-            for entity_id in entity_ids
-        ):
-            raise CadAdapterError(
-                f"SOLIDWORKS ANGLE dimension {dimension_id} supports LINE/LINE only"
-            )
-        try:
-            value = float(dimension.get("value"))
-        except (TypeError, ValueError) as exc:
-            raise CadAdapterError(
-                f"SOLIDWORKS ANGLE dimension {dimension_id} requires a numeric value"
-            ) from exc
-        if not 0.0 < value < 180.0:
-            raise CadAdapterError(
-                f"SOLIDWORKS ANGLE dimension {dimension_id} requires 0 < value < 180 deg"
-            )
+    decision = evaluate_solidworks_dimension_support_v1(dimension, entities_by_id)
+    if decision.supported:
         return
-
-    if unit != "mm":
-        raise CadAdapterError(
-            f"SOLIDWORKS {dimension_type} dimension {dimension_id} requires canonical unit 'mm'"
-        )
+    raise CadAdapterError(
+        "SOLIDWORKS dimension preflight failed "
+        f"[{decision.code}] {decision.dimension_id}: {decision.message}"
+    )
 
 
 def _preflight(package: MappedSketchPackage) -> None:
