@@ -2,85 +2,99 @@
 
 ## Snapshot
 
-- Date: **2026-10-01**
-- Branch: `chat-5/pass-15`
+- Date: **2026-10-02**
+- Branch: `chat-5/pass-16`
 - Slice: **Lifecycle & Engineering Knowledge**
-- Authorization: **direct user instruction — Pass 15**
-- Central baseline: `main` @ `99d8c6d9322f3669a43226e4fd2675fe683ab9f6`
-- Tested implementation SHA: `a0372ac3e7e4036a1b17d600cc3c29b3d09bb5a4`
-- MREA CI: `36816060128` — **SUCCESS**
-- Chat 5: **82 passed in 3.54s**
-- State: **Pass 15 implementation verified; final freeze pending**
+- Authorization: **direct user instruction — Pass 16**
+- Shared central state at worker start: `main` @ `99d8c6d9322f3669a43226e4fd2675fe683ab9f6`
+- Required cumulative Chat-5 dependency: frozen `chat-5/pass-15` @ `70ac1fa5331df47525e42ad4f2d848abddb268fe`
+- Tested implementation SHA: `cce9819eba0117bc1401c28e765b6ce2444efed7`
+- MREA CI: `36933325252` — **SUCCESS**
+- Chat 5 / Lifecycle: **85 passed in 5.85s**
+- Contracts / canonical fixtures: **SUCCESS**
+- Chat 4 / Generic CAD gate: **SUCCESS**
+- Integration / Chat 4 -> Chat 5: **SUCCESS**
+- State: **Pass 16 implementation verified; final handoff/freeze pending**
 
 ## Baseline discipline
 
-Pass 15 starts directly from the current shared `main`, not from the previous worker branch. All changes remain under `chat_5_lifecycle_engineering_knowledge/`.
+Shared `main` still contains the Round-14 closure state and did not yet contain frozen Chat-5 Pass 15 when Pass 16 was authorized. Pass 16 therefore branches from the frozen Pass-15 head so the required structured revision-comparison dependency is preserved instead of being silently discarded.
+
+No files outside `chat_5_lifecycle_engineering_knowledge/` are changed by Pass 16.
 
 ## Gap closed
 
-Pass 14 made revision comparison durable but intentionally compact. Pass 15 adds a richer factual side-by-side view required by the Chat-5 role baseline while keeping the compact API unchanged.
+Pass 15 exposes durable structured factual comparison. Pass 16 adds the first explicit revision-explanation layer: a deterministic evidence-backed explanation of exactly which committed facts differ between two revisions and which stored records/artifacts support each side.
 
-## Structured comparison
+## Delivered surface
 
-`RevisionComparisonSnapshot` exposes committed facts for one revision:
+`mrea_lifecycle.revision_explanation` provides:
+
+- `RevisionChangeSource`;
+- `RevisionChangeFact`;
+- `RevisionChangeExplanation`;
+- `build_revision_change_explanation(...)`;
+- `explain_revision_changes(...)`.
+
+The package root exports these public symbols.
+
+The explanation reuses one snapshot-guarded `compare_revision_details(...)` result. It does not perform an independent second read that could mix generations.
+
+## Supported factual deltas
+
+Stable ordered differences may cover:
 
 - revision metadata/provenance;
-- persisted CAD verification/runtime fields when present;
-- ordered manufacturing records;
-- ordered tests plus exact artifact IDs;
-- ordered failures plus exact evidence IDs and stored cause/feature fields;
-- deterministic revision-level lifecycle state.
+- persisted CAD verification/runtime truth;
+- materials;
+- manufacturing methods;
+- manufacturing records;
+- tests plus exact test artifact IDs;
+- failures plus exact evidence artifact IDs;
+- deterministic lifecycle state.
 
-`RevisionComparisonDetailsResult` contains `left`, `right` and deterministic `changed_categories` for revision metadata, CAD truth, materials, manufacturing methods/records, tests, failures and lifecycle state.
+For manufacturing/tests/failures, evidence includes exact persisted record IDs. Test and failure categories also preserve exact stored artifact IDs.
 
-These categories only state that factual structures differ. They do not rank revisions, recommend one, or infer why an outcome occurred.
+## Integrity boundary
 
-## Geometry boundary
+The explanation verifies that its emitted category sequence exactly matches the durable comparison's `changed_categories`. Divergence raises `LifecycleKnowledgeIntegrityError` rather than returning a partial or contradictory explanation.
 
-No geometry delta is emitted. The current committed Chat-5 relational model has no approved upstream geometry-comparison payload. Pass 15 therefore omits geometry instead of fabricating it from notes, failure locations or CAD artifact IDs.
+Existing missing-revision and cross-part validation remains fail closed.
 
-## Snapshot / HTTP behavior
+## Non-inference boundary
 
-All detail reads use the existing snapshot guard; generation drift fails closed. Added additive GET route:
+Pass 16 does not:
 
-```text
-/v1/knowledge/revision-comparison-details?left_revision_id=...&right_revision_id=...
-```
+- rank or score revisions;
+- recommend a preferred revision;
+- infer causality between a revision change and a test/failure;
+- promote estimated causes into confirmed causes;
+- synthesize or infer geometry;
+- add semantic search, embeddings or an LLM.
 
-Missing revisions, cross-part comparisons and unexpected query parameters map to existing `400 invalid_request` behavior.
+It is a structured factual evidence layer for later knowledge/AI work.
 
-Compatibility is preserved:
+## Compatibility
 
-- `compare_revisions()` unchanged;
-- HTTP schema remains `mrea.lifecycle-http.v1`;
-- SQLite relational schema remains version `4`;
-- no migration or shared-contract/canonical-fixture change;
-- no Chat 1–4/workflow change.
+Unchanged:
 
-## Regression coverage
+- `core/contracts/**` and canonical fixtures;
+- SQLite relational and snapshot schemas;
+- cursor formats;
+- HTTP schema/routes;
+- Chat 1–4 code;
+- workflows;
+- manufacturing-eligibility policy;
+- snapshot-drift fail-closed semantics.
 
-`tests/test_revision_comparison_details.py` covers exact metadata, manufacturing facts, test artifacts, failure evidence, lifecycle states, changed categories, fail-closed invalid inputs, GET serialization and absence of fabricated geometry.
+## Pass 16 delta
 
-Revision-comparison test imports were also cleaned so the Chat-5 suite completes without pytest collection warnings.
+Before final handoff, Pass 16 changed only:
 
-## Verification
+- `docs/PASS_16_REVISION_CHANGE_EXPLANATION.md`;
+- `docs/IMPLEMENTATION_STATE.md`;
+- `src/mrea_lifecycle/__init__.py`;
+- `src/mrea_lifecycle/revision_explanation.py`;
+- `tests/test_revision_change_explanation.py`.
 
-```text
-MREA CI / 36816060128 — SUCCESS
-Chat 5 / Lifecycle — 82 passed in 3.54s
-Contracts / canonical fixtures — SUCCESS
-Chat 4 / Generic CAD gate — SUCCESS
-Integration / Chat 4 -> Chat 5 — SUCCESS
-```
-
-## Remaining intentional limitations
-
-- geometry comparison until an approved upstream durable fact source exists;
-- revision ranking/recommendation;
-- semantic/AI interpretation;
-- external client authn/authz and deployment edge policy;
-- field-device synchronization.
-
-## Freeze rule
-
-`ORCHESTRATOR_HANDOFF.md` is the final worker mutation for Pass 15. After that commit the branch is frozen; final CI is verified on that exact HEAD without another mutation.
+`ORCHESTRATOR_HANDOFF.md` is the final worker mutation. After that commit, the branch is frozen and exact-head CI must be verified without further worker changes.
