@@ -11,6 +11,7 @@ from .contracts import MappedSketchPackage
 from .solidworks_capabilities import evaluate_solidworks_constraint_support_v1
 from .solidworks_constraint_handshake import SOLIDWORKS_CONSTRAINT_CAPABILITIES_SHA256
 from .solidworks_dimension_capabilities import evaluate_solidworks_dimension_support_v1
+from .solidworks_entity_capabilities import evaluate_solidworks_entity_support_v1
 from .solidworks_worker_handshake import (
     SOLIDWORKS_WORKER_CAPABILITIES_SHA256,
     build_solidworks_worker_capability_projection_v1,
@@ -123,6 +124,16 @@ def _verified_dimension_contracts(package: MappedSketchPackage) -> tuple[Mapping
     )
 
 
+def _validate_entity_support(entity: Mapping[str, Any]) -> None:
+    decision = evaluate_solidworks_entity_support_v1(entity)
+    if decision.supported:
+        return
+    raise CadAdapterError(
+        "SOLIDWORKS entity preflight failed "
+        f"[{decision.code}] {decision.entity_id}: {decision.message}"
+    )
+
+
 def _validate_constraint_support(
     constraint: Mapping[str, Any],
     entities_by_id: Mapping[str, Mapping[str, Any]],
@@ -174,18 +185,16 @@ def _preflight(package: MappedSketchPackage) -> None:
             f"{sorted(blocking)!r}"
         )
 
-    unsupported_entities = sorted(
-        {
-            str(entity.get("type"))
-            for entity in package.entity_contracts
-            if entity.get("type") not in _SUPPORTED_ENTITY_TYPES
-        }
-    )
-    if unsupported_entities:
-        raise CadAdapterError(
-            "SOLIDWORKS vendor slice supports canonical POINT/LINE/CIRCLE/ARC only; "
-            f"unsupported entities: {unsupported_entities!r}"
-        )
+    entities_by_id: dict[str, Mapping[str, Any]] = {}
+    for entity in package.entity_contracts:
+        _validate_entity_support(entity)
+        entity_id = str(entity.get("entity_id"))
+        if entity_id in entities_by_id:
+            raise CadAdapterError(
+                "SOLIDWORKS entity preflight failed "
+                f"[ENTITY_ID_DUPLICATE] {entity_id}: duplicate entity_id"
+            )
+        entities_by_id[entity_id] = entity
 
     unsupported_dimensions = sorted(
         {
@@ -200,9 +209,6 @@ def _preflight(package: MappedSketchPackage) -> None:
             f"{unsupported_dimensions!r}"
         )
 
-    entities_by_id = {
-        str(entity.get("entity_id")): entity for entity in package.entity_contracts
-    }
     for constraint in package.constraints:
         _validate_constraint_support(constraint, entities_by_id)
     for dimension in verified_dimensions:
