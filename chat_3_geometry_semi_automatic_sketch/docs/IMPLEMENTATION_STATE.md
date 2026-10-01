@@ -69,6 +69,29 @@ The policy is explicitly injected through the existing `GeometryPipeline(conflic
 Package version: `0.9.0`  
 New dependencies: none.
 
+## Verification
+
+Implementation head:
+
+`9600959db7f0ea1c5bbb90db6ac6c15dcbf93217`
+
+GitHub Actions:
+
+```text
+36801724833  MREA CI  SUCCESS
+```
+
+Required observed jobs:
+
+```text
+Chat 3 / Geometry                 SUCCESS — 87 passed in 0.49s
+Contracts / canonical fixtures   SUCCESS
+Chat 2 / Measurement             SUCCESS
+Chat 4 / Generic CAD gate        SUCCESS
+Integration / Chat 2 -> Chat 3   SUCCESS
+Integration / Chat 3 -> Chat 4   SUCCESS
+```
+
 ## Shared ownership
 
 Pass 12 modifies no:
@@ -89,4 +112,6 @@ Pass 12 modifies no:
 
 ## Status
 
-`PASS12_IMPLEMENTED_PENDING_FINAL_CI_AND_FREEZE`
+`READY_FOR_PASS12_INTEGRATOR_REVIEW`
+
+`chat-3/pass-12` is frozen after the final handoff commit.

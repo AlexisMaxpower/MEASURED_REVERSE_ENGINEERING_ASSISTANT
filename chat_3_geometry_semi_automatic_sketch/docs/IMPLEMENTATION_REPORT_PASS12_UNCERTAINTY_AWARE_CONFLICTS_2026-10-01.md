@@ -48,6 +48,27 @@ The existing default `GeometryConflictDetector` remains unchanged. Pass 12 adds 
 - fail-closed invalid uncertainty;
 - fail-closed invalid detector configuration.
 
+## Verification
+
+Exact implementation head:
+
+`9600959db7f0ea1c5bbb90db6ac6c15dcbf93217`
+
+GitHub Actions run:
+
+`36801724833` — `MREA CI` — `SUCCESS`
+
+Observed gates:
+
+```text
+Chat 3 / Geometry                 SUCCESS — 87 passed in 0.49s
+Contracts / canonical fixtures   SUCCESS
+Chat 2 / Measurement             SUCCESS
+Chat 4 / Generic CAD gate        SUCCESS
+Integration / Chat 2 -> Chat 3   SUCCESS
+Integration / Chat 3 -> Chat 4   SUCCESS
+```
+
 ## Dependencies / ownership
 
 New dependencies: none.  
