@@ -7,7 +7,7 @@ on:
   push:
     branches:
       - main
-      - integration/pass-4-candidate
+      - integration/pass-*-candidate
   workflow_dispatch:
 
 permissions:
@@ -40,7 +40,7 @@ jobs:
 
   round4-chat1-chat2:
     name: Integration / Round 4 Chat 1 -> Chat 2 truth
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/integration/pass-4-candidate' || (github.event_name == 'pull_request' && github.head_ref == 'integration/pass-4-candidate')
+    if: github.ref == 'refs/heads/main' || (startsWith(github.ref, 'refs/heads/integration/pass-') && endsWith(github.ref, '-candidate')) || (github.event_name == 'pull_request' && startsWith(github.head_ref, 'integration/pass-') && endsWith(github.head_ref, '-candidate'))
     needs:
       - shared-gate-infrastructure
     runs-on: ubuntu-latest
@@ -65,7 +65,7 @@ jobs:
 
   round4-chat2-chat3:
     name: Integration / Round 4 Chat 2 -> Chat 3 truth
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/integration/pass-4-candidate' || (github.event_name == 'pull_request' && github.head_ref == 'integration/pass-4-candidate')
+    if: github.ref == 'refs/heads/main' || (startsWith(github.ref, 'refs/heads/integration/pass-') && endsWith(github.ref, '-candidate')) || (github.event_name == 'pull_request' && startsWith(github.head_ref, 'integration/pass-') && endsWith(github.head_ref, '-candidate'))
     needs:
       - shared-gate-infrastructure
     runs-on: ubuntu-latest
@@ -90,7 +90,7 @@ jobs:
 
   round4-chat3-chat4:
     name: Integration / Round 4 Chat 3 -> Chat 4 truth
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/integration/pass-4-candidate' || (github.event_name == 'pull_request' && github.head_ref == 'integration/pass-4-candidate')
+    if: github.ref == 'refs/heads/main' || (startsWith(github.ref, 'refs/heads/integration/pass-') && endsWith(github.ref, '-candidate')) || (github.event_name == 'pull_request' && startsWith(github.head_ref, 'integration/pass-') && endsWith(github.head_ref, '-candidate'))
     needs:
       - shared-gate-infrastructure
     runs-on: ubuntu-latest
@@ -118,7 +118,7 @@ jobs:
 
   round4-chat4-chat5:
     name: Integration / Round 4 Chat 4 -> Chat 5 truth
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/integration/pass-4-candidate' || (github.event_name == 'pull_request' && github.head_ref == 'integration/pass-4-candidate')
+    if: github.ref == 'refs/heads/main' || (startsWith(github.ref, 'refs/heads/integration/pass-') && endsWith(github.ref, '-candidate')) || (github.event_name == 'pull_request' && startsWith(github.head_ref, 'integration/pass-') && endsWith(github.head_ref, '-candidate'))
     needs:
       - shared-gate-infrastructure
     runs-on: ubuntu-latest
@@ -143,7 +143,7 @@ jobs:
 
   round4-golden-path:
     name: Integration / Round 4 golden path
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/integration/pass-4-candidate' || (github.event_name == 'pull_request' && github.head_ref == 'integration/pass-4-candidate')
+    if: github.ref == 'refs/heads/main' || (startsWith(github.ref, 'refs/heads/integration/pass-') && endsWith(github.ref, '-candidate')) || (github.event_name == 'pull_request' && startsWith(github.head_ref, 'integration/pass-') && endsWith(github.head_ref, '-candidate'))
     needs:
       - round4-chat1-chat2
       - round4-chat2-chat3

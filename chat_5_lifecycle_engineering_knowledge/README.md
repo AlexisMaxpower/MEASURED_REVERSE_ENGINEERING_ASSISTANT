@@ -1,11 +1,11 @@
 # Chat 5 — Lifecycle & Engineering Knowledge
 
-Статус: **Pass 13 read-only snapshot drift guard implemented**  
+Статус: **Pass 14 durable revision comparison implemented**  
 Проект: **MREA — Measured Reverse Engineering Assistant**  
 Источник истины: **repository/GitHub + MREA SSOT**  
-Авторизация Pass 13: **direct user instruction**  
-Рабочая ветка: `chat-5/pass-13`  
-Центральный baseline Pass 13: `main` @ `4edde5c644755734a2ccf6e8f1c1b6ab9a63424d`
+Авторизация Pass 14: **direct user instruction**  
+Рабочая ветка: `chat-5/pass-14`  
+Центральный baseline Pass 14: `main` @ `d6758d3a4c5eb2116ac2e48c3a77e65c10688b12`
 
 ## Назначение области
 
@@ -21,15 +21,16 @@ Revision
 → snapshot-bound keyset pagination
 → materialized analytical read model
 → guarded read-only query session
-→ local/internal read-only HTTP transport
+→ durable revision comparison
+→ local/internal GET-only HTTP transport
 → optional authenticated HTTP cursor boundary
 ```
 
 ## Актуальная orchestration truth
 
-Round 12 закрыт и принят центральным оркестратором в `main`. Pass 13 начат непосредственно от текущего общего baseline `4edde5c...`; исторические worker branches не использовались как implementation baseline.
+Round 13 закрыт и интегрирован центральным оркестратором. Pass 14 начат непосредственно от актуального `main` @ `d6758d3a...`; исторические worker branches не использовались как implementation baseline.
 
-Pass 13 не меняет shared contracts, Chat 1–4, root integration tests, workflows или SQLite schema.
+Pass 14 изменяет только `chat_5_lifecycle_engineering_knowledge/`. Shared contracts, canonical fixtures, Chat 1–4, workflows и SQLite schema не меняются.
 
 ## Реализовано
 
@@ -39,9 +40,9 @@ Pass 13 не меняет shared contracts, Chat 1–4, root integration tests, 
 - PhysicalPartInstance identity/state machine;
 - exact failure/evidence linkage;
 - lifecycle repository + unit of work;
-- SQLite authoritative snapshot;
+- authoritative SQLite snapshot;
 - normalized relational read model;
-- backup/restore and read-only session.
+- backup/restore and guarded read-only session.
 
 ### CAD → lifecycle truth
 
@@ -53,6 +54,7 @@ Pass 13 не меняет shared contracts, Chat 1–4, root integration tests, 
 ### Engineering knowledge
 
 - revision lineage/outcomes;
+- durable revision comparison;
 - equipment/position history;
 - exact failure-pattern groups;
 - replacement chains;
@@ -61,32 +63,47 @@ Pass 13 не меняет shared contracts, Chat 1–4, root integration tests, 
 - GET-only WSGI read transport;
 - optional HMAC-SHA256 cursor authentication.
 
-### Pass 13 — read-only snapshot drift guard
+### Pass 14 — durable revision comparison
 
-До Pass 13 read-only session принимал snapshot version при открытии, но его SQLite connection работал в autocommit. Поэтому после внешнего writer commit тот же long-lived session мог прочитать более новые relational/materialized rows, продолжая сообщать старый `snapshot_version`.
+Исторический `RevisionComparison` существовал только как in-memory projection. Pass 14 переносит ту же factual semantics на committed SQLite read model без новой предметной логики.
 
-Теперь repository SQL проходит через snapshot guard:
+`SQLiteLifecycleReadOnlySession.knowledge.compare_revisions(left_revision_id, right_revision_id)` возвращает существующий `RevisionComparisonResult`:
 
-1. перед каждым statement проверяются authoritative snapshot version, read-model version и relational schema generation;
-2. после `fetchone()` / `fetchall()` metadata проверяется повторно;
-3. если generation изменилась, rows не принимаются и поднимается `LifecycleReadOnlyStaleError` с требованием `refresh()`;
-4. `refresh()` закрывает старое соединение и явно принимает новую committed generation.
+- revision IDs;
+- distinct sorted manufacturing materials;
+- exact failure count;
+- exact test count;
+- revision-level lifecycle state по исторической deterministic projection semantics.
 
-Guard намеренно не держит long-lived read transaction: завершённый read-only session не должен блокировать отдельного writer в default SQLite rollback-journal mode.
+Обе ревизии должны существовать и принадлежать одному `part_id`. Missing/cross-part inputs fail closed.
 
-## Проверка Pass 13
+Все SQL statements проходят через Pass-13 snapshot guard. Если committed generation меняется во время long-lived session, comparison не смешивает поколения: возникает `LifecycleReadOnlyStaleError`, после чего требуется `refresh()`.
+
+### HTTP boundary
+
+Добавлен GET endpoint:
+
+```text
+/v1/knowledge/revision-comparison
+  ?left_revision_id=<id>
+  &right_revision_id=<id>
+```
+
+Он использует тот же read-only session/repository и существующую JSON serialization. Invalid/missing/cross-part inputs возвращаются как `400 invalid_request`. HTTP schema остаётся `mrea.lifecycle-http.v1`, потому что это additive GET route без изменения существующих payload contracts.
+
+## Проверка Pass 14
 
 Tested implementation SHA:
 
 ```text
-a26c1d8f6927e3ebdfcf69d7f759893cd7b139bd
+8f5394c9ad2ffe1bfefc02021b78a9c7a17320d0
 ```
 
 MREA CI:
 
 ```text
-36806176020 — SUCCESS
-Chat 5 / Lifecycle: 73 passed in 3.05s
+36811581113 — SUCCESS
+Chat 5 / Lifecycle: SUCCESS
 Contracts / canonical fixtures: SUCCESS
 Chat 4 / Generic CAD gate: SUCCESS
 Integration / Chat 4 -> Chat 5: SUCCESS
@@ -94,13 +111,15 @@ Integration / Chat 4 -> Chat 5: SUCCESS
 
 ## Documentation
 
-- `docs/PASS_13_READ_ONLY_SNAPSHOT_DRIFT_GUARD.md`
-- `docs/BUILD_REUSE_CHECK_PASS13_SNAPSHOT_GUARD.md`
+- `docs/PASS_14_DURABLE_REVISION_COMPARISON.md`
+- `docs/BUILD_REUSE_CHECK_PASS14_REVISION_COMPARISON.md`
 - `docs/IMPLEMENTATION_STATE.md`
-- historical Pass 3–12 docs remain authoritative for their slices.
+- historical Pass 3–13 docs remain authoritative for their slices.
 
 ## Still intentionally out of scope
 
+- ranking revisions or recommending a preferred revision;
+- causal/semantic interpretation of failures or tests;
 - client authentication/authorization;
 - TLS / reverse-proxy / CORS / rate-limiting policy;
 - secret provisioning/storage policy;

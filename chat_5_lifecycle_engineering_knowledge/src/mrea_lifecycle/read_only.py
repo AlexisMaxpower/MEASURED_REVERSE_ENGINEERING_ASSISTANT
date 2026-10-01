@@ -4,10 +4,9 @@ from pathlib import Path
 import sqlite3
 from typing import Any
 
-from .engineering_knowledge import SQLiteEngineeringKnowledgeRepository
-from .materialized_knowledge import SQLiteMaterializedEngineeringKnowledgeRepository
 from .persistence import SQLITE_SNAPSHOT_SCHEMA_VERSION
 from .relational import SQLiteLifecycleQueryRepository
+from .revision_comparison import SQLiteRevisionComparisonEngineeringKnowledgeRepository
 from .sqlite_schema import SQLITE_RELATIONAL_SCHEMA_VERSION
 
 
@@ -152,15 +151,15 @@ class SQLiteLifecycleReadOnlySession:
     relational projection that does not represent the current authoritative snapshot.
     Repository reads are bound to the snapshot accepted at session open and fail closed
     after external snapshot drift until ``refresh()`` is called. Revision/failure
-    analytical queries use snapshot-synchronized materialized rows; other
-    high-cardinality histories retain the keyset repository semantics.
+    analytical queries use snapshot-synchronized materialized rows; durable revision
+    comparison and other factual reads share the same guarded snapshot generation.
     """
 
     def __init__(self, database: str | Path) -> None:
         self.database = Path(database)
         self._connection: sqlite3.Connection | None = None
         self._queries: SQLiteLifecycleQueryRepository | None = None
-        self._knowledge: SQLiteEngineeringKnowledgeRepository | None = None
+        self._knowledge: SQLiteRevisionComparisonEngineeringKnowledgeRepository | None = None
         self._snapshot_version = 0
         self._read_model_version = 0
         self._relational_schema_version = 0
@@ -246,7 +245,7 @@ class SQLiteLifecycleReadOnlySession:
         )
         self._connection = connection
         self._queries = SQLiteLifecycleQueryRepository(guarded_connection)  # type: ignore[arg-type]
-        self._knowledge = SQLiteMaterializedEngineeringKnowledgeRepository(
+        self._knowledge = SQLiteRevisionComparisonEngineeringKnowledgeRepository(
             guarded_connection,  # type: ignore[arg-type]
             snapshot_version=snapshot_version,
         )
@@ -273,7 +272,7 @@ class SQLiteLifecycleReadOnlySession:
         return self._queries
 
     @property
-    def knowledge(self) -> SQLiteEngineeringKnowledgeRepository:
+    def knowledge(self) -> SQLiteRevisionComparisonEngineeringKnowledgeRepository:
         if self._knowledge is None:
             raise LifecycleReadOnlyError("read-only lifecycle session is closed")
         return self._knowledge

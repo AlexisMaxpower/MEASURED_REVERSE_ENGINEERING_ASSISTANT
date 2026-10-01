@@ -3,100 +3,140 @@
 ## Snapshot
 
 - Date: **2026-10-01**
-- Branch: `chat-5/pass-13`
+- Branch: `chat-5/pass-14`
 - Slice: **Lifecycle & Engineering Knowledge**
-- Authorization: **direct user instruction — Pass 13**
-- Central baseline checked before work: `main` @ `4edde5c644755734a2ccf6e8f1c1b6ab9a63424d`
-- Central state at start: **Round 12 closed/accepted; next full worker pass ready**
-- Tested implementation SHA: `a26c1d8f6927e3ebdfcf69d7f759893cd7b139bd`
-- MREA CI: `36806176020` — **SUCCESS**
-- Chat-5 test result: **73 passed in 3.05s**
-- State: **Pass 13 worker implementation verified and handed to central integration**
+- Authorization: **direct user instruction — Pass 14**
+- Central baseline checked before work: `main` @ `d6758d3a4c5eb2116ac2e48c3a77e65c10688b12`
+- Central state at start: **Round 13 closed/integrated; next full worker pass ready**
+- Tested implementation SHA: `8f5394c9ad2ffe1bfefc02021b78a9c7a17320d0`
+- MREA CI: `36811581113` — **SUCCESS**
+- State: **Pass 14 implementation verified; documentation published; final freeze pending**
 
 ## Baseline discipline
 
-Pass 13 was branched directly from the then-current shared `main`. No historical Chat-5 worker branch was used as a baseline.
+Pass 14 was branched directly from current shared `main`, not from `chat-5/pass-13` worker history. `main` remained at the same baseline through implementation verification.
 
-All implementation changes remain under `chat_5_lifecycle_engineering_knowledge/`.
+All changes are under `chat_5_lifecycle_engineering_knowledge/`.
 
-## Root cause closed in Pass 13
+## Gap closed in Pass 14
 
-`SQLiteLifecycleReadOnlySession` previously validated this invariant only at open time:
+The product already had `RevisionComparisonResult` and deterministic `RevisionComparison` in the original in-memory projection layer. The durable SQLite knowledge/read-only surface introduced later did not expose equivalent comparison capability.
+
+This created two truths for the same intended factual operation:
 
 ```text
-authoritative snapshot version == normalized read-model version
+in-memory projection → revision comparison available
+committed durable read model → revision comparison unavailable
 ```
 
-The underlying SQLite handle used autocommit. Across separate SELECT statements, an already-open connection could observe a later writer commit. The Python session object would still retain its old `snapshot_version`, so a later knowledge/lifecycle query could return newer rows under an older generation label.
+Pass 14 closes that gap by reusing the existing result shape and preserving historical projection semantics over committed relational facts.
 
-That is incompatible with the existing snapshot-bound cursor/read contract.
+## Pass 14 architecture
 
-## Pass 13 architecture
+### Durable comparison repository
 
-### Snapshot-guarded connection facade
+Added `SQLiteRevisionComparisonEngineeringKnowledgeRepository`, extending the current materialized engineering knowledge repository.
 
-The session now injects `_SnapshotGuardedConnection` into both SQL repository surfaces.
+`compare_revisions(left_revision_id, right_revision_id)` reads only committed read-model facts and returns the existing `RevisionComparisonResult`:
 
-For every repository `execute()` it validates:
+- left/right revision IDs;
+- distinct sorted manufacturing materials;
+- exact failure counts;
+- exact test counts;
+- revision-level `LifecycleState`.
 
-- lifecycle snapshot schema version;
-- authoritative `lifecycle_store.version`;
-- `lifecycle_read_model_meta.snapshot_version`;
-- current relational migration version.
+No ranking, recommendation, score, causal interpretation or AI inference is produced.
 
-The metadata must still equal the generation accepted when the session opened.
+### Input integrity
 
-### Post-fetch validation
+The comparison requires:
 
-`_SnapshotGuardedCursor` checks the same generation after `fetchone()` and `fetchall()`.
+1. both revision IDs exist in the committed read model;
+2. both revisions share the same `part_id`.
 
-This closes the window where a generation could advance after the pre-statement check but before rows are returned to the caller. Drift raises `LifecycleReadOnlyStaleError`; callers must use `refresh()` or open a new session.
+Missing revisions and cross-part comparisons raise `ValueError` and fail closed.
 
-### No long-lived read transaction
+### Preserved state semantics
 
-Pass 13 does not pin the session with `BEGIN`.
+Pass 14 intentionally preserves the historical `LifecycleStateProjection` behavior rather than inventing a new state definition:
 
-Reason: the current store does not require WAL mode. In the default rollback-journal model, keeping a read transaction open across application calls can block writer commit. The guard keeps completed reads short and lets the writer advance; the old session then fails closed on its next read.
+- a failure newer than the latest installation projects `FAILED`;
+- a later installation/test can project the revision back to `ACTIVE` while failure history remains counted;
+- otherwise the latest canonical revision event maps to `DRAFT`, `MANUFACTURED`, `ACTIVE` or `FAILED` as before.
 
-### No schema / contract change
+Event ordering is deterministic by `(occurred_at, sequence)`.
 
-No SQLite migration is added. `SQLITE_RELATIONAL_SCHEMA_VERSION` remains `4`.
+### Snapshot consistency
 
-No shared contract, canonical fixture, HTTP schema, cursor encoding, lifecycle domain rule or manufacturing eligibility rule changes.
+Comparison uses the Pass-13 `_SnapshotGuardedConnection`.
+
+Because comparison needs multiple SQL statements, every statement is guarded before execute and after fetch. If another writer commits between those statements, the next guard detects generation drift and raises `LifecycleReadOnlyStaleError`; a mixed-generation comparison is not returned.
+
+`SQLiteLifecycleReadOnlySession.refresh()` explicitly accepts the new committed generation.
+
+### HTTP surface
+
+Added additive GET route:
+
+```text
+/v1/knowledge/revision-comparison?left_revision_id=...&right_revision_id=...
+```
+
+The route opens the same fresh guarded read-only session used by existing knowledge endpoints and serializes the existing dataclass result.
+
+Missing parameters, unexpected parameters, missing revisions and cross-part inputs map through the existing `400 invalid_request` boundary.
+
+`LIFECYCLE_HTTP_API_SCHEMA_VERSION` remains `mrea.lifecycle-http.v1`; existing routes and payloads are unchanged.
+
+### No schema / shared-contract change
+
+- `SQLITE_RELATIONAL_SCHEMA_VERSION` remains `4`;
+- no SQLite migration;
+- no change to `core/contracts/**`;
+- no canonical fixture change;
+- no cursor format change;
+- no Chat 1–4 change;
+- no workflow change.
 
 ## Regression coverage
 
-`tests/test_read_only_snapshot_guard.py` verifies one open session across an external commit:
+`tests/test_revision_comparison_durable.py` verifies:
 
-1. session opens on R1 and reads both lifecycle query and materialized knowledge surfaces;
-2. a separate writer successfully commits R2 while the reader object remains open;
-3. the old session rejects both query surfaces with `LifecycleReadOnlyStaleError`;
-4. the cached session generation does not silently advance;
-5. explicit `refresh()` accepts the next generation;
-6. both query surfaces then return R1 and R2.
+1. durable comparison preserves existing material/count/state semantics;
+2. failure followed by a later installation/test projects ACTIVE as in the original in-memory implementation;
+3. missing revision is rejected;
+4. cross-part comparison is rejected;
+5. an external writer commit makes the old read-only session fail closed;
+6. `refresh()` accepts the new generation and comparison reflects it.
+
+`tests/test_revision_comparison_http.py` verifies:
+
+1. GET comparison serialization and snapshot metadata;
+2. required parameters;
+3. cross-part rejection;
+4. unexpected parameter rejection;
+5. existing HTTP schema version is preserved.
 
 ## Verification
 
 Tested implementation SHA:
 
 ```text
-a26c1d8f6927e3ebdfcf69d7f759893cd7b139bd
+8f5394c9ad2ffe1bfefc02021b78a9c7a17320d0
 ```
 
 Workflow:
 
 ```text
-MREA CI / 36806176020 — SUCCESS
+MREA CI / 36811581113 — SUCCESS
 ```
 
-Results:
+Required results:
 
-- `Chat 5 / Lifecycle` — **SUCCESS**, `73 passed in 3.05s`;
+- `Chat 5 / Lifecycle` — **SUCCESS**;
 - `Contracts / canonical fixtures` — **SUCCESS**;
 - `Chat 4 / Generic CAD gate` — **SUCCESS**;
-- `Integration / Chat 4 -> Chat 5` — **SUCCESS**;
-- Chat 1–3 unit jobs — **SUCCESS**;
-- unrelated integration jobs — skipped by existing branch filters.
+- `Integration / Chat 4 -> Chat 5` — **SUCCESS**.
 
 ## Shared-contract impact
 
@@ -104,24 +144,16 @@ None.
 
 ## Standing SOLIDWORKS host qualification
 
-Real-host SOLIDWORKS qualification is not a Chat-5 or per-round status field. The operational authority is the dedicated standing workflow:
-
-```text
-SOLIDWORKS_HOST_QUALIFICATION = DEDICATED_WORKFLOW_AUTHORITY
-QUALIFICATION_WORKFLOW = .github/workflows/solidworks_host_qualification.yml
-ROUND_LEVEL_SOFTWARE_BLOCKER = FALSE
-LEGACY_THREE_LINE_CARRY_FORWARD = RETIRED
-```
-
-Chat 5 preserves runtime evidence (`VERIFIED | FAILED | UNVERIFIED`) on individual CAD/lifecycle records, but it does not infer or mirror the standing host qualification. When host qualification matters, resolve it from the dedicated workflow artifact and its host-boundary fingerprint.
+Unchanged. Standing real-host qualification remains owned by the dedicated workflow authority; Pass 14 neither infers nor mirrors it.
 
 ## Remaining intentional limitations
 
+- revision ranking/recommendation;
+- semantic/AI interpretation;
 - external client authn/authz;
 - deployment/TLS/CORS/rate-limit policy;
-- semantic/AI interpretation;
 - field-device synchronization.
 
 ## Freeze rule
 
-`ORCHESTRATOR_HANDOFF.md` is the final worker mutation for Pass 13. After that commit, `chat-5/pass-13` is frozen. Central integration/final certification may correct integration documentation without reopening worker feature scope.
+`ORCHESTRATOR_HANDOFF.md` is the final worker mutation for Pass 14. After that commit, `chat-5/pass-14` is frozen. Final CI must be verified on that exact branch HEAD without a follow-up mutation.
