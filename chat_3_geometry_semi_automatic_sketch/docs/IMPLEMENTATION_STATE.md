@@ -9,7 +9,16 @@
 
 ## Central baseline read before Pass 13
 
-Round 12 is centrally closed and accepted with the external SOLIDWORKS host gate still unverified. Current orchestration authority reports:
+Round 12 was centrally closed and accepted before this worker pass. Real SOLIDWORKS host qualification is a standing out-of-band environment qualification, not a per-round blocker. Current operational authority is the dedicated workflow:
+
+```text
+SOLIDWORKS_HOST_QUALIFICATION = DEDICATED_WORKFLOW_AUTHORITY
+QUALIFICATION_WORKFLOW = .github/workflows/solidworks_host_qualification.yml
+ROUND_LEVEL_SOFTWARE_BLOCKER = FALSE
+LEGACY_THREE_LINE_CARRY_FORWARD = RETIRED
+```
+
+At worker start the central round authority was:
 
 ```text
 ROUND_12_CLOSED = TRUE
@@ -17,7 +26,7 @@ OPEN_SOFTWARE_BLOCKERS = NONE
 NEXT_FULL_WORKER_PASS = READY
 ```
 
-Directive `OD-2026-10-01-005` requires a fresh worker branch from current certified `main`; Pass 13 follows that requirement and does not reuse a historical worker branch.
+Directive `OD-2026-10-01-005` required a fresh worker branch from the certified shared baseline; Pass 13 did not reuse a historical worker branch.
 
 ## Integrated Chat 3 capabilities entering Pass 13
 
@@ -111,4 +120,4 @@ Pass 13 modifies no:
 
 `READY_FOR_PASS13_INTEGRATOR_REVIEW`
 
-`chat-3/pass-13` is frozen after its final handoff commit.
+`chat-3/pass-13` is frozen after its final handoff commit. Central integration/final certification may correct integration documentation without reopening worker feature scope.
