@@ -3,92 +3,88 @@
 **Control owner:** central orchestration  
 **Finalizing role:** Orchestrator 2 / final orchestrator 2 of 2  
 **Contract baseline:** `mrea.contracts.v1`  
-**Status:** `ROUND_11_CLOSED_ACCEPTED_WITH_EXTERNAL_GATE`
+**Directive revision:** `OD-2026-10-01-005`  
+**Status:** `ROUND_12_CLOSED_ACCEPTED_WITH_EXTERNAL_GATE`
 
-## Round 11 accepted integration
+## Round 12 accepted integration
 
-The independently accepted Round-11 integration candidate was:
-
-```text
-branch: integration/pass-4-candidate
-SHA:    f54d3841067e60e922340593b740f5a50fe4562f
-tree:   38c951bec641c84f079f9247a64b7cd201210066
-```
-
-It was merged through PR #38. The merge commit was:
+Round 12 was independently audited from the certified Round-11 baseline:
 
 ```text
-7c03295200f72dbe6aa9c79bd21113c9f2df87e3
+base main: c888704b37e88b68c055f1095e6e9a4fc3650f7e
+candidate: f8bb708b9d7aadb0d60ca29b062cd4dcc751864b
+candidate tree: f71fc44b559234ecf0d2930834b1d847e6df1fe9
+PR: #42
+merge commit: de5c00e5d795a0e279963f89bbfa9e5dfd1ba58f
 ```
 
-Round-11 worker inputs independently audited before merge:
+Observed Round-12 worker refs:
 
 ```text
-Chat 2  chat-2/pass-11-verification @ f8692b91e6a2eb867d8f6b714b97e05f7477a100
-Chat 3  chat-3/pass-11              @ ffd2fd71e325da690fccebbfa1c1ce904571f655
-Chat 4  chat-4/pass-11              @ 09a0fef643ebf6173c82af42de7b86ec7c2e0b53
-Chat 5  chat-5/pass-11              @ fe6038bd6f709d38c299b36b979ead78a86d8734
+Chat 1  no Round-12 branch / no product delta
+Chat 2  chat-2/pass-12-readiness @ 09ea175eadbf92a35743297de66286a2b56790e6
+Chat 3  chat-3/pass-12           @ 0ee946417226806927a817baa77c5722a0cd0bc4
+Chat 4  chat-4/pass-12           @ 2d7f852bcc7a0ebf883997b560e8a5f21b2cc1c0
+Chat 5  chat-5/pass-12           @ 1c627173888b768bab46809c1b795c0dcece085e
 ```
 
-Chat 2 and Chat 3 Pass-11 tops were verification/documentation-only. Chat 4 and Chat 5 accepted product-owned surfaces were replayed into the central candidate without importing obsolete shared/control history.
+Chat 2 was readiness/control-only and contributed no product delta. The integration replay imported only independently reviewed Chat-3/4/5-owned product/docs/tests surfaces and retained central control/handoff ownership.
+
+## Integrated Round-12 capabilities
+
+- Chat 3: opt-in uncertainty-aware geometry conflict comparison using explicit physical measurement uncertainty without mutating measurement truth.
+- Chat 4: Python -> C# declared SOLIDWORKS worker capability fingerprint plus the existing constraint fingerprint; both are checked before COM startup. The documentation explicitly limits this to the fingerprinted declared-capability surface and selected source-parity checks rather than claiming total behavioral equivalence.
+- Chat 5: snapshot-synchronized materialized revision-outcome/failure-pattern aggregates with keyset traversal for new v2 cursors and preserved legacy v1 cursor execution semantics.
+
+No shared canonical contract change was introduced in the Round-12 candidate.
 
 ## Candidate CI evidence
 
-Exact candidate `f54d3841067e60e922340593b740f5a50fe4562f` passed both central suites:
+Exact candidate `f8bb708b9d7aadb0d60ca29b062cd4dcc751864b`:
 
 ```text
-36798866892  MREA CI                SUCCESS
-36798866917  MREA Round 4 Truth CI  SUCCESS
+36803843534  MREA CI                SUCCESS
+36803843409  MREA Round 4 Truth CI  SUCCESS
 ```
 
-All mandatory slice, contract, boundary and golden-path jobs actually executed; no mandatory gate was accepted through `skipped` or `cancelled` status.
+GitHub recorded the exact-head check set completed without failure, mandatory skip or unfinished check. Normal boundaries/golden path and Round-4 truth boundaries/golden path executed successfully.
 
-## Final post-merge finding and correction
+## Final-Orchestrator control-plane correction
 
-The first post-merge Truth run on merge commit `7c03295200f72dbe6aa9c79bd21113c9f2df87e3` exposed a shared workflow defect:
+Independent final review found that all five worker `ORCHESTRATOR_DIRECTIVE.md` files still contained obsolete `OD-2026-09-30-004` / Round-4 branch freezes and prohibitions. Leaving those files unchanged would make the repository unsafe for the next full worker pass even though the product code was green.
 
-```text
-36800154366  MREA Round 4 Truth CI
-```
+They were replaced by `OD-2026-10-01-005` directives which:
 
-The shared infrastructure job executed, but all four truth boundaries and the Round-4 golden path were skipped because their job-level conditions only admitted `integration/pass-4-candidate`.
+- supersede historical Round-4 selected-cut instructions;
+- require the next pass to resolve current central state first;
+- require a new worker branch from the then-current certified `main`;
+- forbid using old pass branches as implementation baselines;
+- preserve slice ownership/truth boundaries;
+- do not invent the next feature task;
+- fail closed if no current worker-round task exists.
 
-Final Orchestrator 2 corrected `.github/workflows/round4_truth.yml` so the mandatory truth jobs also execute on `refs/heads/main`.
-
-Correction commit / certified software+CI baseline:
-
-```text
-c35c2abc08798f1da4083d1a33dbaa1f42db3af9
-```
-
-Exact-main evidence after the correction:
+## Authority / readiness
 
 ```text
-36800327016  MREA CI                SUCCESS
-36800327069  MREA Round 4 Truth CI  SUCCESS
-```
-
-For `36800327016`, contracts, all five slices, all four normal integration boundaries and the normal golden path executed successfully.
-
-For `36800327069`, the shared gate, all four Round-4 truth boundaries and the Round-4 golden path executed successfully. No required truth gate was skipped.
-
-## Resolved legacy blockers
-
-The old Round-4 Chat-3 uncertainty-propagation blocker and Chat-5 runtime-evidence blocker are closed in the integrated repository. The historical `FIX_REQUIRED / REOPENED` state is no longer current authority.
-
-```text
+ROUND_12_CLOSED = TRUE
 OPEN_SOFTWARE_BLOCKERS = NONE
 CURRENT_CANDIDATE_ACCEPTED = TRUE
 MERGE_TO_MAIN_COMPLETED = TRUE
-ROUND_11_CLOSED = TRUE
+CHAT1_REOPENED = FALSE
+CHAT2_REOPENED = FALSE
+CHAT3_REOPENED = FALSE
+CHAT4_REOPENED = FALSE
+CHAT5_REOPENED = FALSE
 NEXT_FULL_WORKER_PASS = READY
 ```
 
-No worker is currently reopened by the old Round-4 findings. A new worker pass must start from the current shared `main` under a new/current orchestration directive rather than from historical frozen baselines.
+The next complete worker pass must start from current shared `main` after resolving this state and must not revive OD-004 or historical frozen cuts.
+
+Final external reporting of Round-12 closure additionally requires the repository's automatic MREA CI and Round-4 Truth CI to succeed on the exact final `main` head containing the Round-12 certification/control-plane files. Exact final-head evidence is recorded in the Round-12 PR conversation after those runs complete, avoiding a self-referential commit-SHA document.
 
 ## External environment truth
 
-Generic Linux CI, test doubles and synthetic runtime evidence do not promote the real SOLIDWORKS host state.
+Software-only CI does not promote controlled SOLIDWORKS host execution:
 
 ```text
 REAL_SOLIDWORKS_2026_HOST = EXTERNAL_GATE_UNVERIFIED
@@ -96,8 +92,8 @@ PRODUCTION_CSHARP_INTEROP_BUILD = UNVERIFIED
 NATIVE_SLDPRT_GENERATION_READBACK = UNVERIFIED
 ```
 
-Therefore the final Round-11 disposition is:
+Final Round-12 disposition:
 
 ```text
-ROUND 11 CLOSED — ACCEPTED_WITH_EXTERNAL_GATE
+ROUND 12 CLOSED — ACCEPTED_WITH_EXTERNAL_GATE
 ```
