@@ -1,27 +1,35 @@
 # MREA Orchestration State
 
 **Control owner:** central orchestration  
-**Directive revision:** `OD-2026-10-01-006`  
-**Status:** `ROUND_12_CLOSED_GREEN_SOFTWARE`
+**Directive revision:** `OD-2026-10-01-007`  
+**Status:** `ROUND_13_CLOSED_GREEN_SOFTWARE`
 
-## Round 12 authority
+## Round 13 authority
 
 ```text
-ROUND_12_CLOSED = TRUE
+ROUND_13_CLOSED = TRUE
 OPEN_SOFTWARE_BLOCKERS = NONE
 MERGE_TO_MAIN_COMPLETED = TRUE
 NEXT_FULL_WORKER_PASS = READY
 ```
 
-Round-12 integration remains the accepted repository baseline. Historical Round-12 certification records remain audit history; this file is the current operational authority.
+Round-13 integration is the accepted repository baseline. The audited integration merge is `511dc88fa3c625ee81759ac131c9198047e37b10`; the final closure/control commit that contains this state is the required starting baseline for the next worker pass.
+
+Historical worker branches, integration candidates and older round certification records remain audit history only. They are not implementation baselines for a new pass.
+
+## Round 13 integrated scope
+
+- Chat 1 — readiness/control only; no Round-13 product delta imported.
+- Chat 2 — durable offline-first SQLite measurement-session persistence.
+- Chat 3 — measurement-grounded uncertainty-aware constraint tolerance/resolution.
+- Chat 4 — verified-dimension shape capability contract plus fail-closed Python/C# pre-COM handshake.
+- Chat 5 — read-only lifecycle snapshot drift guard.
+
+Final Orchestrator 2 independently audited the repository state, repaired current documentation/control regressions, merged the exact reviewed candidate, and required green post-merge software CI before issuing this closure state.
 
 ## Standing SOLIDWORKS host qualification
 
-The former per-round carry-forward fields
-
-`REAL_SOLIDWORKS_2026_HOST`, `PRODUCTION_CSHARP_INTEROP_BUILD`, and `NATIVE_SLDPRT_GENERATION_READBACK`
-
-are retired as round-level status fields. They are three subchecks of one standing environment qualification named `SOLIDWORKS_HOST_QUALIFICATION`.
+The former per-round carry-forward fields are retired as round-level status fields. Real-host qualification is one standing environment qualification named `SOLIDWORKS_HOST_QUALIFICATION`.
 
 Operational authority is dynamic rather than copied into this file:
 
@@ -32,20 +40,17 @@ ROUND_LEVEL_SOFTWARE_BLOCKER = FALSE
 LEGACY_THREE_LINE_CARRY_FORWARD = RETIRED
 ```
 
-When real-host status is relevant, resolve it from the dedicated workflow and its generated `solidworks_host_qualification.json` evidence. Do not manually mirror that result into ordinary round state.
+Round 13 changed fingerprinted SOLIDWORKS host-boundary code. Therefore any real-host result is valid only when the dedicated workflow evidence carries the matching current host-boundary fingerprint. No Linux/software CI result is promoted to positive real-host qualification.
 
-A successful qualification closes all three legacy sub-gates in one run by proving a fresh production C# build against the installed SOLIDWORKS 2026 interops, real COM execution, native `.SLDPRT` generation and real dimension read-back.
-
-The qualification manifest records a host-boundary fingerprint. A successful qualification remains reusable across later software rounds while that fingerprint is unchanged and the controlled host has not materially changed. Unrelated slice changes do not invalidate it.
-
-Future workers and orchestrators must not copy the three old `UNVERIFIED` lines into ordinary handoffs or round verdicts. Mention the standing qualification only when its state changes, its fingerprint becomes stale, the controlled host changes materially, or the round explicitly concerns real-host SOLIDWORKS behavior.
+When real-host status is relevant, resolve it directly from the dedicated workflow and its generated `solidworks_host_qualification.json`. Do not manually mirror that dynamic result into ordinary round state, worker handoffs, README files or implementation-state documents.
 
 ## Worker-start authority
 
-Every new worker pass must:
+Every new full worker pass must:
 
-1. start from the then-current shared `main`;
-2. use a new pass branch rather than an historical branch as implementation base;
-3. preserve slice ownership, provenance and fail-closed truth boundaries;
-4. follow the active worker-round/user task rather than reviving an old directive;
-5. treat SOLIDWORKS host qualification as out-of-band unless the task changes its fingerprinted host boundary.
+1. read this file and require `ROUND_13_CLOSED = TRUE` and `NEXT_FULL_WORKER_PASS = READY`;
+2. start from the then-current shared `main` containing this Round-13 closure state;
+3. use a new pass branch rather than an historical branch as implementation base;
+4. preserve slice ownership, provenance and fail-closed truth boundaries;
+5. follow the active worker-round/user task rather than reviving an old task;
+6. treat SOLIDWORKS host qualification as out-of-band unless the active task changes or explicitly validates its fingerprinted host boundary.

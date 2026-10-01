@@ -1,6 +1,6 @@
 # ORCHESTRATOR DIRECTIVE — Chat 5
 
-**Revision:** `OD-2026-10-01-006`  
+**Revision:** `OD-2026-10-01-007`  
 **Control owner:** central orchestration  
 **Status:** `READY_FOR_NEXT_FULL_WORKER_PASS_FROM_CURRENT_MAIN`
 
@@ -11,17 +11,17 @@ This directive supersedes all older Chat-5 directives.
 Before starting the next worker pass:
 
 1. read `chat_6_orchestrator/ORCHESTRATION_STATE.md`;
-2. require `ROUND_12_CLOSED = TRUE` and `NEXT_FULL_WORKER_PASS = READY`;
-3. branch from the then-current shared `main`;
+2. require `ROUND_13_CLOSED = TRUE` and `NEXT_FULL_WORKER_PASS = READY`;
+3. branch from the then-current shared `main` containing the Round-13 closure state;
 4. do not use a historical pass branch as the implementation base.
 
 ## Slice ownership
 
-Chat 5 owns Lifecycle & Engineering Knowledge. Preserve manufacturing-eligibility truth, deterministic lifecycle transitions, snapshot/cursor semantics and the rule that lifecycle/knowledge code cannot promote unverified CAD/runtime facts.
+Chat 5 owns Lifecycle & Engineering Knowledge. Preserve manufacturing-eligibility truth, deterministic lifecycle transitions, snapshot/cursor semantics and the rule that lifecycle/knowledge code cannot promote unverified CAD/runtime facts. Read-only sessions must continue to fail closed when their accepted snapshot generation drifts.
 
 ## Standing SOLIDWORKS qualification
 
-SOLIDWORKS real-host qualification is out-of-band. Do not copy the historical three `UNVERIFIED` host labels into Chat-5 handoffs. Refer to `chat_6_orchestrator/SOLIDWORKS_HOST_QUALIFICATION_POLICY.md` only if the active task explicitly concerns that qualification.
+SOLIDWORKS real-host qualification is out-of-band. Do not copy historical per-round host-gate status into Chat-5 handoffs. Refer to `chat_6_orchestrator/SOLIDWORKS_HOST_QUALIFICATION_POLICY.md` only if the active task explicitly concerns that qualification.
 
 ## Next pass rule
 
