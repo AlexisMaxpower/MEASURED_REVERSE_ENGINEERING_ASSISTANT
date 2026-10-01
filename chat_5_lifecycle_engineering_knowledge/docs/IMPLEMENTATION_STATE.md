@@ -11,7 +11,7 @@
 - Tested implementation SHA: `a26c1d8f6927e3ebdfcf69d7f759893cd7b139bd`
 - MREA CI: `36806176020` — **SUCCESS**
 - Chat-5 test result: **73 passed in 3.05s**
-- State: **Pass 13 implementation verified; documentation published; final handoff/freeze pending**
+- State: **Pass 13 worker implementation verified and handed to central integration**
 
 ## Baseline discipline
 
@@ -102,15 +102,18 @@ Results:
 
 None.
 
-## External runtime truth
+## Standing SOLIDWORKS host qualification
 
-Unchanged:
+Real-host SOLIDWORKS qualification is not a Chat-5 or per-round status field. The operational authority is the dedicated standing workflow:
 
 ```text
-REAL_SOLIDWORKS_2026_HOST = EXTERNAL_GATE_UNVERIFIED
-PRODUCTION_CSHARP_INTEROP_BUILD = UNVERIFIED
-NATIVE_SLDPRT_GENERATION_READBACK = UNVERIFIED
+SOLIDWORKS_HOST_QUALIFICATION = DEDICATED_WORKFLOW_AUTHORITY
+QUALIFICATION_WORKFLOW = .github/workflows/solidworks_host_qualification.yml
+ROUND_LEVEL_SOFTWARE_BLOCKER = FALSE
+LEGACY_THREE_LINE_CARRY_FORWARD = RETIRED
 ```
+
+Chat 5 preserves runtime evidence (`VERIFIED | FAILED | UNVERIFIED`) on individual CAD/lifecycle records, but it does not infer or mirror the standing host qualification. When host qualification matters, resolve it from the dedicated workflow artifact and its host-boundary fingerprint.
 
 ## Remaining intentional limitations
 
@@ -121,4 +124,4 @@ NATIVE_SLDPRT_GENERATION_READBACK = UNVERIFIED
 
 ## Freeze rule
 
-`ORCHESTRATOR_HANDOFF.md` is the final worker mutation for Pass 13. After that commit, `chat-5/pass-13` is frozen. Final CI is verified on that exact branch HEAD without a follow-up mutation.
+`ORCHESTRATOR_HANDOFF.md` is the final worker mutation for Pass 13. After that commit, `chat-5/pass-13` is frozen. Central integration/final certification may correct integration documentation without reopening worker feature scope.
