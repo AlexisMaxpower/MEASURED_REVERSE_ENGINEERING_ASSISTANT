@@ -160,7 +160,7 @@ def test_pass4_database_migrates_and_backfills_without_snapshot_rewrite(tmp_path
 
     assert store.loaded_version == 4
     assert store.read_model_version == 4
-    assert store.relational_schema_version == SQLITE_RELATIONAL_SCHEMA_VERSION == 3
+    assert store.relational_schema_version == SQLITE_RELATIONAL_SCHEMA_VERSION == 4
     assert "R-LEGACY" in store.revisions
 
     history = store.queries.revision_history("PART-LEGACY")
@@ -181,11 +181,12 @@ def test_pass4_database_migrates_and_backfills_without_snapshot_rewrite(tmp_path
     assert rows == [
         (2, "normalized_lifecycle_read_model"),
         (3, "cad_runtime_truth"),
+        (4, "materialized_engineering_knowledge"),
     ]
     assert snapshot == (4, "mrea.lifecycle-snapshot.v1")
 
     reopened = SQLiteLifecycleStore(database)
-    assert reopened.relational_schema_version == 3
+    assert reopened.relational_schema_version == 4
     assert reopened.read_model_version == 4
     assert len(reopened.queries.revision_history("PART-LEGACY")) == 1
     reopened.close()
