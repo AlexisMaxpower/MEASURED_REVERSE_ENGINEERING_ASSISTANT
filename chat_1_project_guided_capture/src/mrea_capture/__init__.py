@@ -53,6 +53,8 @@ from .models import (
     QualityReasonCode,
     QualitySeverity,
     RectifiedReferenceRecord,
+    VoiceCaptureCommand,
+    VoiceCaptureEvent,
 )
 from .quality import (
     CaptureQualityAnalyzer,
@@ -150,6 +152,8 @@ __all__ = [
     "RectificationService",
     "RectifiedRaster",
     "RectifiedReferenceRecord",
+    "VoiceCaptureCommand",
+    "VoiceCaptureEvent",
     "active_clean_reference",
     "calibration_for_active_reference",
     "measurement_frames_for_active_reference",

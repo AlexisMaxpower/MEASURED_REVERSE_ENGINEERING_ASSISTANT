@@ -11,8 +11,8 @@ namespace Mrea.SolidWorksCadAgent
     {
         private const string ProtocolVersion = "mrea.solidworks-agent.v1";
         private const string AdapterName = "SOLIDWORKS_2026";
-        private const string WorkerCapabilitiesSha256 = "979a962f6a1a13d674abf0b6c9dcce16eae386e581a5c8597e89a4493b77a4d6";
-        private const string ConstraintCapabilitiesSha256 = "02a33af48298669e3563ce467b6cd6d8f2586d073baa3de6baa45749fc92a3d8";
+        private const string WorkerCapabilitiesSha256 = "0e1c5ca75945f7a62ac6cbd126a6523bc3b851e1ec051345fc265f89b8c3172f";
+        private const string ConstraintCapabilitiesSha256 = "5eac12828b4255e05b17732093bf881e24a64c016abe5828573e4235be665ae4";
 
         private const int ExitSuccess = 0;
         private const int ExitInvalidInput = 20;
@@ -226,6 +226,7 @@ namespace Mrea.SolidWorksCadAgent
             request.constraints = request.constraints ?? new List<ConstraintSpec>();
             request.dimensions = request.dimensions ?? new List<DimensionSpec>();
             ValidateEntityEnvelope(request);
+            ValidateConstraintEnvelope(request);
             ValidateDimensionEnvelope(request);
         }
 
@@ -267,6 +268,87 @@ namespace Mrea.SolidWorksCadAgent
                         throw new InvalidDataException(
                             "ARC start/end angles resolve to a full/zero circle; use CIRCLE instead: " + entity.entity_id);
                 }
+            }
+        }
+
+        private static void ValidateConstraintEnvelope(AgentRequest request)
+        {
+            var entitySpecs = new Dictionary<string, EntitySpec>(StringComparer.Ordinal);
+            foreach (var entity in request.entities)
+            {
+                if (entity == null || string.IsNullOrWhiteSpace(entity.entity_id))
+                    throw new InvalidDataException("Every entity requires entity_id.");
+                if (entitySpecs.ContainsKey(entity.entity_id))
+                    throw new InvalidDataException("Duplicate entity_id: " + entity.entity_id);
+                entitySpecs.Add(entity.entity_id, entity);
+            }
+
+            var constraintIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var constraint in request.constraints)
+            {
+                if (constraint == null || string.IsNullOrWhiteSpace(constraint.constraint_id))
+                    throw new InvalidDataException("Every constraint requires constraint_id.");
+                if (!constraintIds.Add(constraint.constraint_id))
+                    throw new InvalidDataException("Duplicate constraint_id: " + constraint.constraint_id);
+                if (constraint.status != "VERIFIED")
+                    throw new NotSupportedException(
+                        "Real-host constraint must be VERIFIED: " + constraint.constraint_id + " status=" + constraint.status);
+                if (constraint.type != "HORIZONTAL" && constraint.type != "VERTICAL" &&
+                    constraint.type != "PARALLEL" && constraint.type != "PERPENDICULAR" &&
+                    constraint.type != "CONCENTRIC" && constraint.type != "EQUAL" &&
+                    constraint.type != "TANGENT")
+                    throw new NotSupportedException(
+                        "Unsupported fail-closed canonical constraint type: " + constraint.type + " id=" + constraint.constraint_id);
+                if (constraint.entity_ids == null || constraint.entity_ids.Count == 0)
+                    throw new InvalidDataException("Constraint has no entity_ids: " + constraint.constraint_id);
+
+                var seenEntityIds = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var entityId in constraint.entity_ids)
+                {
+                    if (!seenEntityIds.Add(entityId))
+                        throw new InvalidDataException("Constraint contains duplicate entity_ids: " + constraint.constraint_id);
+                    if (!entitySpecs.ContainsKey(entityId))
+                        throw new InvalidDataException("Constraint references unknown entity: " + entityId);
+                }
+
+                if (constraint.type == "HORIZONTAL" || constraint.type == "VERTICAL")
+                {
+                    if (constraint.entity_ids.Count == 1 && entitySpecs[constraint.entity_ids[0]].type == "LINE")
+                        continue;
+                    throw new NotSupportedException(
+                        constraint.type + " requires exactly one LINE: " + constraint.constraint_id);
+                }
+
+                if (constraint.type == "PARALLEL" || constraint.type == "PERPENDICULAR" || constraint.type == "EQUAL")
+                {
+                    if (constraint.entity_ids.Count == 2 &&
+                        entitySpecs[constraint.entity_ids[0]].type == "LINE" &&
+                        entitySpecs[constraint.entity_ids[1]].type == "LINE")
+                        continue;
+                    throw new NotSupportedException(
+                        constraint.type + " requires exactly two LINE entities: " + constraint.constraint_id);
+                }
+
+                if (constraint.type == "CONCENTRIC")
+                {
+                    if (constraint.entity_ids.Count == 2 &&
+                        IsCircleOrArc(entitySpecs[constraint.entity_ids[0]]) &&
+                        IsCircleOrArc(entitySpecs[constraint.entity_ids[1]]))
+                        continue;
+                    throw new NotSupportedException(
+                        "CONCENTRIC requires exactly two CIRCLE/ARC entities: " + constraint.constraint_id);
+                }
+
+                if (constraint.entity_ids.Count != 2)
+                    throw new NotSupportedException(
+                        "TANGENT requires exactly two entities: " + constraint.constraint_id);
+                var firstType = entitySpecs[constraint.entity_ids[0]].type;
+                var secondType = entitySpecs[constraint.entity_ids[1]].type;
+                var firstSupported = firstType == "LINE" || firstType == "CIRCLE" || firstType == "ARC";
+                var secondSupported = secondType == "LINE" || secondType == "CIRCLE" || secondType == "ARC";
+                if (!firstSupported || !secondSupported || (firstType == "LINE" && secondType == "LINE"))
+                    throw new NotSupportedException(
+                        "TANGENT supports LINE/CIRCLE/ARC pairs with at least one CIRCLE/ARC: " + constraint.constraint_id);
             }
         }
 

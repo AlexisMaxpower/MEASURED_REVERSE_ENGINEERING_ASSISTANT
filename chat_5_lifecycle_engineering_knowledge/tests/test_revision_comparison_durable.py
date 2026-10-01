@@ -12,7 +12,7 @@ from mrea_lifecycle import (
     Revision,
     SQLiteLifecycleReadOnlySession,
     SQLiteLifecycleStore,
-    TestRecord,
+    TestRecord as LifecycleTestRecord,
 )
 
 
@@ -70,7 +70,7 @@ def _seed_comparison_database(path) -> None:
             event_id="LC-I1",
         )
         uow.tests.record(
-            TestRecord(
+            LifecycleTestRecord(
                 "T1",
                 "R1",
                 T0 + timedelta(hours=8),
@@ -112,7 +112,7 @@ def _seed_comparison_database(path) -> None:
             event_id="LC-I2",
         )
         uow.tests.record(
-            TestRecord(
+            LifecycleTestRecord(
                 "T2",
                 "R1",
                 T0 + timedelta(hours=11),
@@ -167,7 +167,7 @@ def test_durable_revision_comparison_fails_closed_after_snapshot_drift(tmp_path)
     uow = LifecycleUnitOfWork(writer)
     with uow.transaction():
         uow.tests.record(
-            TestRecord(
+            LifecycleTestRecord(
                 "T-R2",
                 "R2",
                 T0 + timedelta(hours=12),
