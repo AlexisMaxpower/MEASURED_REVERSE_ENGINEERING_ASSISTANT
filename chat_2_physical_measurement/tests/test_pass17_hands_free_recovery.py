@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -20,19 +19,9 @@ from physical_measurement import (
 )
 
 
-class PrefixSequentialIds:
-    def __init__(self) -> None:
-        self._values: dict[str, int] = defaultdict(int)
-
-    def __call__(self, prefix: str) -> str:
-        self._values[prefix] += 1
-        return f"{prefix}-CHAT2-P17-{self._values[prefix]:03d}"
-
-
 def build_service(database_path: Path) -> MeasurementSessionService:
     return MeasurementSessionService(
         SqliteMeasurementSessionRepository(database_path),
-        id_factory=PrefixSequentialIds(),
         clock=lambda: datetime(2026, 10, 2, 1, 0, 0, tzinfo=timezone.utc),
     )
 
