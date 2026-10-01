@@ -13,7 +13,11 @@ from .models import (
     ProvenanceSource,
     decimal_value,
 )
-from .repository import MeasurementSessionRepository
+from .repository import (
+    MeasurementSessionPage,
+    MeasurementSessionPageCursor,
+    MeasurementSessionRepository,
+)
 from .type_registry import MeasurementTypeRegistry
 
 
@@ -235,3 +239,18 @@ class MeasurementSessionService:
         """Return durable sessions newest-first, optionally scoped to one project."""
 
         return self._repository.list_sessions(project_id=project_id)
+
+    def list_session_page(
+        self,
+        *,
+        project_id: str | None = None,
+        limit: int = 50,
+        cursor: MeasurementSessionPageCursor | None = None,
+    ) -> MeasurementSessionPage:
+        """Return one deterministic keyset page of durable measurement sessions."""
+
+        return self._repository.list_session_page(
+            project_id=project_id,
+            limit=limit,
+            cursor=cursor,
+        )
