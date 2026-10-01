@@ -65,7 +65,7 @@ def test_backup_restore_roundtrip_preserves_exact_committed_version(tmp_path) ->
     assert manifest.format_version == LIFECYCLE_BACKUP_FORMAT_VERSION
     assert manifest.snapshot_version == 1
     assert manifest.read_model_version == 1
-    assert manifest.relational_schema_version == SQLITE_RELATIONAL_SCHEMA_VERSION == 3
+    assert manifest.relational_schema_version == SQLITE_RELATIONAL_SCHEMA_VERSION == 4
     assert manifest.created_at == "2026-09-30T03:00:00Z"
     assert manifest.size_bytes == backup.stat().st_size
     assert len(manifest.sha256) == 64
@@ -180,7 +180,7 @@ def test_read_only_session_serves_queries_and_sqlite_rejects_writes(tmp_path) ->
 
     with SQLiteLifecycleReadOnlySession(database) as session:
         assert session.snapshot_version == session.read_model_version == 1
-        assert session.relational_schema_version == SQLITE_RELATIONAL_SCHEMA_VERSION == 3
+        assert session.relational_schema_version == SQLITE_RELATIONAL_SCHEMA_VERSION == 4
         history = session.queries.revision_history("PART-BACKUP")
         assert [item.revision_id for item in history] == ["R1"]
 

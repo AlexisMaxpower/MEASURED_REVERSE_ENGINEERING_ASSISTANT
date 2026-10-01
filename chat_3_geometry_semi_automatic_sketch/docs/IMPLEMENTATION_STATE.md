@@ -1,126 +1,117 @@
 # Chat 3 — Implementation State
 
-**Date:** 2026-09-30  
+**Date:** 2026-10-01  
 **Repository:** `AlexisMaxpower/MEASURED_REVERSE_ENGINEERING_ASSISTANT`  
-**Active branch:** `chat-3/pass-7`  
+**Active branch:** `chat-3/pass-12`  
 **Role:** Chat 3 — Geometry & Semi-Automatic Sketch  
-**Ring:** 7  
-**Authorization:** explicit user-requested continuation; no newer Chat 3 worker directive than OD-2026-09-29-003 was present on `main` when Ring 7 started.
+**Pass:** 12  
+**Base:** shared `main` @ `c888704b37e88b68c055f1095e6e9a4fc3650f7e`
 
-## Baseline
+## Central baseline read before Pass 12
 
-Ring 7 branches from frozen Ring 6 head:
+Round 11 is centrally closed and accepted. Current orchestration state reports:
 
-`28d4373b0e9cfdb25a1a833e9ca646c2a06f9d14`
+```text
+OPEN_SOFTWARE_BLOCKERS = NONE
+ROUND_11_CLOSED = TRUE
+NEXT_FULL_WORKER_PASS = READY
+```
 
-## Capabilities through Ring 6
+The historical Round-4 Chat-3 freeze/fix directive is superseded by the accepted central state. Pass 12 starts from current `main`; it does not reuse a historical worker baseline.
 
-Chat 3 already provides:
+## Integrated Chat 3 capabilities entering Pass 12
 
-- canonical CapturePackage / MeasurementPackage adapter;
-- `IMAGE_PX -> MAT_XY_MM` normalization;
-- POINT / LINE / CIRCLE / ARC models;
+- canonical CapturePackage / MeasurementPackage normalization;
+- IMAGE_PX -> MAT_XY_MM calibration normalization;
+- POINT / LINE / CIRCLE / ARC geometry;
 - deterministic GeometryGraph;
-- measurement binding and geometry conflict visibility;
+- verified measurement binding and explicit conflicts;
+- uncertainty preservation into `MeasurementRef` and `DimensionBinding`;
 - deterministic SketchPackage v1 generation;
-- OpenCV-backed LINE/CIRCLE/ARC extraction with `VISION_DETECTED` provenance;
-- fail-closed ambiguous geometry handling;
-- `ConstraintResolver` confidence, verified-measurement and redundancy gates;
-- COINCIDENT / HORIZONTAL / VERTICAL / PARALLEL / PERPENDICULAR / TANGENT / CONCENTRIC / EQUAL / SYMMETRIC candidates;
+- OpenCV-backed image geometry candidates;
+- constraint candidate generation and deterministic resolution;
+- geometric satisfaction residuals;
+- residual-aware constraint confidence;
 - deterministic SVG Dimensioned View.
 
-## Ring 7 — Constraint Satisfaction Diagnostics
+## Pass 12 — Uncertainty-Aware Geometry Conflict Policy
 
-New module:
+Added:
 
-`src/mrea_geometry/constraint_satisfaction.py`
+`src/mrea_geometry/uncertainty.py`
 
 Public API:
 
-- `ConstraintSatisfaction`;
-- `ConstraintSatisfactionAnalyzer`.
+`UncertaintyAwareGeometryConflictDetector`
 
-### Purpose
+Policy:
 
-A candidate relation is no longer publishable solely because detection once emitted it. Before canonical promotion, current geometry must still satisfy the relation within explicit tolerances.
+```text
+effective_tolerance = baseline_tolerance + uncertainty_scale * uncertainty
+```
 
-### Residuals
+Default baseline tolerance remains `0.05`; default uncertainty scale is `1.0`.
 
-Normalized angular residual (`1e-3` default):
+The policy is explicitly injected through the existing `GeometryPipeline(conflict_detector=...)` boundary. The legacy fixed-tolerance detector remains unchanged, so Pass 12 does not silently alter central default semantics.
 
-- HORIZONTAL;
-- VERTICAL;
-- PARALLEL;
-- PERPENDICULAR.
+### Truth invariants
 
-Linear residual (`0.05 mm` default):
-
-- COINCIDENT;
-- TANGENT;
-- CONCENTRIC;
-- EQUAL;
-- SYMMETRIC.
-
-### Resolver order
-
-1. entity existence;
-2. confidence gate;
-3. geometric satisfaction;
-4. redundancy filter;
-5. verified measurement conflict checks;
-6. canonical publication.
-
-Unsatisfied candidates become canonical unresolved with code:
-
-`UNSATISFIED_CONSTRAINT`
-
-No geometry is moved and no verified measurement is changed.
+- verified physical value remains authoritative;
+- no measurement value/unit/provenance mutation;
+- uncertainty is consumed, never fabricated;
+- uncertainty does not strengthen confidence;
+- absent uncertainty preserves existing fixed-tolerance behavior;
+- negative/non-finite uncertainty fails closed;
+- unverified dimensions do not become truth conflicts.
 
 ## Runtime / dependencies
 
-Package version:
-
-`0.7.0`
-
-New Ring 7 dependencies: **none**.
+Package version: `0.9.0`  
+New dependencies: none.
 
 ## Verification
 
-GitHub Actions implementation run:
+Implementation head:
 
-- run: `36645593928`;
-- implementation head: `8527a4ad9c711b18c6fc1bcd61dbfe537c6d53d5`;
-- Chat 3 / Geometry: **56 passed in 0.44s**;
-- Contracts: SUCCESS;
-- Chat 2 -> Chat 3: SUCCESS;
-- Chat 4 generic CAD: SUCCESS.
+`9600959db7f0ea1c5bbb90db6ac6c15dcbf93217`
 
-The worker branch's Chat 3 -> Chat 4 gate still inherits the old shared test lookup `cad_verification_report["dimensions"]`; current `main` already uses canonical `cad_verification_report["items"]`. Ring 7 does not modify shared integration infrastructure.
+GitHub Actions:
+
+```text
+36801724833  MREA CI  SUCCESS
+```
+
+Required observed jobs:
+
+```text
+Chat 3 / Geometry                 SUCCESS — 87 passed in 0.49s
+Contracts / canonical fixtures   SUCCESS
+Chat 2 / Measurement             SUCCESS
+Chat 4 / Generic CAD gate        SUCCESS
+Integration / Chat 2 -> Chat 3   SUCCESS
+Integration / Chat 3 -> Chat 4   SUCCESS
+```
 
 ## Shared ownership
 
-Ring 7 modifies no:
+Pass 12 modifies no:
 
-- shared contracts;
-- canonical shared fixtures;
-- repository integration tests;
-- CI workflow;
+- `core/contracts/`;
+- shared canonical fixtures;
+- `tests/integration/`;
+- CI workflows;
 - other chat directories.
 
 ## Deferred Chat 3 work
 
 - numerical constraint solving/entity movement;
 - global over-constrained-system diagnosis;
-- uncertainty-aware/noisy-vision tolerance models;
+- uncertainty-aware constraint residual tolerances beyond geometry-conflict policy;
 - multi-view geometry relationships;
 - CAD-native logic.
 
-## Current status
+## Status
 
-`READY_FOR_RING7_INTEGRATOR_REVIEW`
+`READY_FOR_PASS12_INTEGRATOR_REVIEW`
 
-## Ring 7 documents
-
-- `BUILD_REUSE_CHECK_RING7_CONSTRAINT_SATISFACTION.md`;
-- `IMPLEMENTATION_REPORT_RING7_CONSTRAINT_SATISFACTION_2026-09-30.md`;
-- `ORCHESTRATOR_HANDOFF.md`.
+`chat-3/pass-12` is frozen after the final handoff commit.

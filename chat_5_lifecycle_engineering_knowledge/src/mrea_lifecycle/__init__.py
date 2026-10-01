@@ -49,6 +49,7 @@ from .knowledge_paging import (
     KnowledgePage,
     LifecycleKnowledgeCursorError,
 )
+from .materialized_knowledge import SQLiteMaterializedEngineeringKnowledgeRepository
 from .models import (
     CADArtifactReference,
     CADRevisionLink,
@@ -203,6 +204,7 @@ __all__ = [
     "SQLiteLifecycleQueryRepository",
     "SQLiteLifecycleReadOnlySession",
     "SQLiteLifecycleStore",
+    "SQLiteMaterializedEngineeringKnowledgeRepository",
     "SQLiteSchemaMigration",
     "TestRecord",
     "TestService",

@@ -1,11 +1,11 @@
 # Chat 5 — Lifecycle & Engineering Knowledge
 
-Статус: **Pass 11 aggregate keyset pagination implemented**  
+Статус: **Pass 12 materialized engineering aggregates implemented**  
 Проект: **MREA — Measured Reverse Engineering Assistant**  
 Источник истины: **repository/GitHub + MREA SSOT**  
-Авторизация Pass 11: **direct user instruction**  
-Рабочая ветка: `chat-5/pass-11`  
-Центральный baseline: текущий `main` `c034f7583d4e1f130f827d94a43762f3cad1a7e5`
+Авторизация Pass 12: **direct user instruction**  
+Рабочая ветка: `chat-5/pass-12`  
+Центральный baseline Pass 12: `main` @ `c888704b37e88b68c055f1095e6e9a4fc3650f7e`
 
 ## Назначение области
 
@@ -19,21 +19,16 @@ Revision
 → Failed / Removed / Superseded
 → deterministic engineering knowledge queries
 → snapshot-bound keyset pagination
+→ materialized analytical read model
 → local/internal read-only HTTP transport
 → optional authenticated HTTP cursor boundary
 ```
 
-## Актуальная cumulative линия
+## Актуальная orchestration truth
 
-Pass 11 собран file-level replay поверх текущего `main`, а не продолжением stale shared ancestry.
+Pass 11 уже интегрирован центральным оркестратором и закрыт в `main` как часть Round 11. Pass 12 начат непосредственно от текущего общего baseline `c888704b...`; старое worker-local утверждение о том, что Pass 11 не merged, больше не является актуальным.
 
-В него сведены:
-
-- cumulative Chat-5 state Pass 3–10.1;
-- corrected Round-4 runtime truth из `chat-5/pass-8`;
-- Pass-11 aggregate keyset pagination.
-
-`chat-5/pass-8` не изменён.
+Pass 12 не меняет shared contracts, Chat 1–4, root integration tests или workflows.
 
 ## Реализовано
 
@@ -49,10 +44,10 @@ Pass 11 собран file-level replay поверх текущего `main`, а 
 
 ### CAD → lifecycle truth
 
-- canonical numerical CAD verification remains independent from runtime evidence;
-- runtime `VERIFIED | FAILED | UNVERIFIED` survives persistence/read model;
-- runtime-gated manufacturing eligibility fails closed;
-- numerical VERIFIED never upgrades runtime UNVERIFIED.
+- canonical numerical CAD verification остаётся независимой от runtime evidence;
+- runtime `VERIFIED | FAILED | UNVERIFIED` переживает persistence/read model;
+- runtime-gated manufacturing eligibility fail-closed;
+- numerical VERIFIED никогда не повышает runtime UNVERIFIED до VERIFIED.
 
 ### Engineering knowledge
 
@@ -66,7 +61,7 @@ Pass 11 собран file-level replay поверх текущего `main`, а 
 
 ### Keyset pagination
 
-`mrea.knowledge-cursor.v2` is used by new traversals for:
+`mrea.knowledge-cursor.v2` используется новыми traversal для:
 
 ```text
 revision outcomes:
@@ -83,13 +78,45 @@ failure patterns:
  cause_sort)
 ```
 
-New v2 continuation uses key predicates + `LIMIT`, not OFFSET.
+Новые v2 continuation используют key predicates + `LIMIT`, не OFFSET. Уже выданные v1 cursors остаются совместимыми и продолжают исторический OFFSET path.
 
-Already-issued v1 cursors remain accepted and continue on their historical OFFSET paths.
+### Pass 12 — materialized analytical read model
 
-## Orchestration truth
+SQLite relational schema поднята до version `4`.
 
-Current `main` still carries `OD-2026-09-30-004` and centrally selects corrected Pass 8 for Round-4 handling. Pass 11 is a direct-user-authorized worker continuation and is not represented as centrally accepted or merged.
+Материализованы два существующих дорогих factual aggregate:
+
+- `lifecycle_revision_outcomes_materialized`;
+- `lifecycle_failure_patterns_materialized`.
+
+Они не вводят новую предметную семантику: содержимое строится из уже существующего normalized read model и проверяется на равенство прежним raw aggregate queries.
+
+Refresh происходит внутри той же SQLite transaction, что и публикация нового `lifecycle_read_model_meta.snapshot_version`. Поэтому reader либо видит старый полностью согласованный committed snapshot, либо новый полностью согласованный snapshot; промежуточное состояние не публикуется.
+
+`SQLiteLifecycleReadOnlySession` теперь выдаёт `SQLiteMaterializedEngineeringKnowledgeRepository`:
+
+- direct revision-outcome/failure-pattern reads идут по materialized tables;
+- v2 pages идут по materialized tables + keyset predicates;
+- legacy v1 pages намеренно делегируются историческому raw OFFSET path для cursor continuity;
+- equipment history и остальные factual queries сохраняют прежний implementation path.
+
+## Проверка Pass 12
+
+Tested implementation SHA:
+
+```text
+0e4b2df0b144fe7116b7e94141be85266a0820fc
+```
+
+MREA CI:
+
+```text
+36802306777 — SUCCESS
+Chat 5 / Lifecycle: 72 passed in 11.64s
+Contracts / canonical fixtures: SUCCESS
+Chat 4 / Generic CAD gate: SUCCESS
+Integration / Chat 4 -> Chat 5: SUCCESS
+```
 
 ## Documentation
 
@@ -102,14 +129,14 @@ Current `main` still carries `OD-2026-09-30-004` and centrally selects corrected
 - `docs/PASS_9_READ_ONLY_HTTP_API.md`
 - `docs/PASS_10_AUTHENTICATED_HTTP_CURSORS.md`
 - `docs/PASS_10_1_KEYSET_PAGINATION.md`
-- `docs/BUILD_REUSE_CHECK_PASS11_FAILURE_PATTERN_KEYSET.md`
 - `docs/PASS_11_FAILURE_PATTERN_KEYSET_PAGINATION.md`
+- `docs/BUILD_REUSE_CHECK_PASS12_MATERIALIZED_KNOWLEDGE.md`
+- `docs/PASS_12_MATERIALIZED_ANALYTICAL_AGGREGATES.md`
 - `docs/IMPLEMENTATION_STATE.md`
 - `ORCHESTRATOR_HANDOFF.md`
 
 ## Still intentionally out of scope
 
-- materialized analytical aggregates;
 - client authentication/authorization;
 - TLS / reverse-proxy / CORS / rate-limiting policy;
 - secret provisioning/storage policy;

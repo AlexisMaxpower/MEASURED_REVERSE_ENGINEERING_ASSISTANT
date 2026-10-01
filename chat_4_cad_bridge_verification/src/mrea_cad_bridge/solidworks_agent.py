@@ -10,6 +10,10 @@ from typing import Any, Mapping, Protocol
 from .contracts import MappedSketchPackage
 from .solidworks_capabilities import evaluate_solidworks_constraint_support_v1
 from .solidworks_constraint_handshake import SOLIDWORKS_CONSTRAINT_CAPABILITIES_SHA256
+from .solidworks_worker_handshake import (
+    SOLIDWORKS_WORKER_CAPABILITIES_SHA256,
+    build_solidworks_worker_capability_projection_v1,
+)
 from .vendor import (
     CadAdapterError,
     CadAdapterResult,
@@ -20,8 +24,13 @@ from .vendor import (
 
 SOLIDWORKS_AGENT_PROTOCOL = "mrea.solidworks-agent.v1"
 SOLIDWORKS_ADAPTER_NAME = "SOLIDWORKS_2026"
-_SUPPORTED_ENTITY_TYPES = frozenset({"POINT", "LINE", "CIRCLE", "ARC"})
-_SUPPORTED_DIMENSION_TYPES = frozenset({"DISTANCE", "DIAMETER", "RADIUS", "ANGLE"})
+_WORKER_CAPABILITY_PROJECTION = build_solidworks_worker_capability_projection_v1()
+_SUPPORTED_ENTITY_TYPES = frozenset(
+    _WORKER_CAPABILITY_PROJECTION["geometry_entities"]["supported"]
+)
+_SUPPORTED_DIMENSION_TYPES = frozenset(
+    _WORKER_CAPABILITY_PROJECTION["verified_dimensions"]["supported"]
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -241,6 +250,7 @@ def build_solidworks_agent_request(
     return {
         "protocol_version": SOLIDWORKS_AGENT_PROTOCOL,
         "adapter_name": SOLIDWORKS_ADAPTER_NAME,
+        "worker_capabilities_sha256": SOLIDWORKS_WORKER_CAPABILITIES_SHA256,
         "constraint_capabilities_sha256": SOLIDWORKS_CONSTRAINT_CAPABILITIES_SHA256,
         "sketch_package_id": package.sketch_package_id,
         "output_directory": str(config.output_directory.resolve()),
