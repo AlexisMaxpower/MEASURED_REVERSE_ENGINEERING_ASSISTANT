@@ -39,6 +39,7 @@ def _dimension(
     *entity_ids: str,
     unit: str = "mm",
     verified: bool = True,
+    uncertainty: float | None = 0.02,
 ) -> DimensionBinding:
     return DimensionBinding(
         dimension_id=dimension_id,
@@ -50,7 +51,7 @@ def _dimension(
         source="MANUAL_MEASURED",
         target_entity_ids=tuple(entity_ids),
         geometry_estimate=value,
-        uncertainty=0.02 if verified else None,
+        uncertainty=uncertainty if verified else None,
     )
 
 
@@ -162,9 +163,65 @@ def test_rectangle_profile_is_constrained_up_to_xy_frame() -> None:
     assert diagnosis.unsupported_dimension_ids == ()
 
 
-def test_verified_angle_dimension_fails_closed_as_indeterminate() -> None:
+def test_verified_line_angle_dimension_removes_one_relative_orientation_dof() -> None:
     first = Line("L1", Point2D(0.0, 0.0), Point2D(10.0, 0.0))
     second = Line("L2", Point2D(0.0, 0.0), Point2D(0.0, 10.0))
+    draft = _draft(
+        first,
+        second,
+        dimensions=(_dimension("D-A", "ANGLE", 90.0, "L1", "L2", unit="deg"),),
+    )
+
+    diagnosis = ConstraintFreedomAnalyzer().analyze(draft, _resolution())
+
+    assert diagnosis.status == "UNDER_CONSTRAINED"
+    assert diagnosis.variable_count == 8
+    assert diagnosis.supported_equation_count == 1
+    assert diagnosis.supported_rank == 1
+    assert diagnosis.degrees_of_freedom == 7
+    assert diagnosis.frame_degrees_of_freedom == 3
+    assert diagnosis.internal_degrees_of_freedom == 4
+    assert diagnosis.unsupported_dimension_ids == ()
+
+
+def test_verified_line_angle_is_invariant_to_line_endpoint_storage_direction() -> None:
+    normal = _draft(
+        Line("L1", Point2D(0.0, 0.0), Point2D(10.0, 0.0)),
+        Line("L2", Point2D(0.0, 0.0), Point2D(0.0, 10.0)),
+        dimensions=(_dimension("D-A", "ANGLE", 90.0, "L1", "L2", unit="deg"),),
+    )
+    reversed_storage = _draft(
+        Line("L1", Point2D(10.0, 0.0), Point2D(0.0, 0.0)),
+        Line("L2", Point2D(0.0, 10.0), Point2D(0.0, 0.0)),
+        dimensions=(_dimension("D-A", "ANGLE", 90.0, "L1", "L2", unit="deg"),),
+    )
+
+    first = ConstraintFreedomAnalyzer().analyze(normal, _resolution())
+    second = ConstraintFreedomAnalyzer().analyze(reversed_storage, _resolution())
+
+    assert first.to_dict() == second.to_dict()
+
+
+def test_verified_zero_degree_angle_keeps_nonzero_local_rank() -> None:
+    first = Line("L1", Point2D(0.0, 0.0), Point2D(10.0, 0.0))
+    second = Line("L2", Point2D(0.0, 0.0), Point2D(20.0, 0.0))
+    draft = _draft(
+        first,
+        second,
+        dimensions=(_dimension("D-A", "ANGLE", 0.0, "L1", "L2", unit="deg"),),
+    )
+
+    diagnosis = ConstraintFreedomAnalyzer().analyze(draft, _resolution())
+
+    assert diagnosis.status == "UNDER_CONSTRAINED"
+    assert diagnosis.supported_rank == 1
+    assert diagnosis.degrees_of_freedom == 7
+    assert diagnosis.unsupported_dimension_ids == ()
+
+
+def test_verified_angle_without_unique_shared_vertex_fails_closed() -> None:
+    first = Line("L1", Point2D(0.0, 0.0), Point2D(10.0, 0.0))
+    second = Line("L2", Point2D(0.0, 5.0), Point2D(0.0, 15.0))
     draft = _draft(
         first,
         second,
@@ -179,6 +236,87 @@ def test_verified_angle_dimension_fails_closed_as_indeterminate() -> None:
     assert [item.code for item in diagnosis.issues] == [
         "CONSTRAINT_FREEDOM_UNSUPPORTED_VERIFIED_DIMENSION"
     ]
+
+
+def test_verified_angle_with_two_possible_shared_vertices_fails_closed() -> None:
+    first = Line("L1", Point2D(0.0, 0.0), Point2D(10.0, 0.0))
+    second = Line("L2", Point2D(0.0, 0.0), Point2D(10.0, 0.0))
+    draft = _draft(
+        first,
+        second,
+        dimensions=(_dimension("D-A", "ANGLE", 0.0, "L1", "L2", unit="deg"),),
+    )
+
+    diagnosis = ConstraintFreedomAnalyzer().analyze(draft, _resolution())
+
+    assert diagnosis.status == "INDETERMINATE"
+    assert diagnosis.unsupported_dimension_ids == ("D-A",)
+
+
+def test_verified_angle_mismatch_beyond_explicit_uncertainty_fails_closed() -> None:
+    first = Line("L1", Point2D(0.0, 0.0), Point2D(10.0, 0.0))
+    second = Line("L2", Point2D(0.0, 0.0), Point2D(0.0, 10.0))
+    draft = _draft(
+        first,
+        second,
+        dimensions=(
+            _dimension(
+                "D-A",
+                "ANGLE",
+                80.0,
+                "L1",
+                "L2",
+                unit="deg",
+                uncertainty=0.25,
+            ),
+        ),
+    )
+
+    diagnosis = ConstraintFreedomAnalyzer().analyze(draft, _resolution())
+
+    assert diagnosis.status == "INDETERMINATE"
+    assert diagnosis.unsupported_dimension_ids == ("D-A",)
+
+
+def test_verified_angle_accepts_geometry_within_explicit_measurement_uncertainty() -> None:
+    first = Line("L1", Point2D(0.0, 0.0), Point2D(10.0, 0.0))
+    second = Line("L2", Point2D(0.0, 0.0), Point2D(0.0, 10.0))
+    draft = _draft(
+        first,
+        second,
+        dimensions=(
+            _dimension(
+                "D-A",
+                "ANGLE",
+                89.8,
+                "L1",
+                "L2",
+                unit="deg",
+                uncertainty=0.25,
+            ),
+        ),
+    )
+
+    diagnosis = ConstraintFreedomAnalyzer().analyze(draft, _resolution())
+
+    assert diagnosis.status == "UNDER_CONSTRAINED"
+    assert diagnosis.supported_rank == 1
+    assert diagnosis.unsupported_dimension_ids == ()
+
+
+def test_verified_angle_with_invalid_unit_fails_closed() -> None:
+    first = Line("L1", Point2D(0.0, 0.0), Point2D(10.0, 0.0))
+    second = Line("L2", Point2D(0.0, 0.0), Point2D(0.0, 10.0))
+    draft = _draft(
+        first,
+        second,
+        dimensions=(_dimension("D-A", "ANGLE", 90.0, "L1", "L2", unit="mm"),),
+    )
+
+    diagnosis = ConstraintFreedomAnalyzer().analyze(draft, _resolution())
+
+    assert diagnosis.status == "INDETERMINATE"
+    assert diagnosis.unsupported_dimension_ids == ("D-A",)
 
 
 def test_unverified_unsupported_dimension_does_not_constrain_or_block_dof() -> None:
