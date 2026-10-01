@@ -11,6 +11,7 @@ namespace Mrea.SolidWorksCadAgent
     {
         private const string ProtocolVersion = "mrea.solidworks-agent.v1";
         private const string AdapterName = "SOLIDWORKS_2026";
+        private const string WorkerCapabilitiesSha256 = "1713a8671cc358c54af5664fb1144789ba85b50291d2b02e479aa568a14ae4bd";
         private const string ConstraintCapabilitiesSha256 = "02a33af48298669e3563ce467b6cd6d8f2586d073baa3de6baa45749fc92a3d8";
 
         private const int ExitSuccess = 0;
@@ -198,6 +199,15 @@ namespace Mrea.SolidWorksCadAgent
                 throw new InvalidDataException("Unsupported protocol_version: " + request.protocol_version);
             if (request.adapter_name != AdapterName)
                 throw new InvalidDataException("Unsupported adapter_name: " + request.adapter_name);
+            if (!string.Equals(
+                request.worker_capabilities_sha256,
+                WorkerCapabilitiesSha256,
+                StringComparison.Ordinal))
+                throw new InvalidDataException(
+                    "Worker capability fingerprint mismatch; expected=" +
+                    WorkerCapabilitiesSha256 +
+                    " actual=" +
+                    (request.worker_capabilities_sha256 ?? "<missing>"));
             if (!string.Equals(
                 request.constraint_capabilities_sha256,
                 ConstraintCapabilitiesSha256,
