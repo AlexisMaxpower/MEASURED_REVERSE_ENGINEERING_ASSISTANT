@@ -104,6 +104,14 @@ from .relational import (
     SQLiteLifecycleQueryRepository,
 )
 from .repository import LifecycleRepository
+from .revision_comparison import (
+    RevisionComparisonDetailsResult,
+    RevisionComparisonSnapshot,
+    RevisionFailureFact,
+    RevisionManufacturingFact,
+    RevisionTestFact,
+    SQLiteRevisionComparisonEngineeringKnowledgeRepository,
+)
 from .services import (
     CADRevisionPreparationService,
     FailureService,
@@ -191,12 +199,17 @@ __all__ = [
     "ReplacementChainEntry",
     "Revision",
     "RevisionComparison",
+    "RevisionComparisonDetailsResult",
     "RevisionComparisonResult",
+    "RevisionComparisonSnapshot",
+    "RevisionFailureFact",
     "RevisionLineageEntry",
+    "RevisionManufacturingFact",
     "RevisionOrigin",
     "RevisionOutcomeSummary",
     "RevisionQueryResult",
     "RevisionService",
+    "RevisionTestFact",
     "SQLITE_RELATIONAL_SCHEMA_VERSION",
     "SQLITE_SNAPSHOT_SCHEMA_VERSION",
     "SQLiteEngineeringKnowledgeRepository",
@@ -205,6 +218,7 @@ __all__ = [
     "SQLiteLifecycleReadOnlySession",
     "SQLiteLifecycleStore",
     "SQLiteMaterializedEngineeringKnowledgeRepository",
+    "SQLiteRevisionComparisonEngineeringKnowledgeRepository",
     "SQLiteSchemaMigration",
     "TestRecord",
     "TestService",
