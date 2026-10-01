@@ -4,8 +4,10 @@ from .constraint_confidence import ConstraintConfidence, ConstraintConfidenceMod
 from .constraint_satisfaction import ConstraintSatisfaction, ConstraintSatisfactionAnalyzer
 from .constraint_uncertainty import (
     ConstraintTolerancePolicy,
+    MeasurementContradictionPolicy,
     UncertaintyAwareConstraintResolver,
     UncertaintyAwareConstraintTolerancePolicy,
+    UncertaintyAwareMeasurementContradictionPolicy,
 )
 from .constraints import ConstraintIssue, ConstraintResolution, ConstraintResolver, ResolvedConstraint
 from .contracts import CanonicalGeometryInput, CanonicalInputAdapter
@@ -67,6 +69,7 @@ __all__ = [
     "GeometryPipeline",
     "ImageGeometryExtractor",
     "Line",
+    "MeasurementContradictionPolicy",
     "MeasurementRef",
     "Point2D",
     "PointEntity",
@@ -76,6 +79,7 @@ __all__ = [
     "UncertaintyAwareConstraintResolver",
     "UncertaintyAwareConstraintTolerancePolicy",
     "UncertaintyAwareGeometryConflictDetector",
+    "UncertaintyAwareMeasurementContradictionPolicy",
     "UnresolvedBinding",
     "VisionGeometryPipeline",
 ]

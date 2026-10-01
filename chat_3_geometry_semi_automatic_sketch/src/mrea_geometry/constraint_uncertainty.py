@@ -29,6 +29,19 @@ class ConstraintTolerancePolicy(Protocol):
     ) -> ConstraintSatisfaction: ...
 
 
+class MeasurementContradictionPolicy(Protocol):
+    """Policy boundary for verified-measurement contradiction checks."""
+
+    def conflict(
+        self,
+        candidate: ConstraintCandidate,
+        *,
+        dimensions: tuple[DimensionBinding, ...],
+        entities: dict[str, GeometryPrimitive],
+        measurement_tolerance: float,
+    ) -> ConstraintIssue | None: ...
+
+
 class UncertaintyAwareConstraintTolerancePolicy:
     """Widen linear residual tolerance only from directly relevant verified uncertainty.
 
@@ -170,12 +183,191 @@ class UncertaintyAwareConstraintTolerancePolicy:
         return float(uncertainty)
 
 
+class UncertaintyAwareMeasurementContradictionPolicy:
+    """Evaluate verified-measurement contradiction using explicit measurement uncertainty.
+
+    Uncertainty may relax only the already-supported EQUAL intrinsic-metric and CONCENTRIC
+    center-distance contradiction gates. Missing uncertainty preserves fixed baseline behavior.
+    """
+
+    _LINEAR_TYPES = {
+        "LINEAR_EXTERNAL",
+        "LINEAR_INTERNAL",
+        "THICKNESS",
+        "SLOT_WIDTH",
+    }
+    _DIAMETER_TYPES = {"DIAMETER_EXTERNAL", "DIAMETER_INTERNAL"}
+
+    def conflict(
+        self,
+        candidate: ConstraintCandidate,
+        *,
+        dimensions: tuple[DimensionBinding, ...],
+        entities: dict[str, GeometryPrimitive],
+        measurement_tolerance: float,
+    ) -> ConstraintIssue | None:
+        if not isfinite(measurement_tolerance) or measurement_tolerance < 0.0:
+            raise ValueError("measurement_tolerance must be a finite non-negative number")
+        if len(candidate.entity_ids) != 2:
+            return None
+        if candidate.kind == "EQUAL":
+            return self._equal_conflict(
+                candidate,
+                dimensions=dimensions,
+                entities=entities,
+                measurement_tolerance=measurement_tolerance,
+            )
+        if candidate.kind == "CONCENTRIC":
+            return self._concentric_conflict(
+                candidate,
+                dimensions=dimensions,
+                measurement_tolerance=measurement_tolerance,
+            )
+        return None
+
+    def _equal_conflict(
+        self,
+        candidate: ConstraintCandidate,
+        *,
+        dimensions: tuple[DimensionBinding, ...],
+        entities: dict[str, GeometryPrimitive],
+        measurement_tolerance: float,
+    ) -> ConstraintIssue | None:
+        first_id, second_id = candidate.entity_ids
+        first = entities.get(first_id)
+        second = entities.get(second_id)
+        if first is None or second is None:
+            return None
+
+        left_metrics = self._verified_metrics(first_id, first, dimensions)
+        right_metrics = self._verified_metrics(second_id, second, dimensions)
+        conflicts: list[tuple[str, str]] = []
+
+        for left_kind, left_value, left_uncertainty, left_mid in left_metrics:
+            for right_kind, right_value, right_uncertainty, right_mid in right_metrics:
+                if left_kind != right_kind:
+                    continue
+                allowance = measurement_tolerance
+                if left_uncertainty is not None and right_uncertainty is not None:
+                    allowance += left_uncertainty + right_uncertainty
+                if abs(left_value - right_value) > allowance:
+                    conflicts.append((left_mid, right_mid))
+
+        if not conflicts:
+            return None
+
+        measurement_ids = tuple(sorted({mid for pair in conflicts for mid in pair}))
+        return ConstraintIssue(
+            issue_id=f"U-{candidate.constraint_id}",
+            code="VERIFIED_MEASUREMENT_CONTRADICTS_EQUAL_CONSTRAINT",
+            message=(
+                "EQUAL geometry candidate conflicts with verified physical measurements; "
+                "verified measurements were preserved and the constraint was not published."
+            ),
+            entity_ids=tuple(sorted(candidate.entity_ids)),
+            measurement_ids=measurement_ids,
+        )
+
+    def _concentric_conflict(
+        self,
+        candidate: ConstraintCandidate,
+        *,
+        dimensions: tuple[DimensionBinding, ...],
+        measurement_tolerance: float,
+    ) -> ConstraintIssue | None:
+        key = tuple(sorted(candidate.entity_ids))
+        conflicts: list[str] = []
+
+        for dimension in dimensions:
+            if (
+                not dimension.verified
+                or dimension.measurement_type != "CENTER_DISTANCE"
+                or tuple(sorted(dimension.target_entity_ids)) != key
+            ):
+                continue
+            allowance = measurement_tolerance
+            if dimension.uncertainty is not None:
+                allowance += self._validated_uncertainty(dimension)
+            if abs(dimension.value) > allowance:
+                conflicts.append(dimension.measurement_id)
+
+        if not conflicts:
+            return None
+
+        return ConstraintIssue(
+            issue_id=f"U-{candidate.constraint_id}",
+            code="VERIFIED_MEASUREMENT_CONTRADICTS_CONCENTRIC_CONSTRAINT",
+            message=(
+                "CONCENTRIC geometry candidate conflicts with a verified non-zero center "
+                "distance; verified measurement was preserved and the constraint was not published."
+            ),
+            entity_ids=key,
+            measurement_ids=tuple(sorted(conflicts)),
+        )
+
+    def _verified_metrics(
+        self,
+        entity_id: str,
+        entity: GeometryPrimitive,
+        dimensions: tuple[DimensionBinding, ...],
+    ) -> tuple[tuple[str, float, float | None, str], ...]:
+        result: list[tuple[str, float, float | None, str]] = []
+        for dimension in dimensions:
+            if not dimension.verified or dimension.target_entity_ids != (entity_id,):
+                continue
+
+            metric_kind: str | None = None
+            metric_value: float | None = None
+            uncertainty_factor = 1.0
+
+            if isinstance(entity, Circle):
+                if dimension.measurement_type in self._DIAMETER_TYPES:
+                    metric_kind = "RADIUS"
+                    metric_value = dimension.value / 2.0
+                    uncertainty_factor = 0.5
+                elif dimension.measurement_type == "RADIUS":
+                    metric_kind = "RADIUS"
+                    metric_value = dimension.value
+            elif isinstance(entity, Line) and dimension.measurement_type in self._LINEAR_TYPES:
+                metric_kind = "LENGTH"
+                metric_value = dimension.value
+
+            if metric_kind is None or metric_value is None:
+                continue
+
+            metric_uncertainty: float | None = None
+            if dimension.uncertainty is not None:
+                metric_uncertainty = self._validated_uncertainty(dimension) * uncertainty_factor
+
+            result.append(
+                (
+                    metric_kind,
+                    float(metric_value),
+                    metric_uncertainty,
+                    dimension.measurement_id,
+                )
+            )
+
+        return tuple(sorted(result, key=lambda item: (item[0], item[3], item[1])))
+
+    @staticmethod
+    def _validated_uncertainty(dimension: DimensionBinding) -> float:
+        if dimension.unit != "mm":
+            raise ValueError("relevant measurement contradiction uncertainty must use mm")
+        uncertainty = dimension.uncertainty
+        if uncertainty is None:
+            raise ValueError("dimension uncertainty is required")
+        if not isfinite(uncertainty) or uncertainty < 0.0:
+            raise ValueError("dimension uncertainty must be a finite non-negative number")
+        return float(uncertainty)
+
+
 class UncertaintyAwareConstraintResolver(ConstraintResolver):
-    """Explicit resolver variant that applies measurement-grounded residual tolerance.
+    """Explicit resolver variant with measurement-grounded uncertainty policies.
 
     The base ``ConstraintResolver`` remains unchanged. This resolver performs the same
-    promotion gates in the same order, with one opt-in step between baseline residual
-    analysis and the existing confidence gate.
+    promotion gates in the same order, with opt-in uncertainty handling for geometric
+    residual tolerance and verified-measurement contradiction decisions.
     """
 
     def __init__(
@@ -186,6 +378,7 @@ class UncertaintyAwareConstraintResolver(ConstraintResolver):
         satisfaction_analyzer: ConstraintSatisfactionAnalyzer | None = None,
         confidence_model: ConstraintConfidenceModel | None = None,
         tolerance_policy: ConstraintTolerancePolicy | None = None,
+        measurement_contradiction_policy: MeasurementContradictionPolicy | None = None,
     ) -> None:
         super().__init__(
             minimum_confidence=minimum_confidence,
@@ -194,13 +387,14 @@ class UncertaintyAwareConstraintResolver(ConstraintResolver):
             confidence_model=confidence_model,
         )
         self.tolerance_policy = tolerance_policy or UncertaintyAwareConstraintTolerancePolicy()
+        self.measurement_contradiction_policy = (
+            measurement_contradiction_policy or UncertaintyAwareMeasurementContradictionPolicy()
+        )
 
     def resolve(self, draft: GeometryDraft) -> ConstraintResolution:
         entities = {item.entity_id: item for item in draft.entities}
         candidates = self._deduplicate(draft.constraints)
         axis_by_entity = self._axis_map(candidates)
-        verified_metrics = self._verified_metrics(draft.dimensions, entities)
-        center_distances = self._verified_center_distances(draft.dimensions)
 
         resolved: list[ResolvedConstraint] = []
         issues: list[ConstraintIssue] = []
@@ -263,10 +457,11 @@ class UncertaintyAwareConstraintResolver(ConstraintResolver):
             if self._is_axis_redundant(candidate, axis_by_entity):
                 continue
 
-            conflict = self._measurement_conflict(
+            conflict = self.measurement_contradiction_policy.conflict(
                 candidate,
-                verified_metrics=verified_metrics,
-                center_distances=center_distances,
+                dimensions=draft.dimensions,
+                entities=entities,
+                measurement_tolerance=self.measurement_tolerance,
             )
             if conflict is not None:
                 issues.append(conflict)
