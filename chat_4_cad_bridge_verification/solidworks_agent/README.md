@@ -29,7 +29,7 @@ The request carries two fail-closed compatibility fingerprints:
 - `worker_capabilities_sha256` — the declared Python/C# worker capability projection;
 - `constraint_capabilities_sha256` — the narrower constraint capability contract.
 
-Both are checked before SOLIDWORKS COM startup. The full worker fingerprint covers the Pass-13 verified-dimension rules and the Pass-14 entity-geometry rules.
+Both are checked before SOLIDWORKS COM startup. The full worker fingerprint covers the Pass-13 verified-dimension rules, Pass-14 entity-geometry rules, and Pass-15 machine-readable constraint shape rules.
 
 The response records vendor-runtime facts used by Primary Chat 4 runtime evidence:
 
@@ -68,11 +68,14 @@ Before opening SOLIDWORKS, the worker validates:
 6. non-degenerate `LINE` geometry (`length_squared_mm2 > 1e-24`);
 7. positive finite `CIRCLE`/`ARC` radius;
 8. finite `ARC` angles and a non-zero/non-full-circle modulo span (`>= 1e-12 deg`);
-9. dimension IDs and referenced entity IDs;
-10. no duplicate entity IDs within a dimension;
-11. dimension-specific units;
-12. supported dimension/entity patterns;
-13. ANGLE range and non-parallel LINE geometry.
+9. unique non-empty constraint IDs;
+10. constraint status `VERIFIED`, unique entity references, and existing referenced entities;
+11. supported constraint/entity patterns for `HORIZONTAL`, `VERTICAL`, `PARALLEL`, `PERPENDICULAR`, `CONCENTRIC`, `EQUAL`, and `TANGENT`;
+12. dimension IDs and referenced entity IDs;
+13. no duplicate entity IDs within a dimension;
+14. dimension-specific units;
+15. supported dimension/entity patterns;
+16. ANGLE range and non-parallel LINE geometry.
 
 Only after those checks does `SolidWorksSession.Open(request)` attach to or launch SOLIDWORKS.
 
@@ -98,13 +101,12 @@ The machine-readable entity source is `src/mrea_cad_bridge/solidworks_entity_cap
 
 Fail-closed verified constraints:
 
-- `HORIZONTAL`;
-- `VERTICAL`;
-- `PARALLEL`;
-- `PERPENDICULAR`;
-- `CONCENTRIC`;
-- `EQUAL` for LINE/LINE;
-- `TANGENT` for supported LINE/CIRCLE/ARC pairs with at least one CIRCLE/ARC.
+- `HORIZONTAL` / `VERTICAL`: exactly one `LINE`;
+- `PARALLEL` / `PERPENDICULAR` / `EQUAL`: exactly two `LINE` entities;
+- `CONCENTRIC`: exactly two `CIRCLE`/`ARC` entities;
+- `TANGENT`: exactly two `LINE`/`CIRCLE`/`ARC` entities with at least one `CIRCLE`/`ARC`.
+
+The exact ordered entity-type patterns are machine-readable under `build_solidworks_capabilities_v1()["constraints"]["rules"]`. The same object is included in both the full worker fingerprint and the narrower constraint fingerprint. Python preflight and `Program.ValidateConstraintEnvelope(...)` enforce that subset before COM startup.
 
 `COINCIDENT` and `SYMMETRIC` remain unsupported because the canonical relation payload does not currently carry enough sub-entity/axis role information for a deterministic mapping.
 
@@ -148,6 +150,6 @@ The local one-command fallback remains:
 .\scripts\qualify_solidworks_host.ps1
 ```
 
-Host qualification is fingerprint-bound. `solidworks_entity_capabilities.py` is part of the standing host-boundary fingerprint, so changes to these Pass-14 rules invalidate reuse of qualification produced for an earlier fingerprint.
+Host qualification is fingerprint-bound. Pass 15 changes already-fingerprinted `solidworks_capabilities.py` and `Program.cs`, so a qualification from an earlier host-boundary fingerprint cannot positively qualify this changed boundary.
 
 Software-only CI, mocks and static parity checks never create a positive real-host qualification. When real-host status matters, resolve it from the dedicated qualification workflow and its generated `solidworks_host_qualification.json` manifest rather than copying round-level status text.
