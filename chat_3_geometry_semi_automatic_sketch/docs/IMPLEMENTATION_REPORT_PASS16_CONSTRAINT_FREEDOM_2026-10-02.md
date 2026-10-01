@@ -43,11 +43,13 @@ Unsupported verified dimension semantics, unresolved measurement bindings, ambig
 
 Existing global constraint conflicts and verified measurement-vs-geometry conflicts block an exact DOF claim.
 
-## Topology witness correction found by CI
+## Topology witness correction found by CI and leadership audit
 
-The first Pass-16 CI run correctly exposed that generic point-on-line `COINCIDENT` residuals lose rank at an exact zero-distance line-line endpoint intersection. The public freedom analyzer now uses an explicit unique nearest endpoint-pair witness for Line-Line `COINCIDENT`, producing the two independent X/Y equations required by topology. Ambiguous endpoint pairs fail closed. Arc `COINCIDENT` remains unsupported in DOF accounting until an explicit endpoint/curve witness contract exists.
+The first Pass-16 CI run correctly exposed that generic point-on-line `COINCIDENT` residuals lose rank at an exact zero-distance line-line endpoint intersection. The public freedom analyzer therefore uses a unique endpoint-pair witness for Line-Line `COINCIDENT`, producing the two independent X/Y equations required by topology.
 
-This is a root-cause correction; the failing rectangle test was not weakened.
+The Orchestrator-2 review tightened this rule further: entity-only `COINCIDENT` does not carry endpoint ordinals, so *nearest proximity alone is not a topology witness*. The selected endpoint pair is accepted only when it is uniquely nearest **and already coincident within `ambiguity_tolerance_mm`**. A unique but spatially separated nearest pair, an ambiguous pair, or an Arc contact without an explicit endpoint/curve witness fails closed to `INDETERMINATE` instead of guessing intended topology.
+
+This is a root-cause correction; the rectangle test was not weakened, and a dedicated leadership regression test covers the separated-line fail-closed case.
 
 ## Invariants
 
@@ -66,23 +68,25 @@ New dependencies: none.
 
 ## Verification
 
-Code head:
+Original worker code head before leadership repair:
 
 `dd5595e3961979cc42f71135c99b5cf1ac616b54`
 
-GitHub Actions:
+Original worker GitHub Actions:
 
 ```text
 36933857622  MREA CI  SUCCESS
 ```
 
-Observed Chat-3 gate:
+Observed Chat-3 gate on that worker head:
 
 ```text
 Chat 3 / Geometry  SUCCESS — 141 passed in 0.51s
 ```
 
-The same exact-head workflow also passed canonical contracts and adjacent worker/generic-CAD gates, including the existing Chat-2 -> Chat-3 and Chat-3 -> Chat-4 integration jobs in the complete workflow.
+The same worker-head workflow also passed canonical contracts and adjacent worker/generic-CAD gates, including the existing Chat-2 -> Chat-3 and Chat-3 -> Chat-4 integration jobs in the complete workflow.
+
+The authoritative integrated Round-16 candidate includes the later Orchestrator-2 topology-witness repair and must be certified only by CI on that later exact integration SHA; the worker run above is historical evidence only.
 
 ## Shared ownership
 
