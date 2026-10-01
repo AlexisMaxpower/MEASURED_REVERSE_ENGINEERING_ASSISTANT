@@ -2,102 +2,98 @@
 
 **Date:** 2026-10-01  
 **Repository:** `AlexisMaxpower/MEASURED_REVERSE_ENGINEERING_ASSISTANT`  
-**Active branch:** `chat-3/pass-12`  
+**Active branch:** `chat-3/pass-13`  
 **Role:** Chat 3 — Geometry & Semi-Automatic Sketch  
-**Pass:** 12  
-**Base:** shared `main` @ `c888704b37e88b68c055f1095e6e9a4fc3650f7e`
+**Pass:** 13  
+**Base:** shared `main` @ `4edde5c644755734a2ccf6e8f1c1b6ab9a63424d`
 
-## Central baseline read before Pass 12
+## Central baseline read before Pass 13
 
-Round 11 is centrally closed and accepted. Current orchestration state reports:
+Round 12 is centrally closed and accepted with the external SOLIDWORKS host gate still unverified. Current orchestration authority reports:
 
 ```text
+ROUND_12_CLOSED = TRUE
 OPEN_SOFTWARE_BLOCKERS = NONE
-ROUND_11_CLOSED = TRUE
 NEXT_FULL_WORKER_PASS = READY
 ```
 
-The historical Round-4 Chat-3 freeze/fix directive is superseded by the accepted central state. Pass 12 starts from current `main`; it does not reuse a historical worker baseline.
+Directive `OD-2026-10-01-005` requires a fresh worker branch from current certified `main`; Pass 13 follows that requirement and does not reuse a historical worker branch.
 
-## Integrated Chat 3 capabilities entering Pass 12
+## Integrated Chat 3 capabilities entering Pass 13
 
 - canonical CapturePackage / MeasurementPackage normalization;
 - IMAGE_PX -> MAT_XY_MM calibration normalization;
 - POINT / LINE / CIRCLE / ARC geometry;
 - deterministic GeometryGraph;
 - verified measurement binding and explicit conflicts;
-- uncertainty preservation into `MeasurementRef` and `DimensionBinding`;
+- uncertainty preservation into `MeasurementRef` / `DimensionBinding`;
+- opt-in uncertainty-aware geometry-conflict comparison;
 - deterministic SketchPackage v1 generation;
 - OpenCV-backed image geometry candidates;
 - constraint candidate generation and deterministic resolution;
-- geometric satisfaction residuals;
-- residual-aware constraint confidence;
+- geometric satisfaction residuals and residual-aware confidence;
 - deterministic SVG Dimensioned View.
 
-## Pass 12 — Uncertainty-Aware Geometry Conflict Policy
+## Pass 13 — Measurement-Grounded Constraint Uncertainty
 
-Added:
+Added `src/mrea_geometry/constraint_uncertainty.py` with:
 
-`src/mrea_geometry/uncertainty.py`
+- `ConstraintTolerancePolicy`;
+- `UncertaintyAwareConstraintTolerancePolicy`;
+- `UncertaintyAwareConstraintResolver`.
 
-Public API:
+The policy widens linear residual tolerance only from directly relevant verified physical uncertainty:
 
-`UncertaintyAwareGeometryConflictDetector`
+- `EQUAL` Circle radius residual through verified RADIUS/DIAMETER uncertainty;
+- `EQUAL` Line length residual through the existing verified linear-metric mapping;
+- `CONCENTRIC` through same-pair verified CENTER_DISTANCE uncertainty.
 
-Policy:
+It deliberately does not derive uncertainty for angular, coincident, tangent or symmetric residuals, and does not invent an ARC measurement-binding semantic.
 
-```text
-effective_tolerance = baseline_tolerance + uncertainty_scale * uncertainty
-```
+### Invariants
 
-Default baseline tolerance remains `0.05`; default uncertainty scale is `1.0`.
-
-The policy is explicitly injected through the existing `GeometryPipeline(conflict_detector=...)` boundary. The legacy fixed-tolerance detector remains unchanged, so Pass 12 does not silently alter central default semantics.
-
-### Truth invariants
-
-- verified physical value remains authoritative;
-- no measurement value/unit/provenance mutation;
-- uncertainty is consumed, never fabricated;
-- uncertainty does not strengthen confidence;
-- absent uncertainty preserves existing fixed-tolerance behavior;
-- negative/non-finite uncertainty fails closed;
-- unverified dimensions do not become truth conflicts.
+- default `ConstraintResolver` behavior remains unchanged;
+- verified physical measurement truth is never rewritten;
+- missing uncertainty preserves baseline behavior;
+- invalid relevant uncertainty fails closed;
+- stored candidate/entity confidence is not modified;
+- residual-derived confidence uses the effective tolerance and remains only one input to the existing minimum-confidence gate;
+- no geometry is moved.
 
 ## Runtime / dependencies
 
-Package version: `0.9.0`  
+Package version: `0.10.0`  
 New dependencies: none.
 
 ## Verification
 
 Implementation head:
 
-`9600959db7f0ea1c5bbb90db6ac6c15dcbf93217`
+`d24903828692705b653fbf98e74514e3944750bc`
 
 GitHub Actions:
 
 ```text
-36801724833  MREA CI  SUCCESS
+36806295147  MREA CI  SUCCESS
 ```
 
-Required observed jobs:
+Observed required gates:
 
 ```text
-Chat 3 / Geometry                 SUCCESS — 87 passed in 0.49s
+Chat 3 / Geometry                 SUCCESS — 101 passed in 0.57s
 Contracts / canonical fixtures   SUCCESS
 Chat 2 / Measurement             SUCCESS
 Chat 4 / Generic CAD gate        SUCCESS
-Integration / Chat 2 -> Chat 3   SUCCESS
-Integration / Chat 3 -> Chat 4   SUCCESS
+Integration / Chat 2 -> Chat 3   SUCCESS — 1 passed
+Integration / Chat 3 -> Chat 4   SUCCESS — 1 passed
 ```
 
 ## Shared ownership
 
-Pass 12 modifies no:
+Pass 13 modifies no:
 
 - `core/contracts/`;
-- shared canonical fixtures;
+- canonical shared fixtures;
 - `tests/integration/`;
 - CI workflows;
 - other chat directories.
@@ -106,12 +102,13 @@ Pass 12 modifies no:
 
 - numerical constraint solving/entity movement;
 - global over-constrained-system diagnosis;
-- uncertainty-aware constraint residual tolerances beyond geometry-conflict policy;
+- uncertainty/noise models for contact and angular relations;
+- uncertainty-aware verified-measurement contradiction policy inside constraint promotion;
 - multi-view geometry relationships;
 - CAD-native logic.
 
 ## Status
 
-`READY_FOR_PASS12_INTEGRATOR_REVIEW`
+`READY_FOR_PASS13_INTEGRATOR_REVIEW`
 
-`chat-3/pass-12` is frozen after the final handoff commit.
+`chat-3/pass-13` is frozen after its final handoff commit.

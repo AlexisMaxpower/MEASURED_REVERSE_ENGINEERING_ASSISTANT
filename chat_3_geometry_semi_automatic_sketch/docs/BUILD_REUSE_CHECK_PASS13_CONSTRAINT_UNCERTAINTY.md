@@ -24,12 +24,12 @@ No third-party dependency, shared contract, canonical fixture, CI workflow, CAD-
 
 ## Selected scope
 
-Add an explicit opt-in `UncertaintyAwareConstraintTolerancePolicy` applied after baseline residual computation and before the existing resolver gates.
+Add an explicit opt-in `UncertaintyAwareConstraintTolerancePolicy` and `UncertaintyAwareConstraintResolver`. The policy is applied after baseline residual computation and before the existing satisfaction/confidence gates.
 
 The policy may widen only linear `mm` tolerance where canonical measurement semantics directly match the residual:
 
 1. `EQUAL`
-   - circle/arc radius equality: `RADIUS` uncertainty is used directly;
+   - circle radius equality: `RADIUS` uncertainty is used directly;
    - `DIAMETER_EXTERNAL` / `DIAMETER_INTERNAL` uncertainty is divided by two because the residual is radius difference;
    - line-length equality follows the existing Chat-3 verified line-metric mapping for linear measurements;
    - both compared entities must have an explicit relevant verified uncertainty;
@@ -39,6 +39,8 @@ The policy may widen only linear `mm` tolerance where canonical measurement sema
    - only an explicit verified `CENTER_DISTANCE` measurement bound to the same entity pair may widen the center-distance residual tolerance.
 
 For multiple relevant verified measurements, the smallest explicit uncertainty is selected deterministically as the strongest available measurement precision.
+
+ARC equality is deliberately not uncertainty-mapped in this pass because the existing verified intrinsic-metric mapping used by constraint truth checks covers Circle and Line, not Arc. Pass 13 does not invent a new measurement-binding semantic to extend that boundary.
 
 ## Deliberate non-mapping
 
@@ -57,8 +59,8 @@ Those relations require a separate observation/noise model rather than borrowing
 - uncertainty is consumed only when explicitly supplied;
 - missing uncertainty preserves baseline fixed-tolerance behavior;
 - invalid negative/non-finite relevant uncertainty fails closed;
-- upstream candidate/entity confidence is never changed;
-- effective constraint confidence remains the existing minimum of candidate, entity and residual-derived contributions;
+- stored candidate/entity confidence is never changed;
+- residual-derived confidence consumes the effective tolerance, and final resolved confidence remains the existing minimum of candidate, entity and residual-derived contributions;
 - policy is opt-in, so the established default resolver semantics remain unchanged.
 
 ## Build decision
