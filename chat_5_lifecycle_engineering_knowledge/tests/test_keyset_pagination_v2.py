@@ -175,11 +175,11 @@ def test_keyset_continuation_sql_does_not_use_offset(tmp_path) -> None:
         select_sql = "\n".join(
             statement.upper()
             for statement in statements
-            if "LIFECYCLE_REVISIONS" in statement.upper()
+            if "LIFECYCLE_REVISION_OUTCOMES_MATERIALIZED" in statement.upper()
         )
         assert "OFFSET" not in select_sql
-        assert "R.CREATED_AT >" in select_sql
-        assert "R.REVISION_ID >" in select_sql
+        assert "CREATED_AT >" in select_sql
+        assert "REVISION_ID >" in select_sql
 
 
 def test_legacy_v1_offset_cursor_remains_accepted(tmp_path) -> None:
