@@ -28,6 +28,7 @@ from .models import (
     UnresolvedBinding,
 )
 from .sketch_package import SketchPackageBuilder
+from .uncertainty import UncertaintyAwareGeometryConflictDetector
 from .vision import CandidateIssue, GeometryExtractionResult, ImageGeometryExtractor
 from .vision_pipeline import VisionGeometryPipeline
 
@@ -66,6 +67,7 @@ __all__ = [
     "ReferenceImageLayer",
     "ResolvedConstraint",
     "SketchPackageBuilder",
+    "UncertaintyAwareGeometryConflictDetector",
     "UnresolvedBinding",
     "VisionGeometryPipeline",
 ]

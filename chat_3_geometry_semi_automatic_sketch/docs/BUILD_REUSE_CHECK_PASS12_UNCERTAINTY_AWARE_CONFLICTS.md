@@ -6,9 +6,9 @@
 
 ## Problem
 
-Chat 3 already preserves canonical physical measurement uncertainty through normalization and dimension binding, but `GeometryConflictDetector` still compares every verified measurement against derived geometry using only one fixed numeric tolerance.
+Chat 3 already preserves canonical physical measurement uncertainty through normalization and dimension binding, but the existing `GeometryConflictDetector` compares verified measurements against derived geometry with a fixed tolerance only.
 
-That means a verified measurement carrying explicit uncertainty can be flagged as a geometry conflict even when the derived estimate lies inside the measurement's stated uncertainty band.
+That can report a geometry conflict even when the derived estimate remains inside explicitly supplied physical measurement uncertainty.
 
 ## Reuse decision
 
@@ -16,8 +16,8 @@ Reuse existing Chat-3-owned structures:
 
 - `MeasurementRef.uncertainty`;
 - `DimensionBinding.uncertainty`;
-- `GeometryConflictDetector`;
-- existing `GeometryConflict.tolerance` field as the effective tolerance actually used for the decision.
+- `GeometryPipeline(conflict_detector=...)` injection point;
+- `GeometryConflict.tolerance` as the effective tolerance actually used by the selected policy.
 
 No new dependency, shared contract, canonical fixture, cross-chat API, or CAD-specific logic is required.
 
@@ -36,7 +36,7 @@ baseline_tolerance = 0.05
 uncertainty_scale = 1.0
 ```
 
-If uncertainty is absent, behavior is exactly the existing fixed-tolerance behavior.
+If uncertainty is absent, the uncertainty-aware detector behaves exactly like the existing fixed-tolerance policy.
 
 Uncertainty never changes:
 
@@ -48,6 +48,12 @@ Uncertainty never changes:
 - upstream confidence.
 
 Invalid non-finite or negative uncertainty fails closed instead of being silently ignored.
+
+## Compatibility decision
+
+Do **not** silently change the default `GeometryConflictDetector` semantics in this pass.
+
+Add `UncertaintyAwareGeometryConflictDetector` as an explicit policy that plugs into the existing `GeometryPipeline` injection point. This makes the capability usable immediately while preserving the established central default until orchestration explicitly adopts a policy change.
 
 ## Build decision
 
