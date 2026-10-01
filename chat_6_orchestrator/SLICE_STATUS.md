@@ -1,46 +1,59 @@
 # MREA Slice Status
 
-**Central round:** 14  
-**Directive:** `OD-2026-10-01-008`  
-**Status:** `ROUND_14_CLOSED_GREEN_SOFTWARE`
+**Central round:** 16  
+**Directive:** `OD-2026-10-02-009`  
+**Status:** `ROUND_16_CLOSED_GREEN_SOFTWARE`
 
 ## Integrated slice state
 
 | Slice | Final central disposition |
 |---|---|
-| Chat 1 — Project & Guided Capture | `INTEGRATED / GREEN — quality/lifecycle synchronization around active immutable clean-reference evidence` |
-| Chat 2 — Physical Measurement | `INTEGRATED / GREEN — deterministic durable session enumeration and project scoping` |
-| Chat 3 — Geometry & Sketch | `INTEGRATED / GREEN — uncertainty-aware verified-measurement contradiction policy` |
-| Chat 4 — CAD Bridge & Verification | `INTEGRATED / GREEN — entity-geometry capability contract and pre-COM Python/C# handshake` |
-| Chat 5 — Lifecycle & Engineering Knowledge | `INTEGRATED / GREEN — durable snapshot-bound revision comparison and read-only GET exposure` |
+| Chat 1 — Project & Guided Capture | `INTEGRATED / GREEN — voice-trigger capture provenance + fail-closed capture preparation` |
+| Chat 2 — Physical Measurement | `INTEGRATED / GREEN — durable keyset pagination + spoken measurement/unit truth guards` |
+| Chat 3 — Geometry & Sketch | `INTEGRATED / GREEN — global constraint diagnosis + fail-closed local DOF/topology diagnosis` |
+| Chat 4 — CAD Bridge & Verification | `INTEGRATED / GREEN — constraint capability/response normalization + complete success/conflict evidence` |
+| Chat 5 — Lifecycle & Engineering Knowledge | `INTEGRATED / GREEN — structured durable comparison + source-backed factual change explanation` |
 
 ## Round authority
 
 ```text
 OPEN_SOFTWARE_BLOCKERS = NONE
-ROUND_14_CLOSED = TRUE
+ROUND_16_CLOSED = TRUE
 MERGE_TO_MAIN_COMPLETED = TRUE
 NEXT_FULL_WORKER_PASS = READY
 ```
 
-Audited Round-14 integration merge:
+Accepted cumulative lineage:
 
 ```text
-94ea4e957ec85d9276303d30124910497e2ddafa
+Round-15 upstream candidate: 7b20b4325157bdc30b4ab35b266ba0b7c603267b
+Round-16 final candidate:    4aab61d6c793ff7ec955848ce6be664b147369bc
+Integration merge to main:  d3c56ce026f16508f91570112c57d7f617a46386
 ```
 
-The next full worker pass must branch from the then-current shared `main` containing the Round-14 closure/control state, not from any Round-14 worker or integration branch.
+The next full worker pass must branch from the then-current shared `main` containing the Round-16 closure/control state, not from any historical worker or integration branch.
 
-## Shared integration hardening accepted in Round 14
+## Final software evidence
 
-- Truth CI push trigger accepts versioned `integration/pass-*-candidate` branches.
-- Truth boundary and golden-path job conditions accept the same versioned candidate pattern for push and pull-request events.
-- Contracts CI contains regression coverage preventing restoration of the historical single-branch Truth-CI lock.
-- SOLIDWORKS standing qualification fingerprint coverage includes the entity-geometry capability contract.
+Candidate exact-head gates:
+
+```text
+36938081940  MREA CI                SUCCESS  11/11
+36938081943  MREA Round 4 Truth CI  SUCCESS   6/6
+36938085912  PR MREA CI             SUCCESS  11/11
+36938085900  PR Round 4 Truth CI     SUCCESS   6/6
+```
+
+Post-merge exact-main gates on `d3c56ce026f16508f91570112c57d7f617a46386`:
+
+```text
+36939539944  MREA CI                SUCCESS  11/11
+36939539923  MREA Round 4 Truth CI  SUCCESS   6/6
+```
+
+All normal/truth boundaries and both golden paths actually executed.
 
 ## SOLIDWORKS environment qualification
-
-Real SOLIDWORKS environment qualification is not encoded as a repeated per-round exception.
 
 ```text
 SOLIDWORKS_HOST_QUALIFICATION = DEDICATED_WORKFLOW_AUTHORITY
@@ -49,6 +62,4 @@ ROUND_LEVEL_SOFTWARE_BLOCKER = FALSE
 LEGACY_THREE_LINE_CARRY_FORWARD = RETIRED
 ```
 
-Round 14 changed the fingerprinted SOLIDWORKS host boundary. A positive real-host result is applicable only if its dedicated workflow artifact has the matching current host-boundary fingerprint. Software CI does not establish real-host qualification.
-
-The standing qualification is governed by `chat_6_orchestrator/SOLIDWORKS_HOST_QUALIFICATION_POLICY.md`; resolve its dynamic state from the dedicated workflow when relevant rather than copying it into ordinary round status.
+Passes 15/16 changed fingerprinted host-boundary code. A positive real-host result is applicable only if the dedicated qualification artifact carries the matching current fingerprint. Software CI does not establish real-host qualification.
