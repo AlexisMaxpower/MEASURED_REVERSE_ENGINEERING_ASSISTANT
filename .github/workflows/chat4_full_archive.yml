@@ -1,0 +1,42 @@
+name: Chat 4 full archive
+
+on:
+  push:
+    branches:
+      - chat-4/pass-15-full-archive
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact archive branch
+        uses: actions/checkout@v4
+
+      - name: Build archive payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p archive_payload
+          cp -a chat_4_cad_bridge_verification archive_payload/
+          cat > archive_payload/CHAT4_ARCHIVE_MANIFEST.txt <<'EOF'
+          MREA Chat 4 — complete conversation work snapshot
+          Source repository: AlexisMaxpower/MEASURED_REVERSE_ENGINEERING_ASSISTANT
+          Source product commit before archive-only workflow: 50149cf538af8a9121a2974eb235b9f46ad30c8f
+          Source product tree: 5826d5f8b0f5acaae7596242c2b83beef5dcda
+          Chat 4 subtree: ab90c45074281bff0ca80eddac6df066f46ec648
+          Scope: complete current chat_4_cad_bridge_verification directory, including cumulative work through Pass 15 and Pass 10–15 documentation/tests/source.
+          Real SOLIDWORKS 2026 controlled-host execution is not implied by this archive.
+          EOF
+          find archive_payload -type f -print0 | sort -z | xargs -0 sha256sum > archive_payload/SHA256SUMS.txt
+
+      - name: Upload complete Chat 4 snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: MREA_CHAT4_COMPLETE_SNAPSHOT_THROUGH_PASS15_2026-10-01
+          path: archive_payload/
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 9
