@@ -17,6 +17,9 @@ class RevisionQueryResult:
     created_at: datetime
     origin: str
     verification_status: Optional[str]
+    runtime_status: Optional[str]
+    runtime_evidence_schema_version: Optional[str]
+    runtime_real_host_executed: Optional[bool]
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,8 +102,10 @@ class SQLiteLifecycleReadModelWriter:
                     revision_id, part_id, revision_code, created_at,
                     parent_revision_id, notes, source_cad_artifact_id, origin,
                     cad_package_id, sketch_package_id,
-                    cad_verification_report_id, cad_adapter, verification_status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    cad_verification_report_id, cad_adapter, verification_status,
+                    runtime_status, runtime_evidence_schema_version,
+                    runtime_real_host_executed
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     revision.revision_id,
@@ -122,6 +127,22 @@ class SQLiteLifecycleReadModelWriter:
                     (
                         cad_link.verification_status.value
                         if cad_link is not None
+                        else None
+                    ),
+                    (
+                        cad_link.runtime_status.value
+                        if cad_link is not None and cad_link.runtime_status is not None
+                        else None
+                    ),
+                    (
+                        cad_link.runtime_evidence_schema_version
+                        if cad_link is not None
+                        else None
+                    ),
+                    (
+                        int(cad_link.runtime_real_host_executed)
+                        if cad_link is not None
+                        and cad_link.runtime_real_host_executed is not None
                         else None
                     ),
                 ),
@@ -365,7 +386,8 @@ class SQLiteLifecycleQueryRepository:
         rows = self.connection.execute(
             """
             SELECT revision_id, part_id, revision_code, created_at,
-                   origin, verification_status
+                   origin, verification_status, runtime_status,
+                   runtime_evidence_schema_version, runtime_real_host_executed
             FROM lifecycle_revisions
             WHERE part_id = ?
             ORDER BY created_at, revision_id
@@ -380,6 +402,11 @@ class SQLiteLifecycleQueryRepository:
                 created_at=datetime.fromisoformat(row[3]),
                 origin=row[4],
                 verification_status=row[5],
+                runtime_status=row[6],
+                runtime_evidence_schema_version=row[7],
+                runtime_real_host_executed=(
+                    bool(row[8]) if row[8] is not None else None
+                ),
             )
             for row in rows
         )

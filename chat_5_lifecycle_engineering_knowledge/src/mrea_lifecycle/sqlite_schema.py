@@ -5,7 +5,7 @@ import sqlite3
 from typing import Callable, Tuple
 
 
-SQLITE_RELATIONAL_SCHEMA_VERSION = 2
+SQLITE_RELATIONAL_SCHEMA_VERSION = 3
 
 
 @dataclass(frozen=True, slots=True)
@@ -262,11 +262,41 @@ def _create_normalized_read_model(connection: sqlite3.Connection) -> None:
     )
 
 
+def _add_cad_runtime_truth_columns(connection: sqlite3.Connection) -> None:
+    columns = {
+        row[1]
+        for row in connection.execute("PRAGMA table_info(lifecycle_revisions)").fetchall()
+    }
+    if "runtime_status" not in columns:
+        connection.execute(
+            "ALTER TABLE lifecycle_revisions ADD COLUMN runtime_status TEXT"
+        )
+    if "runtime_evidence_schema_version" not in columns:
+        connection.execute(
+            "ALTER TABLE lifecycle_revisions "
+            "ADD COLUMN runtime_evidence_schema_version TEXT"
+        )
+    if "runtime_real_host_executed" not in columns:
+        connection.execute(
+            "ALTER TABLE lifecycle_revisions "
+            "ADD COLUMN runtime_real_host_executed INTEGER"
+        )
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS ix_lifecycle_revisions_runtime_verification "
+        "ON lifecycle_revisions(origin, verification_status, runtime_status)"
+    )
+
+
 SQLITE_MIGRATIONS: Tuple[SQLiteSchemaMigration, ...] = (
     SQLiteSchemaMigration(
         version=2,
         name="normalized_lifecycle_read_model",
         apply=_create_normalized_read_model,
+    ),
+    SQLiteSchemaMigration(
+        version=3,
+        name="cad_runtime_truth",
+        apply=_add_cad_runtime_truth_columns,
     ),
 )
 

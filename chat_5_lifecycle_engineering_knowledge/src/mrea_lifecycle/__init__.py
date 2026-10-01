@@ -52,6 +52,7 @@ from .knowledge_paging import (
 from .models import (
     CADArtifactReference,
     CADRevisionLink,
+    CADRuntimeStatus,
     CADVerificationStatus,
     FailureRecord,
     Installation,
@@ -120,6 +121,7 @@ __all__ = [
     "CADArtifactReference",
     "CADRevisionLink",
     "CADRevisionPreparationService",
+    "CADRuntimeStatus",
     "CADVerificationStatus",
     "CanonicalLifecycleEventAdapter",
     "DEFAULT_KNOWLEDGE_PAGE_LIMIT",

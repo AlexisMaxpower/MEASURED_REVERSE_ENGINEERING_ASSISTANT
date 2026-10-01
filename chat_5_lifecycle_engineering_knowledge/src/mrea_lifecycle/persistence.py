@@ -12,6 +12,7 @@ from typing import Mapping, Optional
 from .models import (
     CADArtifactReference,
     CADRevisionLink,
+    CADRuntimeStatus,
     CADVerificationStatus,
     FailureRecord,
     Installation,
@@ -100,6 +101,14 @@ def _cad_link(raw: object) -> Optional[CADRevisionLink]:
     if not isinstance(raw_artifacts, list):
         raise LifecyclePersistenceError("invalid persisted CAD artifacts")
     artifacts = tuple(CADArtifactReference(**artifact) for artifact in raw_artifacts)
+    raw_runtime_status = raw.get("runtime_status")
+    raw_runtime_real_host_executed = raw.get("runtime_real_host_executed")
+    if raw_runtime_real_host_executed is not None and not isinstance(
+        raw_runtime_real_host_executed, bool
+    ):
+        raise LifecyclePersistenceError(
+            "invalid persisted CAD runtime real_host_executed"
+        )
     return CADRevisionLink(
         cad_package_id=raw["cad_package_id"],
         sketch_package_id=raw["sketch_package_id"],
@@ -107,6 +116,15 @@ def _cad_link(raw: object) -> Optional[CADRevisionLink]:
         cad_adapter=raw["cad_adapter"],
         verification_status=CADVerificationStatus(raw["verification_status"]),
         artifacts=artifacts,
+        runtime_status=(
+            CADRuntimeStatus(raw_runtime_status)
+            if raw_runtime_status is not None
+            else None
+        ),
+        runtime_evidence_schema_version=raw.get(
+            "runtime_evidence_schema_version"
+        ),
+        runtime_real_host_executed=raw_runtime_real_host_executed,
     )
 
 
