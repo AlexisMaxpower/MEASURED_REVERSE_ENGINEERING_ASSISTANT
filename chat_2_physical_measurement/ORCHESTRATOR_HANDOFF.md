@@ -1,191 +1,140 @@
 # ORCHESTRATOR HANDOFF — Chat 2
 
-**Pass:** 3  
-**Directive:** `OD-2026-09-29-003`  
-**Branch:** `chat-2/pass-3`  
-**Implementation commit SHA:** `b40574d37a864679b515f78ce91e7c0a403f97f1`  
-**Implementation CI:** `MREA CI` run `36618777772` / run #76  
-**Date:** 2026-09-29  
-**From:** Chat 2 — Physical Measurement  
-**To:** Chat 6 — Orchestrator / Repository Integrator
+**Pass:** 16  
+**Directive:** `OD-2026-10-01-008`  
+**Branch:** `chat-2/pass-16`  
+**Baseline:** `main` @ `99d8c6d9322f3669a43226e4fd2675fe683ab9f6`  
+**Executable implementation SHA:** `8ec59f7dff2ff10c37e9d801933634f9de9cf669`  
+**MREA CI:** run `36933965494` / #848 — `SUCCESS`  
+**Round 4 Truth CI:** run `36933965647` / #65 — `SUCCESS`  
+**PR:** #51  
+**Date:** 2026-10-02  
+**From:** Chat 2 — Physical Measurement
 
-> This handoff is the final commit of Pass 3 and freezes `chat-2/pass-3` per Chat 6 workflow. The implementation SHA above is the executable pre-handoff state validated by CI. No post-handoff worker commits are permitted unless Chat 6 returns `FIX_REQUIRED`.
+> This handoff is the final worker commit for Pass 16. After publication, `chat-2/pass-16` is frozen unless central orchestration returns an explicit `FIX_REQUIRED`.
 
-## Delivered functionality
+## Delivered
 
-Implemented the provider-independent hands-free measurement domain/application baseline required by `OD-2026-09-29-003`.
+Pass 16 closes a Phase-D voice-value gap without touching shared contracts or the concurrent Pass-15 persistence work.
 
-Primary flow:
+The provider-independent measurement command parser now supports deterministic Russian spoken decimal measurements, including:
 
 ```text
-speech-provider text / OCR value / device value / manual fallback
-→ deterministic parser or provider-neutral candidate API
-→ unverified PhysicalMeasurement candidate
-→ explicit confirm / reject / correct
-→ verified measurement only after USER_CONFIRMED
+замер сорок два восемнадцать
+-> Decimal("42.18")
+-> VOICE_REPORTED candidate
+-> explicit confirmation required
+-> USER_CONFIRMED only after confirmation
 ```
 
-No speech-recognition or OCR vendor SDK is part of the domain/application correctness path.
+Also supported:
 
-## Command parser
+- compact two-decimal measurement speech such as `сто двадцать три сорок пять` -> `123.45`;
+- leading-zero hundredths such as `сто один ноль пять` -> `101.05`;
+- explicit `целых ... десятых/сотых/тысячных` forms;
+- spoken `плюс` / `минус`;
+- common millimetre/degree suffixes;
+- the same grammar in correction commands.
 
-Added a narrow deterministic grammar supporting:
+## Fail-closed rules
 
-- `замер` → measurement trigger / awaiting value;
-- `замер 42,18` → `Decimal("42.18")` candidate;
-- `замер 42.18` → same numeric value;
-- optional `мм` / `mm` after a single numeric token;
-- confirmation commands: `подтвердить`, `подтверди`, `подтверждаю`;
-- rejection commands: `отклонить`, `отклони`, `отмена`, `отменить`;
-- correction commands: `исправить <value>`, `исправь <value>`, `коррекция <value>`.
+No inferred or ambiguous voice text becomes measurement truth.
 
-The parser fails closed on unsupported text, multiple numeric values and mixed decimal-separator forms instead of guessing a physical value.
+The parser rejects, among other cases:
 
-## State machine
+- standalone word-only whole values such as `сорок два`;
+- under-specified `сорок два пять`;
+- mixed word/numeric values;
+- incomplete explicit fractions;
+- unsupported descriptive words such as `примерно`;
+- conflicting sign representations.
 
-Implemented states:
+Existing numeric command forms remain compatible.
 
-- `IDLE`;
-- `AWAITING_VALUE`;
-- `CANDIDATE_PENDING`;
-- `VERIFIED`;
-- `REJECTED`.
+## Truth / provenance boundary
 
-Illegal transitions raise `InvalidMeasurementTransition`.
+Unchanged:
 
-Candidate semantics:
+```text
+provider text
+-> deterministic candidate value
+-> VOICE_REPORTED
+-> unverified PhysicalMeasurement
+-> explicit user confirmation
+-> USER_CONFIRMED verified measurement
+```
 
-- `VOICE_REPORTED` — candidate only;
-- `OCR_MEASURED` — candidate only;
-- `DEVICE_REPORTED` — candidate only;
-- `MANUAL_MEASURED` — authoritative fallback candidate, but still requires explicit confirmation.
+No speech provider, OCR provider, geometry normalization or CAD behavior was added or changed.
 
-`VISION_DETECTED`, `AI_INFERRED` and derived/calibration provenance are rejected by the direct physical-measurement candidate path.
+## Canonical inputs / outputs
 
-## Confirmation / reject / correct behavior
+Shared canonical contracts remain unchanged.
 
-- No candidate becomes verified automatically.
-- Verification requires `explicit_user_confirmation=True` and records `USER_CONFIRMED`.
-- Reject removes the unverified candidate from the active `MeasurementSession`.
-- Correct rejects/removes the previous candidate, creates a new measurement ID and keeps the corrected value unverified.
-- Manual fallback can replace a pending reported candidate while preserving evidence/anchor context.
-- Already verified measurements cannot be rejected as candidates or silently re-confirmed.
+- upstream `CapturePackage` boundary unchanged;
+- downstream `MeasurementPackage` boundary unchanged;
+- raw anchors remain `IMAGE_PX`;
+- verified physical measurement cannot be silently rewritten;
+- no Change Request is required.
 
-## Evidence and canonical-boundary preservation
-
-The Pass 3 workflow reuses existing Chat 2 anchors/context and preserves:
-
-- `view_id`;
-- `reference_frame_id` through anchors;
-- `evidence_frame_id`;
-- provenance;
-- uncertainty;
-- instrument metadata.
-
-The existing canonical adapter remains unchanged. A dedicated Pass 3 test verifies that a user-confirmed `VOICE_REPORTED` measurement serializes with:
-
-- `source = VOICE_REPORTED`;
-- `verified = true`;
-- `confirmation_source = USER_CONFIRMED`;
-- preserved evidence/reference linkage;
-- raw `IMAGE_PX` anchors;
-- `feature_id = null`.
-
-No `IMAGE_PX -> MAT_XY_MM` normalization was moved into Chat 2.
-
-## Files changed in Pass 3
+## Files changed
 
 Modified:
 
-- `src/physical_measurement/models.py`
-- `src/physical_measurement/service.py`
-- `src/physical_measurement/__init__.py`
-- `README.md`
+- `src/physical_measurement/hands_free.py`
 - `ORCHESTRATOR_HANDOFF.md`
 
 Added:
 
-- `src/physical_measurement/hands_free.py`
-- `tests/test_pass3_hands_free.py`
-- `docs/BUILD_REUSE_CHECK_PASS_3.md`
-- `docs/IMPLEMENTATION_REPORT_PASS_3.md`
+- `tests/test_pass16_spoken_measurements.py`
+- `docs/PASS_16_BUILD_REUSE_CHECK.md`
+- `docs/IMPLEMENTATION_REPORT_PASS_16.md`
 
-No shared contract, canonical fixture, Chat-6-owned CI file or shared integration test was modified.
+No file outside `chat_2_physical_measurement/` is changed.
 
-## Build / Reuse decision
+## Test inventory and executed evidence
 
-Recorded in `docs/BUILD_REUSE_CHECK_PASS_3.md`.
+Exact executable SHA validated by CI:
 
-Decision: use Python standard library plus existing MREA domain/service boundaries; do not introduce a speech/NLU/state-machine dependency for this narrow deterministic domain protocol. Speech/OCR engines remain replaceable external providers.
+`8ec59f7dff2ff10c37e9d801933634f9de9cf669`
 
-## Local tests actually executed
-
-Before branch publication:
+`Chat 2 / Measurement` executed the complete Chat-2 pytest suite:
 
 ```text
-pytest -q tests/test_phase_a.py tests/test_pass3_hands_free.py
-18 passed
+60 passed in 0.33s
 ```
 
-Also executed:
+Required executable gates on MREA CI #848:
 
-```text
-python -m compileall -q src
-```
+- `Contracts / canonical fixtures` — `SUCCESS`;
+- `Chat 2 / Measurement` — `SUCCESS`;
+- `Integration / Chat 1 -> Chat 2` — `SUCCESS`;
+- `Integration / Chat 2 -> Chat 3` — `SUCCESS`.
 
-Result: success.
+Repository truth workflow:
 
-The full schema/cross-slice suite was intentionally delegated to repository-owned GitHub Actions rather than reconstructed locally from partial repository files.
+- `MREA Round 4 Truth CI` #65 — `SUCCESS`.
 
-## GitHub Actions CI evidence
+No real audio/speech-recognition provider execution was performed because Pass 16 begins after provider text and does not add a provider integration.
 
-Executable implementation state:
+## Concurrency / repository state
 
-```text
-workflow = MREA CI
-run_id = 36618777772
-run_number = 76
-head_sha = b40574d37a864679b515f78ce91e7c0a403f97f1
-```
+At Pass-16 start and again immediately before this handoff, accepted `main` remained `99d8c6d9322f3669a43226e4fd2675fe683ab9f6`.
 
-Required Pass 3 gates:
-
-- `Contracts / canonical fixtures` — `success`;
-- `Chat 2 / Measurement` — `success`;
-- `Integration / Chat 1 -> Chat 2` — `success`;
-- `Integration / Chat 2 -> Chat 3` — `success`.
-
-Additional executable slice jobs in the same run were green for Chat 1, Chat 3, Chat 4 generic CAD and Chat 5. Unrelated conditional integration jobs may be skipped by workflow conditions and are outside this Chat 2 acceptance gate.
+Pass 15 remains separate in draft PR #49. Pass 16 intentionally does not modify Pass-15 persistence surfaces (`repository.py`, pagination, SQLite metadata/migration) and has no dependency on that unmerged branch.
 
 ## Known limitations
 
-- no actual speech-recognition engine/provider adapter yet;
-- no OCR engine/provider adapter yet;
-- no device/caliper hardware protocol yet;
-- hands-free controller state is in-memory and has no process-restart recovery yet;
-- command grammar is intentionally narrow; natural-language number words such as `сорок два` are not parsed;
-- internal uncertainty field remains named `uncertainty_mm`;
-- current service candidate unit remains `mm`; angle-specific `deg` candidate workflow remains future work;
-- internal physical measurement still uses exactly two anchors;
-- no automatic feature detection or `feature_id` assignment was added.
+- no speech-recognition engine/provider is added;
+- grammar is intentionally finite rather than general Russian NLP;
+- standalone word-only whole values remain unsupported;
+- compact fractional speech is two-decimal only; other scales require explicit scale wording;
+- millions and larger cardinals are unsupported;
+- hands-free controller restart-state durability remains separate future work.
 
 ## Open Change Requests
 
 None.
 
-Canonical v1 is sufficient for this pass.
+## Acceptance gate
 
-## Requested acceptance gate
-
-Please review `chat-2/pass-3` against `OD-2026-09-29-003` and verify:
-
-1. provider-independent trigger/value/confirm/reject/correct workflow exists;
-2. `замер` and `замер 42,18` semantics are deterministic;
-3. voice/OCR/device values remain unverified candidates until explicit confirmation;
-4. manual entry remains available as fallback;
-5. reject/correct transitions fail closed and do not leak rejected values as active measurements;
-6. evidence/reference/view/provenance and raw `IMAGE_PX` semantics are preserved;
-7. required Chat 2 and cross-slice CI gates are green on implementation SHA `b40574d37a864679b515f78ce91e7c0a403f97f1`;
-8. no shared ownership boundary was violated.
-
-If accepted, integrate through Chat 6 and issue the next directive. This branch is frozen after this handoff commit.
+Review PR #51 against `OD-2026-10-01-008`, preserving the independent Pass-15 integration decision. The branch is frozen after this handoff commit.
