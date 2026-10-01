@@ -9,6 +9,7 @@ from typing import Any, Mapping, Protocol
 
 from .contracts import MappedSketchPackage
 from .solidworks_capabilities import evaluate_solidworks_constraint_support_v1
+from .solidworks_constraint_handshake import SOLIDWORKS_CONSTRAINT_CAPABILITIES_SHA256
 from .vendor import (
     CadAdapterError,
     CadAdapterResult,
@@ -240,6 +241,7 @@ def build_solidworks_agent_request(
     return {
         "protocol_version": SOLIDWORKS_AGENT_PROTOCOL,
         "adapter_name": SOLIDWORKS_ADAPTER_NAME,
+        "constraint_capabilities_sha256": SOLIDWORKS_CONSTRAINT_CAPABILITIES_SHA256,
         "sketch_package_id": package.sketch_package_id,
         "output_directory": str(config.output_directory.resolve()),
         "part_template_path": (
