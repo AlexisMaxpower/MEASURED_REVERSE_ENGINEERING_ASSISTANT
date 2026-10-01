@@ -1,15 +1,16 @@
 # Chat 3 — Implementation State
 
-**Date:** 2026-10-01  
+**Date:** 2026-10-02  
 **Repository:** `AlexisMaxpower/MEASURED_REVERSE_ENGINEERING_ASSISTANT`  
-**Active branch:** `chat-3/pass-15`  
+**Active branch:** `chat-3/pass-16`  
 **Role:** Chat 3 — Geometry & Semi-Automatic Sketch  
-**Pass:** 15  
-**Base:** shared `main` @ `99d8c6d9322f3669a43226e4fd2675fe683ab9f6`
+**Pass:** 16  
+**Worker base:** `chat-3/pass-15` @ `4d4a7a4f3b4b17680dc6eb2c97d337c29ae848ac`  
+**Central main observed at start:** `99d8c6d9322f3669a43226e4fd2675fe683ab9f6`
 
-## Central baseline read before Pass 15
+## Coordination state at Pass-16 start
 
-Round 14 was centrally closed and accepted before this worker pass.
+Central `main` still exposed the accepted Round-14 closure:
 
 ```text
 ROUND_14_CLOSED = TRUE
@@ -18,9 +19,9 @@ MERGE_TO_MAIN_COMPLETED = TRUE
 NEXT_FULL_WORKER_PASS = READY
 ```
 
-Directive `OD-2026-10-01-008` required a fresh worker branch from current shared `main`; Pass 15 follows that rule and does not reuse an historical branch.
+Chat 3 already had a published Pass-15 branch ahead of that central main. Pass 16 therefore extends the exact Pass-15 Chat-3 head to preserve published Chat-3 state instead of recreating or dropping Pass-15 work. The branch remains isolated from `main` and other worker slices.
 
-## Integrated Chat 3 capabilities entering Pass 15
+## Integrated Chat 3 capabilities entering Pass 16
 
 - canonical CapturePackage / MeasurementPackage normalization;
 - IMAGE_PX -> MAT_XY_MM calibration normalization;
@@ -35,58 +36,68 @@ Directive `OD-2026-10-01-008` required a fresh worker branch from current shared
 - geometric satisfaction residuals and residual-aware confidence;
 - measurement-grounded residual-tolerance uncertainty;
 - uncertainty-aware verified-measurement contradiction policy;
-- deterministic SVG Dimensioned View.
+- deterministic SVG Dimensioned View;
+- global read-only constraint-system redundancy/conflict diagnosis.
 
-## Pass 15 — Global Constraint-System Diagnosis
+## Pass 16 — Constraint Freedom Diagnosis
 
 Added public read-only diagnostic surface:
 
-- `ConstraintSystemStatus`;
-- `ConstraintSystemIssue`;
-- `ConstraintSystemDiagnosis`;
-- `ConstraintSystemAnalyzer`.
+- `ConstraintFreedomStatus`;
+- `ConstraintFreedomIssue`;
+- `ConstraintFreedomDiagnosis`;
+- `ConstraintFreedomAnalyzer`.
 
-Supported system-level diagnosis now includes:
+The analyzer now provides local Jacobian-rank DOF accounting for the supported Chat-3 geometry/constraint subset and separates:
 
-- direct/transitive orientation redundancy and contradiction across `HORIZONTAL`, `VERTICAL`, `PARALLEL`, `PERPENDICULAR`;
-- semantic duplicate constraints;
-- transitive `EQUAL` redundancy within supported metric domains;
-- transitive `CONCENTRIC` redundancy;
-- direct/transitive `CONCENTRIC` + `TANGENT` conflict for round entities;
-- missing geometry references;
-- duplicate constraint IDs.
+- total remaining local DOF;
+- rigid-frame DOF;
+- internal shape DOF.
+
+Statuses:
+
+- `FULLY_CONSTRAINED`;
+- `CONSTRAINED_UP_TO_FRAME`;
+- `UNDER_CONSTRAINED`;
+- `INDETERMINATE`;
+- `CONFLICTING`.
+
+Exact DOF is deliberately withheld when verified/upstream truth is incomplete or unsupported. Unsupported verified dimensions, unresolved measurement bindings, ambiguous topology witnesses, unsupported accepted constraints and numerical degeneracy fail closed.
+
+Existing global constraint conflicts and verified measurement-vs-derived-geometry conflicts block a positive freedom claim.
+
+Line-Line `COINCIDENT` uses an explicit unique endpoint-pair topology witness so exact endpoint coincidence contributes two independent coordinate equations. Ambiguous endpoint selection fails closed. Arc-contact DOF semantics remain deferred rather than projected onto unsupported topology.
 
 ### Invariants
 
-- diagnosis is read-only;
-- `CONSISTENT` does not mean fully constrained;
-- no numerical solver or DOF count is introduced;
-- no constraint is deleted automatically;
-- verified physical truth, provenance, confidence and tolerances are never rewritten;
 - no geometry is moved;
-- unsupported relation logic is not guessed.
+- no solver mutates the sketch;
+- no verified measurement is rewritten;
+- no provenance/confidence/uncertainty is strengthened or invented;
+- unsupported semantics are not guessed;
+- shared contracts remain unchanged.
 
 ## Runtime / dependencies
 
-Package version: `0.12.0`  
+Package version: `0.13.0`  
 New dependencies: none.
 
 ## Verification
 
-Implementation head:
+Code head:
 
-`e736936f62e8e48b933ce872da435e18ce51e11c`
+`dd5595e3961979cc42f71135c99b5cf1ac616b54`
 
 GitHub Actions:
 
 ```text
-36815732621  MREA CI  SUCCESS
+36933857622  MREA CI  SUCCESS
 ```
 
-Observed required gates:
+Observed required gates include:
 
 ```text
-Chat 3 / Geometry                 SUCCESS — 130 passed in 0.35s
+Chat 3 / Geometry                 SUCCESS — 141 passed in 0.51s
 Contracts / canonical fixtures   SUCCESS
 Chat 2 / Measurement             SUCCESS
 Chat 4 / Generic CAD gate        SUCCESS
@@ -94,9 +105,11 @@ Integration / Chat 2 -> Chat 3   SUCCESS
 Integration / Chat 3 -> Chat 4   SUCCESS
 ```
 
+The first Pass-16 CI iteration exposed one Line-Line coincidence rank defect in the new DOF path; it was corrected at the topology-witness layer without weakening the regression test. The subsequent exact code head is green.
+
 ## Shared ownership
 
-Pass 15 modifies no:
+Pass 16 modifies no:
 
 - `core/contracts/`;
 - canonical shared fixtures;
@@ -107,13 +120,14 @@ Pass 15 modifies no:
 ## Deferred Chat 3 work
 
 - numerical constraint solving/entity movement;
-- degree-of-freedom accounting / fully-constrained diagnosis;
-- uncertainty/noise models for contact and angular relations;
+- verified angular-dimension DOF semantics;
+- explicit arc-contact topology witnesses for DOF accounting;
+- richer uncertainty/noise models for contact and angular relations;
 - multi-view geometry relationships;
 - CAD-native logic.
 
 ## Status
 
-`READY_FOR_PASS15_INTEGRATOR_REVIEW`
+`READY_FOR_PASS16_INTEGRATOR_REVIEW`
 
-`chat-3/pass-15` is frozen after its final handoff commit.
+`chat-3/pass-16` is a cumulative Chat-3 worker candidate over the published Pass-15 head and must not be interpreted as a direct write to central `main`.
