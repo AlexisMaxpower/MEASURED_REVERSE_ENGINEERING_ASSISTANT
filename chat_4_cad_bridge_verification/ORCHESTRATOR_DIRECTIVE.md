@@ -1,100 +1,50 @@
 # ORCHESTRATOR DIRECTIVE — Chat 4
 
-**Revision:** `OD-2026-09-30-004`  
-**Owner:** Chat 6  
-**Central round:** 4  
-**Worker target branch:** `chat-4/pass-7`
+**Revision:** `OD-2026-10-01-005`  
+**Control owner:** central orchestration  
+**Issued as:** Round-12 final control-plane repair by Orchestrator 2  
+**Status:** `READY_FOR_NEXT_FULL_WORKER_PASS_FROM_CURRENT_MAIN`
 
-## Accepted central baseline
+This directive supersedes `OD-2026-09-30-004` and every historical instruction that pins Chat 4 to `chat-4/pass-7` or forbids work beyond the old Round-4 cut.
 
-Round 3 is closed. Chat 4 Pass 3 is accepted for software integration on `main`.
+## Required baseline
 
-The generic/runtime-evidence path is accepted. Real Windows 11 + installed SOLIDWORKS 2026 execution remains explicitly `UNVERIFIED`.
+Before starting the next worker pass:
 
-Round-4 plan:
+1. read `chat_6_orchestrator/ORCHESTRATION_STATE.md`;
+2. require `ROUND_12_CLOSED = TRUE` and `NEXT_FULL_WORKER_PASS = READY`;
+3. branch the new worker pass from the then-current shared `main`;
+4. do not reuse a historical Chat-4/4B pass branch as the implementation base.
 
-`chat_6_orchestrator/PASS_4_PLAN_2026-09-30.md`
+Round 12 integrates the broader declared Python -> C# SOLIDWORKS worker capability fingerprint in addition to the existing constraint fingerprint. Its documented scope is declared-capability compatibility plus selected source-parity checks, not proof of complete behavioral equivalence.
 
-## Observed later state
+## Slice ownership
 
-Observed branch head:
+Chat 4 owns CAD Bridge & Verification, including generic CAD transfer/verification and SOLIDWORKS-specific behavior behind the vendor/process boundary.
 
-`d9633e3b8e95158d359e502e9797d4876384cd09`
+Preserve these invariants:
 
-Observed later work includes broader SOLIDWORKS vendor capability including fail-closed ANGLE dimensions.
+- canonical verification remains vendor-neutral;
+- unsupported vendor cases fail closed;
+- vendor/process success alone does not promote canonical verification;
+- real-host execution is not inferred from Linux CI, static checks, mocks or test doubles;
+- capability/protocol compatibility checks occur before CAD mutation where designed;
+- canonical contracts/shared CI are not changed without an approved central change.
 
-Problem:
-
-`chat-4/pass-7` still contains an `ORCHESTRATOR_HANDOFF.md` that identifies Pass 3.
-
-Therefore the current Pass-7 branch is not yet a protocol-valid frozen Stage-1 input.
-
-## OD-004 task
-
-Do **not** begin Pass 8.
-
-Finish the existing cumulative Chat-4 work through Pass 7 as one reviewable worker cut:
-
-1. inspect current `chat-4/pass-7` against accepted Round-3 main and current canonical contracts;
-2. correct only defects required for a truthful cumulative Pass-7 handoff;
-3. run available Chat-4 generic and adjacent boundary gates;
-4. publish a current Pass-7 `ORCHESTRATOR_HANDOFF.md` recording:
-   - exact branch;
-   - exact implementation/pre-handoff SHA;
-   - cumulative scope since accepted Pass 3;
-   - exact CI run IDs/results;
-   - changed files / ownership statement;
-   - unsupported vendor cases;
-   - `REAL_HOST` truth;
-   - production C# build truth;
-   - explicit branch freeze;
-5. freeze `chat-4/pass-7` after the handoff commit.
-
-## Required truth invariants
-
-- canonical/Primary verification semantics remain vendor-neutral;
-- SOLIDWORKS types stay behind the adapter/process boundary;
-- unsupported geometry/dimensions/constraints fail explicitly;
-- vendor success does not imply canonical `VERIFIED` without Primary read-back verification;
-- generic CAD CI must not require installed SOLIDWORKS;
-- real-host success may be claimed only from an actual controlled Windows 11 x64 + SOLIDWORKS 2026 x64 run.
-
-## Required gates
-
-Keep green where executable in repository CI:
-
-- `Chat 4 / Generic CAD gate`;
-- `Integration / Chat 3 -> Chat 4`;
-- `Integration / Chat 4 -> Chat 5`;
-- canonical contracts/fixtures.
-
-## Environment truth
+## External truth
 
 Until actual controlled-host evidence exists:
 
 ```text
-REAL_HOST = UNVERIFIED
-C# PRODUCTION BUILD = UNVERIFIED
-NATIVE SLDPRT GENERATION/READBACK = UNVERIFIED
+REAL_SOLIDWORKS_2026_HOST = EXTERNAL_GATE_UNVERIFIED
+PRODUCTION_CSHARP_INTEROP_BUILD = UNVERIFIED
+NATIVE_SLDPRT_GENERATION_READBACK = UNVERIFIED
 ```
 
-Static/unit/test-double evidence cannot promote those states.
+## Next pass rule
 
-## Do not
+This control document intentionally does not invent the next feature. Execute the active worker-round/user task for Chat 4 after resolving the current certified `main`. If no current task exists, stop rather than reviving an old OD-004 task.
 
-- start Pass 8;
-- modify Chat-6-owned CI/shared integration tests;
-- change canonical contracts without approved CR;
-- weaken read-back verification;
-- merge directly to `main`;
-- claim Stage-1 acceptance before Chat 6 review.
+## Delivery rule
 
-## Completion state
-
-Expected final worker state:
-
-```text
-CHAT_4_PASS_7 = HANDOFF_PUBLISHED_AND_FROZEN
-REAL_HOST = UNVERIFIED unless actual controlled-host evidence exists
-ROUND_4_STAGE1_ACCEPTANCE = PENDING_CHAT6
-```
+Use a new pass branch from current `main`, run Chat-4 generic plus adjacent boundary/contract gates, preserve external-host truth, publish a truthful handoff with exact SHA/CI evidence, and do not merge directly to `main`.
