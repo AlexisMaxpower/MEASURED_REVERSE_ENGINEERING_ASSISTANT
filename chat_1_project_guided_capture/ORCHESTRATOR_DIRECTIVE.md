@@ -1,83 +1,39 @@
 # ORCHESTRATOR DIRECTIVE — Chat 1
 
-**Revision:** `OD-2026-09-30-004`  
-**Owner:** Chat 6  
-**Central round:** 4  
-**Worker target branch:** `chat-1/pass-4`
+**Revision:** `OD-2026-10-01-005`  
+**Control owner:** central orchestration  
+**Issued as:** Round-12 final control-plane repair by Orchestrator 2  
+**Status:** `READY_FOR_NEXT_FULL_WORKER_PASS_FROM_CURRENT_MAIN`
 
-Read before further work.
+This directive supersedes `OD-2026-09-30-004` and every historical instruction that pins Chat 1 to `chat-1/pass-4` or a Round-4 Stage-1 state.
 
-## Accepted central baseline
+## Required baseline
 
-Round 3 is closed on the certified software baseline. Chat 1 Pass 3 is accepted in `main`.
+Before starting the next worker pass:
 
-Current Round-4 plan:
+1. read `chat_6_orchestrator/ORCHESTRATION_STATE.md`;
+2. require `ROUND_12_CLOSED = TRUE` and `NEXT_FULL_WORKER_PASS = READY`;
+3. branch the new worker pass from the then-current shared `main`;
+4. do not reuse a historical Chat-1 pass branch as the implementation base.
 
-`chat_6_orchestrator/PASS_4_PLAN_2026-09-30.md`
+Round 12 contains no new Chat-1 product delta. The current integrated Chat-1 surface on `main` remains authoritative.
 
-## Observed Pass-4 state
+## Slice ownership
 
-Observed branch head:
+Chat 1 owns Project & Guided Capture: project/session capture flow, clean-reference lineage, capture quality/readiness, calibration/rectification capture-side state, and canonical CapturePackage production within the existing shared contract.
 
-`beed09508c8cba294b1e78d7b6b7f3226f72d734`
+Preserve these invariants:
 
-Observed implementation includes immutable clean-reference recapture lineage and source/supersession relationships.
+- recapture/replacement is explicit lineage, never silent mutation;
+- provenance remains attributable to the correct capture generation;
+- verified downstream physical facts are not rewritten by recapture;
+- measurement, geometry, CAD and lifecycle ownership stays outside Chat 1;
+- canonical contracts/shared CI are not changed without an approved central change.
 
-Problem:
+## Next pass rule
 
-`chat-1/pass-4` still contains an `ORCHESTRATOR_HANDOFF.md` that identifies Pass 3 / `chat-1/pass-3`.
+This control document intentionally does not invent the next feature. Execute the active worker-round/user task for Chat 1 after resolving the current certified `main`. If no current task exists, stop rather than reviving an old OD-004 task.
 
-Therefore the current Pass-4 branch is not yet a protocol-valid frozen Stage-1 input.
+## Delivery rule
 
-## OD-004 task
-
-Do **not** start another feature pass.
-
-Finish the existing Pass 4 as a reviewable worker result:
-
-1. inspect the current Pass-4 implementation against the accepted Round-3 baseline and current canonical contracts;
-2. correct only defects necessary for a truthful Pass-4 result;
-3. run the required Chat-1 slice and Chat1->Chat2 boundary gates against the current repository/shared baseline where possible;
-4. publish a new Pass-4 `ORCHESTRATOR_HANDOFF.md` that records:
-   - exact branch;
-   - exact implementation/pre-handoff SHA;
-   - CI run IDs/results;
-   - exact delivered scope;
-   - changed files;
-   - provenance/immutability invariants;
-   - known limitations;
-   - explicit freeze state;
-5. after that handoff commit, freeze `chat-1/pass-4`.
-
-## Required truth invariants
-
-- clean-reference recapture must be explicit lineage, not silent replacement;
-- measurement/reference provenance must remain attributable to the correct clean-reference generation;
-- existing verified physical facts must not be mutated by a later recapture;
-- `CapturePackage v1` compatibility must remain intact unless Chat 6 approves a Change Request;
-- no measurement, geometry or CAD ownership moves into Chat 1.
-
-## Required gates
-
-Keep green:
-
-- `Chat 1 / Capture`;
-- `Integration / Chat 1 -> Chat 2`;
-- canonical contracts/fixtures.
-
-## Do not
-
-- start Pass 5;
-- modify Chat-6-owned CI/shared integration tests;
-- modify `core/contracts` without approved CR;
-- merge to `main`;
-- claim Stage-1 acceptance before Chat 6 review.
-
-## Completion state
-
-Expected final worker state:
-
-```text
-CHAT_1_PASS_4 = HANDOFF_PUBLISHED_AND_FROZEN
-ROUND_4_STAGE1_ACCEPTANCE = PENDING_CHAT6
-```
+Use a new pass branch from current `main`, run Chat-1 plus adjacent boundary/contract gates, publish a truthful handoff with exact SHA/CI evidence, and do not merge directly to `main`.
