@@ -28,6 +28,20 @@ That run must, in one execution:
 9. finish with runtime status `VERIFIED`;
 10. emit `solidworks_host_qualification.json` with all three subchecks `VERIFIED`.
 
+## Dynamic source of truth
+
+Do not copy a qualification result into ordinary orchestration state. When the result matters, resolve it from the dedicated workflow run and its generated manifest.
+
+The central control files therefore keep only this stable pointer:
+
+```text
+SOLIDWORKS_HOST_QUALIFICATION = DEDICATED_WORKFLOW_AUTHORITY
+ROUND_LEVEL_SOFTWARE_BLOCKER = FALSE
+LEGACY_THREE_LINE_CARRY_FORWARD = RETIRED
+```
+
+If no valid successful controlled-host run exists, there is simply no positive host qualification yet. That absence is not an ordinary software-round blocker and is not repeated as three `UNVERIFIED` lines.
+
 ## Persistence
 
 The qualification manifest records a `host_boundary_fingerprint` over the C# agent, host scripts, runtime-evidence bridge and canonical fixture.
@@ -40,9 +54,7 @@ Unrelated Capture, Measurement, Geometry, generic CAD, Lifecycle, documentation 
 
 ## Reporting rule
 
-Ordinary worker/orchestrator reports must not repeat the three legacy `UNVERIFIED` lines. They should mention `SOLIDWORKS_HOST_QUALIFICATION` only when its state changes, the fingerprint becomes stale, or real SOLIDWORKS behavior is explicitly in scope.
-
-An unexecuted standing qualification is not a software-round blocker and does not downgrade an otherwise green software round.
+Ordinary worker/orchestrator reports must not repeat the three legacy `UNVERIFIED` lines. They should mention `SOLIDWORKS_HOST_QUALIFICATION` only when its state changes, the fingerprint becomes stale, the controlled host changes materially, or real SOLIDWORKS behavior is explicitly in scope.
 
 Never infer positive qualification from Linux CI, mocks, static checks, test doubles or a Windows runner without SOLIDWORKS.
 
@@ -50,7 +62,7 @@ Never infer positive qualification from Linux CI, mocks, static checks, test dou
 
 Register one GitHub self-hosted runner on the Windows 11 x64 machine with SOLIDWORKS 2026 and add the label `solidworks-2026`.
 
-After that, launch **MREA SOLIDWORKS 2026 Host Qualification** from GitHub Actions whenever qualification is needed. The evidence stays in the workflow run/artifact; no manual chat-to-chat handoff is required.
+After that, launch **MREA SOLIDWORKS 2026 Host Qualification** from GitHub Actions whenever qualification is needed. The workflow performs the build, host execution, native-file creation, read-back and evidence generation in one run; no chat-to-chat evidence handoff is required.
 
 Local fallback from repository root:
 
@@ -58,12 +70,6 @@ Local fallback from repository root:
 .\chat_4_cad_bridge_verification\scripts\qualify_solidworks_host.ps1
 ```
 
-## Migration state
+## Migration truth
 
-No real-host result is fabricated by introducing this policy. Until the first successful controlled-host run:
-
-```text
-SOLIDWORKS_HOST_QUALIFICATION = NOT_YET_EXECUTED_ON_REGISTERED_HOST
-ROUND_LEVEL_SOFTWARE_BLOCKER = FALSE
-LEGACY_THREE_LINE_CARRY_FORWARD = RETIRED
-```
+Introducing this policy does not fabricate a real-host result. At policy adoption no new controlled-host execution had been performed. From this point forward, the dedicated workflow — not copied round text — owns the dynamic qualification result.

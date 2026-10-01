@@ -33,9 +33,10 @@ def test_legacy_solidworks_external_flags_cannot_return_to_current_round_authori
             assert legacy not in text, f"legacy per-round SOLIDWORKS gate returned in {relative}: {legacy}"
 
 
-def test_standing_qualification_is_explicitly_out_of_band() -> None:
+def test_standing_qualification_uses_dynamic_workflow_authority() -> None:
     state = _read("chat_6_orchestrator/ORCHESTRATION_STATE.md")
-    assert "SOLIDWORKS_HOST_QUALIFICATION = NOT_YET_EXECUTED_ON_REGISTERED_HOST" in state
+    assert "SOLIDWORKS_HOST_QUALIFICATION = DEDICATED_WORKFLOW_AUTHORITY" in state
+    assert "QUALIFICATION_WORKFLOW = .github/workflows/solidworks_host_qualification.yml" in state
     assert "ROUND_LEVEL_SOFTWARE_BLOCKER = FALSE" in state
     assert "LEGACY_THREE_LINE_CARRY_FORWARD = RETIRED" in state
 

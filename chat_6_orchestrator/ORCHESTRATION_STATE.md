@@ -21,31 +21,24 @@ The former per-round carry-forward fields
 
 `REAL_SOLIDWORKS_2026_HOST`, `PRODUCTION_CSHARP_INTEROP_BUILD`, and `NATIVE_SLDPRT_GENERATION_READBACK`
 
-are retired as round-level status fields. They are one standing environment qualification named:
+are retired as round-level status fields. They are three subchecks of one standing environment qualification named `SOLIDWORKS_HOST_QUALIFICATION`.
+
+Operational authority is dynamic rather than copied into this file:
 
 ```text
-SOLIDWORKS_HOST_QUALIFICATION
-```
-
-Source of truth:
-
-- `.github/workflows/solidworks_host_qualification.yml`
-- `chat_6_orchestrator/SOLIDWORKS_HOST_QUALIFICATION_POLICY.md`
-- the latest successful workflow artifact `solidworks_host_qualification.json`
-
-Current migration state:
-
-```text
-SOLIDWORKS_HOST_QUALIFICATION = NOT_YET_EXECUTED_ON_REGISTERED_HOST
+SOLIDWORKS_HOST_QUALIFICATION = DEDICATED_WORKFLOW_AUTHORITY
+QUALIFICATION_WORKFLOW = .github/workflows/solidworks_host_qualification.yml
 ROUND_LEVEL_SOFTWARE_BLOCKER = FALSE
 LEGACY_THREE_LINE_CARRY_FORWARD = RETIRED
 ```
 
+When real-host status is relevant, resolve it from the dedicated workflow and its generated `solidworks_host_qualification.json` evidence. Do not manually mirror that result into ordinary round state.
+
 A successful qualification closes all three legacy sub-gates in one run by proving a fresh production C# build against the installed SOLIDWORKS 2026 interops, real COM execution, native `.SLDPRT` generation and real dimension read-back.
 
-Once successful, the qualification is reusable across later software rounds while its recorded host-boundary fingerprint is unchanged. Unrelated slice changes do not invalidate it.
+The qualification manifest records a host-boundary fingerprint. A successful qualification remains reusable across later software rounds while that fingerprint is unchanged and the controlled host has not materially changed. Unrelated slice changes do not invalidate it.
 
-Future workers and orchestrators must not copy the three old `UNVERIFIED` lines into ordinary handoffs or round verdicts. Mention the standing qualification only when its state changes, its fingerprint becomes stale, or the round explicitly concerns real-host SOLIDWORKS behavior.
+Future workers and orchestrators must not copy the three old `UNVERIFIED` lines into ordinary handoffs or round verdicts. Mention the standing qualification only when its state changes, its fingerprint becomes stale, the controlled host changes materially, or the round explicitly concerns real-host SOLIDWORKS behavior.
 
 ## Worker-start authority
 

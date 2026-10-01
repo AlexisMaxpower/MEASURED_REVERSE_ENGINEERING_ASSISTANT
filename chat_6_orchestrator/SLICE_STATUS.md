@@ -28,12 +28,12 @@ NEXT_FULL_WORKER_PASS = READY
 Real SOLIDWORKS environment qualification is no longer encoded as three repeated per-round exceptions.
 
 ```text
-SOLIDWORKS_HOST_QUALIFICATION = NOT_YET_EXECUTED_ON_REGISTERED_HOST
+SOLIDWORKS_HOST_QUALIFICATION = DEDICATED_WORKFLOW_AUTHORITY
 ROUND_LEVEL_SOFTWARE_BLOCKER = FALSE
 LEGACY_THREE_LINE_CARRY_FORWARD = RETIRED
 ```
 
-The single standing qualification is governed by `chat_6_orchestrator/SOLIDWORKS_HOST_QUALIFICATION_POLICY.md` and `.github/workflows/solidworks_host_qualification.yml`.
+The single standing qualification is governed by `chat_6_orchestrator/SOLIDWORKS_HOST_QUALIFICATION_POLICY.md` and `.github/workflows/solidworks_host_qualification.yml`. Its actual positive/absent/stale state is resolved from that dedicated workflow and its fingerprinted evidence when relevant, not copied into each round.
 
 A successful controlled-host run proves together:
 
@@ -41,4 +41,4 @@ A successful controlled-host run proves together:
 - real SOLIDWORKS 2026 COM execution;
 - native `.SLDPRT` generation plus canonical real-model dimension read-back.
 
-Future ordinary rounds do not repeat the old three `UNVERIFIED` lines. Qualification is reported only when it changes, becomes stale because the fingerprinted host boundary changed, or is explicitly in scope.
+Future ordinary rounds do not repeat the old three `UNVERIFIED` lines. Qualification is reported only when its state changes, becomes stale because the fingerprinted host boundary changed, the controlled host changes materially, or it is explicitly in scope.
