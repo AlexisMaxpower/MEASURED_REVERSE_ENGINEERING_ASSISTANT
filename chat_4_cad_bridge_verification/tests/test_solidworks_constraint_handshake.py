@@ -15,7 +15,7 @@ from mrea_cad_bridge.solidworks_constraint_handshake import (
 )
 
 
-EXPECTED_SHA256 = "02a33af48298669e3563ce467b6cd6d8f2586d073baa3de6baa45749fc92a3d8"
+EXPECTED_SHA256 = "5eac12828b4255e05b17732093bf881e24a64c016abe5828573e4235be665ae4"
 
 
 class SolidWorksConstraintCapabilityHandshakeTests(unittest.TestCase):
@@ -50,15 +50,45 @@ class SolidWorksConstraintCapabilityHandshakeTests(unittest.TestCase):
         self.assertEqual(match.group(1), EXPECTED_SHA256)
 
         validate_start = program.index("private static void ValidateRequestEnvelope")
-        validate_end = program.index("private static string StartupFailureCode")
+        validate_end = program.index("private static void ValidateEntityEnvelope")
         validate_body = program[validate_start:validate_end]
         self.assertIn("request.constraint_capabilities_sha256", validate_body)
         self.assertIn("Constraint capability fingerprint mismatch", validate_body)
-
+        self.assertIn("ValidateConstraintEnvelope(request);", validate_body)
         self.assertLess(
-            program.index("ValidateRequestEnvelope(request);"),
+            validate_body.index("request.constraint_capabilities_sha256"),
+            validate_body.index("ValidateConstraintEnvelope(request);"),
+        )
+        self.assertLess(
+            program.index("ValidateConstraintEnvelope(request);"),
             program.index("SolidWorksSession.Open(request)"),
         )
+
+    def test_csharp_constraint_envelope_contains_declared_fail_closed_subset(self):
+        root = Path(__file__).resolve().parents[1]
+        program = (root / "solidworks_agent" / "Program.cs").read_text(encoding="utf-8")
+        start = program.index("private static void ValidateConstraintEnvelope")
+        end = program.index("private static void ValidateDimensionEnvelope")
+        envelope = program[start:end]
+
+        for constraint_type in (
+            "HORIZONTAL",
+            "VERTICAL",
+            "PARALLEL",
+            "PERPENDICULAR",
+            "CONCENTRIC",
+            "EQUAL",
+            "TANGENT",
+        ):
+            self.assertIn(f'constraint.type == "{constraint_type}"', envelope)
+        self.assertIn("Duplicate constraint_id", envelope)
+        self.assertIn("Constraint contains duplicate entity_ids", envelope)
+        self.assertIn("Constraint references unknown entity", envelope)
+        self.assertIn("Real-host constraint must be VERIFIED", envelope)
+        self.assertIn("requires exactly one LINE", envelope)
+        self.assertIn("requires exactly two LINE entities", envelope)
+        self.assertIn("CONCENTRIC requires exactly two CIRCLE/ARC entities", envelope)
+        self.assertIn("TANGENT supports LINE/CIRCLE/ARC pairs with at least one CIRCLE/ARC", envelope)
 
     def test_protocol_model_carries_fingerprint_field(self):
         root = Path(__file__).resolve().parents[1]
