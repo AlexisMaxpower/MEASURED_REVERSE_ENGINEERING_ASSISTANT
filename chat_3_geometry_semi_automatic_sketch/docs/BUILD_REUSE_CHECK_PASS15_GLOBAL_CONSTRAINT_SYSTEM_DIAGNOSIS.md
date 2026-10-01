@@ -28,12 +28,13 @@ Add a read-only `ConstraintSystemAnalyzer` with explicit diagnostic output.
 
 ### Logical conflict detection
 
-Fail closed for relation sets that contain:
+Fail closed for supported relation systems that contain:
 
-- `HORIZONTAL` and `VERTICAL` on the same line;
-- `PARALLEL` and `PERPENDICULAR` on the same line pair;
-- `CONCENTRIC` and `TANGENT` on the same round-entity pair;
-- references to entities absent from the analyzed draft.
+- `HORIZONTAL` and `VERTICAL` parity that cannot coexist on the same connected line-orientation graph;
+- `PARALLEL` / `PERPENDICULAR` parity cycles that contradict earlier accepted line-orientation relations, including transitive conflicts;
+- round entities that are directly or transitively `CONCENTRIC` while also constrained `TANGENT`;
+- references to entities absent from the analyzed draft;
+- duplicate `constraint_id` values whose identity cannot be diagnosed unambiguously.
 
 These are system-level conflicts; the analyzer reports them but never mutates or silently drops constraints.
 
@@ -42,9 +43,10 @@ These are system-level conflicts; the analyzer reports them but never mutates or
 Report constraints that add no new structural relation because they are:
 
 - semantic duplicates of an earlier deterministic relation;
-- transitive cycle edges for equivalence-like `EQUAL`, `PARALLEL`, or `CONCENTRIC` relations;
-- `PARALLEL` implied by two already-axis-constrained lines of the same axis;
-- `PERPENDICULAR` implied by one horizontal and one vertical line.
+- line-orientation relations already implied by `HORIZONTAL` / `VERTICAL` / `PARALLEL` / `PERPENDICULAR` paths;
+- transitive cycle edges for equivalence-like `EQUAL` or `CONCENTRIC` relations.
+
+`COINCIDENT`, `TANGENT`, and `SYMMETRIC` are deliberately not treated as transitive equivalence relations.
 
 Redundancy is diagnostic only. It does not claim that the sketch is fully constrained, nor does it remove constraints.
 
@@ -62,10 +64,10 @@ The analyzer reports exactly one system status:
 
 - input resolution and geometry are never mutated;
 - analysis order is stable by `constraint_id`;
+- relation paths are deterministic and preserve supporting constraint IDs;
 - issue IDs and referenced constraint/entity IDs are deterministic;
 - unsupported relation combinations are not guessed into conflicts;
-- `COINCIDENT`, `TANGENT`, and `SYMMETRIC` are not treated as transitive equivalence relations;
-- missing entity references are explicit conflicts rather than ignored data;
+- missing entity references and duplicate constraint IDs are explicit conflicts rather than ignored data;
 - no physical measurement value, provenance, confidence, tolerance, or geometry coordinate is rewritten.
 
 ## Build decision
