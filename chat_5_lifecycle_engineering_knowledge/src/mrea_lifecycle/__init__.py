@@ -3,6 +3,52 @@ from .adapters import (
     CANONICAL_LIFECYCLE_EVENT_TYPES,
     CanonicalLifecycleEventAdapter,
 )
+from .backup import (
+    LIFECYCLE_BACKUP_FORMAT_VERSION,
+    LifecycleBackupConsistencyError,
+    LifecycleBackupError,
+    LifecycleBackupIntegrityError,
+    LifecycleBackupManager,
+    LifecycleBackupManifest,
+    LifecycleBackupVerification,
+    LifecycleDatabaseInspection,
+    inspect_lifecycle_database,
+)
+from .engineering_knowledge import (
+    EquipmentPositionHistoryEntry,
+    FailurePatternSummary,
+    LifecycleKnowledgeIntegrityError,
+    ReplacementChainEntry,
+    RevisionLineageEntry,
+    RevisionOutcomeSummary,
+    SQLiteEngineeringKnowledgeRepository,
+)
+from .http_api import (
+    LIFECYCLE_HTTP_API_SCHEMA_VERSION,
+    LifecycleHttpMethodNotAllowedError,
+    LifecycleHttpNotFoundError,
+    LifecycleHttpRequestError,
+    LifecycleHttpResponse,
+    ReadOnlyLifecycleHttpAPI,
+    build_read_only_lifecycle_http_app,
+)
+from .http_cursor import (
+    HTTP_CURSOR_FORMAT_VERSION,
+    MIN_HTTP_CURSOR_KEY_BYTES,
+    HttpCursorAuthenticator,
+    LifecycleHttpCursorError,
+)
+from .keyset_knowledge import SQLiteKeysetEngineeringKnowledgeRepository
+from .knowledge_paging import (
+    DEFAULT_KNOWLEDGE_PAGE_LIMIT,
+    KNOWLEDGE_CURSOR_FORMAT_VERSION,
+    KNOWLEDGE_KEYSET_CURSOR_FORMAT_VERSION,
+    MAX_KNOWLEDGE_PAGE_LIMIT,
+    KnowledgeCursorState,
+    KnowledgeKeysetCursorState,
+    KnowledgePage,
+    LifecycleKnowledgeCursorError,
+)
 from .models import (
     CADArtifactReference,
     CADRevisionLink,
@@ -22,6 +68,13 @@ from .models import (
     RevisionOrigin,
     TestRecord,
 )
+from .persistence import (
+    SQLITE_SNAPSHOT_SCHEMA_VERSION,
+    LifecycleConcurrencyError,
+    LifecyclePersistenceError,
+    LifecycleTransactionRequiredError,
+    SQLiteLifecycleStore,
+)
 from .physical import (
     PhysicalEquipmentRegistry,
     PhysicalPartLifecycleService,
@@ -36,6 +89,19 @@ from .projections import (
     RevisionComparison,
     RevisionComparisonResult,
 )
+from .read_only import (
+    LifecycleReadOnlyError,
+    LifecycleReadOnlyStaleError,
+    SQLiteLifecycleReadOnlySession,
+)
+from .relational import (
+    EquipmentOccupancyQueryResult,
+    FailureQueryResult,
+    PhysicalEventQueryResult,
+    RevisionQueryResult,
+    SQLiteLifecycleQueryRepository,
+)
+from .repository import LifecycleRepository
 from .services import (
     CADRevisionPreparationService,
     FailureService,
@@ -44,7 +110,9 @@ from .services import (
     RevisionService,
     TestService,
 )
+from .sqlite_schema import SQLITE_RELATIONAL_SCHEMA_VERSION, SQLiteSchemaMigration
 from .store import InMemoryLifecycleStore, LifecycleInvariantError
+from .unit_of_work import LifecycleUnitOfWork
 
 __all__ = [
     "CANONICAL_LIFECYCLE_EVENT_SCHEMA_VERSION",
@@ -54,22 +122,60 @@ __all__ = [
     "CADRevisionPreparationService",
     "CADVerificationStatus",
     "CanonicalLifecycleEventAdapter",
+    "DEFAULT_KNOWLEDGE_PAGE_LIMIT",
+    "EquipmentOccupancyQueryResult",
     "EquipmentPartRegistry",
+    "EquipmentPositionHistoryEntry",
+    "FailurePatternSummary",
+    "FailureQueryResult",
     "FailureRecord",
     "FailureService",
+    "HTTP_CURSOR_FORMAT_VERSION",
+    "HttpCursorAuthenticator",
     "InMemoryLifecycleStore",
     "Installation",
     "InstallationService",
+    "KNOWLEDGE_CURSOR_FORMAT_VERSION",
+    "KNOWLEDGE_KEYSET_CURSOR_FORMAT_VERSION",
+    "KnowledgeCursorState",
+    "KnowledgeKeysetCursorState",
+    "KnowledgePage",
     "KnowledgeQueryService",
+    "LIFECYCLE_BACKUP_FORMAT_VERSION",
+    "LIFECYCLE_HTTP_API_SCHEMA_VERSION",
+    "LifecycleBackupConsistencyError",
+    "LifecycleBackupError",
+    "LifecycleBackupIntegrityError",
+    "LifecycleBackupManager",
+    "LifecycleBackupManifest",
+    "LifecycleBackupVerification",
+    "LifecycleConcurrencyError",
+    "LifecycleDatabaseInspection",
     "LifecycleEvent",
     "LifecycleEventType",
+    "LifecycleHttpCursorError",
+    "LifecycleHttpMethodNotAllowedError",
+    "LifecycleHttpNotFoundError",
+    "LifecycleHttpRequestError",
+    "LifecycleHttpResponse",
     "LifecycleInvariantError",
+    "LifecycleKnowledgeCursorError",
+    "LifecycleKnowledgeIntegrityError",
+    "LifecyclePersistenceError",
+    "LifecycleReadOnlyError",
+    "LifecycleReadOnlyStaleError",
+    "LifecycleRepository",
     "LifecycleState",
     "LifecycleStateProjection",
     "LifecycleTimeline",
+    "LifecycleTransactionRequiredError",
+    "LifecycleUnitOfWork",
+    "MAX_KNOWLEDGE_PAGE_LIMIT",
+    "MIN_HTTP_CURSOR_KEY_BYTES",
     "ManufacturingRecord",
     "ManufacturingService",
     "PhysicalEquipmentRegistry",
+    "PhysicalEventQueryResult",
     "PhysicalLifecycleEvent",
     "PhysicalLifecycleEventType",
     "PhysicalPartInstance",
@@ -78,11 +184,26 @@ __all__ = [
     "PhysicalPartStateProjection",
     "PhysicalPartTimeline",
     "PhysicalTestOutcome",
+    "ReadOnlyLifecycleHttpAPI",
+    "ReplacementChainEntry",
     "Revision",
     "RevisionComparison",
     "RevisionComparisonResult",
+    "RevisionLineageEntry",
     "RevisionOrigin",
+    "RevisionOutcomeSummary",
+    "RevisionQueryResult",
     "RevisionService",
+    "SQLITE_RELATIONAL_SCHEMA_VERSION",
+    "SQLITE_SNAPSHOT_SCHEMA_VERSION",
+    "SQLiteEngineeringKnowledgeRepository",
+    "SQLiteKeysetEngineeringKnowledgeRepository",
+    "SQLiteLifecycleQueryRepository",
+    "SQLiteLifecycleReadOnlySession",
+    "SQLiteLifecycleStore",
+    "SQLiteSchemaMigration",
     "TestRecord",
     "TestService",
+    "build_read_only_lifecycle_http_app",
+    "inspect_lifecycle_database",
 ]
