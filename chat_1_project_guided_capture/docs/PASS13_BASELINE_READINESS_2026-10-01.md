@@ -39,15 +39,23 @@ The integrated Chat-1 product surface on that baseline remains authoritative.
 - `CapturePackage v1` and shared contracts are unchanged;
 - no shared CI or root integration test is modified.
 
-## Validation plan
+## Validation
 
-Before final handoff:
+Pre-handoff commit:
 
-1. verify the branch is based on the exact certified main SHA above;
-2. run/observe the Chat-1 slice, canonical contract gate and Chat1->Chat2 boundaries on the Pass-13 branch;
-3. record exact CI evidence;
-4. publish `ORCHESTRATOR_HANDOFF.md` as the final branch mutation;
-5. freeze `chat-1/pass-13`.
+`47d1e38724eb5f7163875eba074ed55ab56e87f6`
+
+MREA CI:
+
+`36805805798` — **SUCCESS**
+
+Required gates on that exact SHA:
+
+- `Chat 1 / Capture` — **SUCCESS**;
+- `Contracts / canonical fixtures` — **SUCCESS**;
+- `Integration / Chat 1 -> Chat 2` — **SUCCESS**.
+
+The Chat1->Chat2 gate actually executed its real Capture -> Measurement boundary test; it was not accepted through a skipped state.
 
 ## Product delta
 
@@ -57,4 +65,8 @@ SHARED_CONTRACT_DELTA = NONE
 ADJACENT_SLICE_DELTA = NONE
 ```
 
-This pass intentionally stops at a verified fresh baseline because no current repository-authored Chat-1 feature task exists.
+The only Pass-13 repository work before final handoff is this worker-owned readiness record.
+
+## Completion rule
+
+`ORCHESTRATOR_HANDOFF.md` will be the final branch mutation. After that commit `chat-1/pass-13` is frozen. A later product pass must start from then-current certified `main` under the then-current central directive/task rather than extending this readiness branch.
