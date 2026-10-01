@@ -14,7 +14,7 @@ from mrea_lifecycle import (
     Revision,
     SQLiteLifecycleReadOnlySession,
     SQLiteLifecycleStore,
-    TestRecord,
+    TestRecord as LifecycleTestRecord,
     build_read_only_lifecycle_http_app,
 )
 
@@ -88,7 +88,7 @@ def _seed_detail_database(path) -> None:
             event_id="LC-M2",
         )
         uow.tests.record(
-            TestRecord(
+            LifecycleTestRecord(
                 test_id="T1",
                 revision_id="R1",
                 tested_at=T0 + timedelta(hours=3),
@@ -118,7 +118,7 @@ def _seed_detail_database(path) -> None:
             event_id="LC-F1",
         )
         uow.tests.record(
-            TestRecord(
+            LifecycleTestRecord(
                 test_id="T2",
                 revision_id="R2",
                 tested_at=T0 + timedelta(hours=5),
