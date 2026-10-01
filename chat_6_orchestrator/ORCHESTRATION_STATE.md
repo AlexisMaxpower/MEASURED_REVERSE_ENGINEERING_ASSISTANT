@@ -1,150 +1,103 @@
 # MREA Orchestration State
 
-**Owner:** Chat 6 — Orchestrator / Repository Integrator  
-**Directive revision:** `OD-2026-09-30-004`  
+**Control owner:** central orchestration  
+**Finalizing role:** Orchestrator 2 / final orchestrator 2 of 2  
 **Contract baseline:** `mrea.contracts.v1`  
-**Status:** `ROUND_4_BLOCKED_BY_CHAT3_CHAT5_FIX_REQUIRED`
+**Status:** `ROUND_11_CLOSED_ACCEPTED_WITH_EXTERNAL_GATE`
 
-## Final Review finding
+## Round 11 accepted integration
 
-Chat 8 returned:
-
-`FINAL_REVIEW_FIX_REQUIRED`
-
-Finding:
-
-`chat_8_deputy_orchestrator/ROUND_4_FINAL_REVIEW_FINDING_001_CROSS_SLICE_COVERAGE.md`
-
-Chat 6 accepted the finding and added Round-4-specific shared boundary/golden-path coverage.
-
-## Corrected shared infrastructure
-
-Shared code/CI baseline before the control-document commit containing this state:
-
-```text
-main: 6157c7154e3cd08d3e4d60b05c65b5445888ba24
-tree: 0cb7b15abb1553654f009be6dbbe73029e046a88
-```
-
-Evidence:
-
-```text
-36751841476  MREA Round 4 Truth CI  SUCCESS
-36751841522  MREA CI                SUCCESS
-```
-
-Added shared gates:
-
-- `tests/integration/test_round4_chat1_to_chat2_truth.py`
-- `tests/integration/test_round4_chat2_to_chat3_truth.py`
-- `tests/integration/test_round4_chat3_to_chat4_truth.py`
-- `tests/integration/test_round4_chat4_to_chat5_truth.py`
-- `tests/integration/test_round4_golden_path.py`
-- `.github/workflows/round4_truth.yml`
-
-## Diagnostic replay candidate
-
-Same accepted Round-4 worker replay content was rebuilt over corrected main:
+The independently accepted Round-11 integration candidate was:
 
 ```text
 branch: integration/pass-4-candidate
-base:   6157c7154e3cd08d3e4d60b05c65b5445888ba24
-SHA:    b5fdcd6324efd1396a3d57a28fc11e0dd0ba4afd
-tree:   feaa4de6f84bda514e92d5bbf9939f1187da35a3
+SHA:    f54d3841067e60e922340593b740f5a50fe4562f
+tree:   38c951bec641c84f079f9247a64b7cd201210066
 ```
 
-Regression:
-
-`36752208418` — `MREA CI` — `SUCCESS`
-
-Round-4 truth:
-
-`36752208521` — `FAILURE`
-
-The candidate is diagnostic evidence only and is not authorized for merge/final acceptance.
-
-## Boundary results
+It was merged through PR #38. The merge commit was:
 
 ```text
-Round 4 Chat 1 -> Chat 2 truth  SUCCESS
-Round 4 Chat 2 -> Chat 3 truth  FAILURE
-Round 4 Chat 3 -> Chat 4 truth  SUCCESS
-Round 4 Chat 4 -> Chat 5 truth  FAILURE
-Round 4 golden path             SKIPPED (blocked by failed dependencies)
+7c03295200f72dbe6aa9c79bd21113c9f2df87e3
 ```
 
-## Confirmed blocker A — Chat 3
-
-Canonical physical uncertainty from Chat 2 is silently lost by Chat 3 normalization/binding.
-
-Observed failure:
+Round-11 worker inputs independently audited before merge:
 
 ```text
-MeasurementPackage uncertainty = 0.5
-MeasurementRef has no uncertainty
+Chat 2  chat-2/pass-11-verification @ f8692b91e6a2eb867d8f6b714b97e05f7477a100
+Chat 3  chat-3/pass-11              @ ffd2fd71e325da690fccebbfa1c1ce904571f655
+Chat 4  chat-4/pass-11              @ 09a0fef643ebf6173c82af42de7b86ec7c2e0b53
+Chat 5  chat-5/pass-11              @ fe6038bd6f709d38c299b36b979ead78a86d8734
 ```
 
-Action:
+Chat 2 and Chat 3 Pass-11 tops were verification/documentation-only. Chat 4 and Chat 5 accepted product-owned surfaces were replayed into the central candidate without importing obsolete shared/control history.
 
-`chat_3_geometry_semi_automatic_sketch/ORCHESTRATOR_FIX_REQUIRED_ROUND4_001.md`
+## Candidate CI evidence
 
-`chat-3/pass-8` is explicitly reopened only for that correction.
-
-## Confirmed blocker B — Chat 5
-
-Chat 5 cannot consume Chat-4 runtime evidence/status.
-
-Observed failure:
+Exact candidate `f54d3841067e60e922340593b740f5a50fe4562f` passed both central suites:
 
 ```text
-CADRevisionPreparationService.prepare()
-got an unexpected keyword argument 'runtime_evidence'
+36798866892  MREA CI                SUCCESS
+36798866917  MREA Round 4 Truth CI  SUCCESS
 ```
 
-Therefore runtime `UNVERIFIED` cannot currently be persisted/enforced as a manufacturing blocker for runtime-gated CAD origins.
+All mandatory slice, contract, boundary and golden-path jobs actually executed; no mandatory gate was accepted through `skipped` or `cancelled` status.
 
-Action:
+## Final post-merge finding and correction
 
-`chat_5_lifecycle_engineering_knowledge/ORCHESTRATOR_FIX_REQUIRED_ROUND4_001.md`
-
-`chat-5/pass-8` is explicitly reopened only for that correction.
-
-## Frozen slices not reopened
+The first post-merge Truth run on merge commit `7c03295200f72dbe6aa9c79bd21113c9f2df87e3` exposed a shared workflow defect:
 
 ```text
-Chat 1  chat-1/pass-4 @ a7d607f8cdd281749ae40529de15c2d84dfda78e  ACCEPTED / FROZEN
-Chat 2  chat-2/pass-6 @ 539d58567046fd29ccf2d42b629227ffe8da6546  ACCEPTED / FROZEN
-Chat 4  chat-4/pass-7 @ 61f37a4dd46921b7fe9145bcbe5242bc3f6417b3  ACCEPTED / FROZEN
+36800154366  MREA Round 4 Truth CI
 ```
 
-Chat 3 previous frozen handoff:
+The shared infrastructure job executed, but all four truth boundaries and the Round-4 golden path were skipped because their job-level conditions only admitted `integration/pass-4-candidate`.
 
-`d786e1d49b5c8f2837a3ce936f7f1c0d93336d49`
+Final Orchestrator 2 corrected `.github/workflows/round4_truth.yml` so the mandatory truth jobs also execute on `refs/heads/main`.
 
-Chat 5 previous frozen handoff:
-
-`82e2203aaeb69ee1fe9f89fd42d0aea451b8690f`
-
-## Next state transition
+Correction commit / certified software+CI baseline:
 
 ```text
-CHAT3_FIX_REQUIRED + CHAT5_FIX_REQUIRED
-    -> corrected worker re-handoffs
-    -> Chat6 independent review
-    -> replay corrected Chat3/Chat5 slice content over current shared main
-    -> MREA CI SUCCESS
-    -> all Round4 Truth boundary jobs SUCCESS
-    -> Round4 golden path ACTUALLY EXECUTED + SUCCESS
-    -> new exact candidate to Chat8
-    -> Chat8 Final Review
+c35c2abc08798f1da4083d1a33dbaa1f42db3af9
 ```
 
-No merge to main is authorized before Chat 8 returns an exact-SHA acceptance verdict.
+Exact-main evidence after the correction:
+
+```text
+36800327016  MREA CI                SUCCESS
+36800327069  MREA Round 4 Truth CI  SUCCESS
+```
+
+For `36800327016`, contracts, all five slices, all four normal integration boundaries and the normal golden path executed successfully.
+
+For `36800327069`, the shared gate, all four Round-4 truth boundaries and the Round-4 golden path executed successfully. No required truth gate was skipped.
+
+## Resolved legacy blockers
+
+The old Round-4 Chat-3 uncertainty-propagation blocker and Chat-5 runtime-evidence blocker are closed in the integrated repository. The historical `FIX_REQUIRED / REOPENED` state is no longer current authority.
+
+```text
+OPEN_SOFTWARE_BLOCKERS = NONE
+CURRENT_CANDIDATE_ACCEPTED = TRUE
+MERGE_TO_MAIN_COMPLETED = TRUE
+ROUND_11_CLOSED = TRUE
+NEXT_FULL_WORKER_PASS = READY
+```
+
+No worker is currently reopened by the old Round-4 findings. A new worker pass must start from the current shared `main` under a new/current orchestration directive rather than from historical frozen baselines.
 
 ## External environment truth
+
+Generic Linux CI, test doubles and synthetic runtime evidence do not promote the real SOLIDWORKS host state.
 
 ```text
 REAL_SOLIDWORKS_2026_HOST = EXTERNAL_GATE_UNVERIFIED
 PRODUCTION_CSHARP_INTEROP_BUILD = UNVERIFIED
 NATIVE_SLDPRT_GENERATION_READBACK = UNVERIFIED
+```
+
+Therefore the final Round-11 disposition is:
+
+```text
+ROUND 11 CLOSED — ACCEPTED_WITH_EXTERNAL_GATE
 ```
