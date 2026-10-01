@@ -49,6 +49,7 @@ from .knowledge_paging import (
     KnowledgePage,
     LifecycleKnowledgeCursorError,
 )
+from .materialized_knowledge import SQLiteMaterializedEngineeringKnowledgeRepository
 from .models import (
     CADArtifactReference,
     CADRevisionLink,
@@ -64,6 +65,7 @@ from .models import (
     PhysicalLifecycleEventType,
     PhysicalPartInstance,
     PhysicalPartState,
+    PhysicalPartStateProjection,
     PhysicalTestOutcome,
     Revision,
     RevisionOrigin,
@@ -79,7 +81,6 @@ from .persistence import (
 from .physical import (
     PhysicalEquipmentRegistry,
     PhysicalPartLifecycleService,
-    PhysicalPartStateProjection,
     PhysicalPartTimeline,
 )
 from .projections import (
@@ -203,6 +204,7 @@ __all__ = [
     "SQLiteLifecycleQueryRepository",
     "SQLiteLifecycleReadOnlySession",
     "SQLiteLifecycleStore",
+    "SQLiteMaterializedEngineeringKnowledgeRepository",
     "SQLiteSchemaMigration",
     "TestRecord",
     "TestService",
