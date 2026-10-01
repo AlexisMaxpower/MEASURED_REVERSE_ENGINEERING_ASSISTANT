@@ -294,6 +294,11 @@ def _parse_russian_measurement_words(parts: list[str]) -> Decimal:
     if explicit_fraction is not None:
         return explicit_fraction
 
+    if _parse_russian_cardinal(parts) is not None:
+        raise MeasurementCommandError(
+            "standalone spoken whole value requires explicit numeric or decimal structure"
+        )
+
     candidates: set[Decimal] = set()
     for split_at in range(1, len(parts)):
         whole_candidate = _parse_russian_cardinal(parts[:split_at])
