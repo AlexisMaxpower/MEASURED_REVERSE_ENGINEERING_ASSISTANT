@@ -8,10 +8,84 @@ from enum import StrEnum
 
 from .models import FeatureAnchor, MeasurementType, PhysicalMeasurement, ProvenanceSource
 from .service import MeasurementSessionService
+from .type_registry import MeasurementTypeRegistry
 
 
 _NUMBER_RE = re.compile(r"^[+-]?\d+(?:[.,]\d+)?$")
 _NUMERIC_LIKE_RE = re.compile(r"[+-]?\d+(?:[.,]\d+)?")
+
+_UNIT_SUFFIXES: dict[str, str] = {
+    "мм": "mm",
+    "mm": "mm",
+    "миллиметр": "mm",
+    "миллиметра": "mm",
+    "миллиметров": "mm",
+    "градус": "deg",
+    "градуса": "deg",
+    "градусов": "deg",
+    "deg": "deg",
+    "degree": "deg",
+    "degrees": "deg",
+}
+
+_RUSSIAN_ONES = {
+    "ноль": 0,
+    "один": 1,
+    "одна": 1,
+    "одно": 1,
+    "два": 2,
+    "две": 2,
+    "три": 3,
+    "четыре": 4,
+    "пять": 5,
+    "шесть": 6,
+    "семь": 7,
+    "восемь": 8,
+    "девять": 9,
+}
+_RUSSIAN_TEENS = {
+    "десять": 10,
+    "одиннадцать": 11,
+    "двенадцать": 12,
+    "тринадцать": 13,
+    "четырнадцать": 14,
+    "пятнадцать": 15,
+    "шестнадцать": 16,
+    "семнадцать": 17,
+    "восемнадцать": 18,
+    "девятнадцать": 19,
+}
+_RUSSIAN_TENS = {
+    "двадцать": 20,
+    "тридцать": 30,
+    "сорок": 40,
+    "пятьдесят": 50,
+    "шестьдесят": 60,
+    "семьдесят": 70,
+    "восемьдесят": 80,
+    "девяносто": 90,
+}
+_RUSSIAN_HUNDREDS = {
+    "сто": 100,
+    "двести": 200,
+    "триста": 300,
+    "четыреста": 400,
+    "пятьсот": 500,
+    "шестьсот": 600,
+    "семьсот": 700,
+    "восемьсот": 800,
+    "девятьсот": 900,
+}
+_RUSSIAN_THOUSANDS = {"тысяча", "тысячи", "тысяч"}
+_RUSSIAN_WHOLE_MARKERS = {"целая", "целое", "целые", "целых"}
+_RUSSIAN_FRACTION_SCALES = {
+    "десятая": 10,
+    "десятых": 10,
+    "сотая": 100,
+    "сотых": 100,
+    "тысячная": 1000,
+    "тысячных": 1000,
+}
 
 
 class MeasurementCommandError(ValueError):
@@ -47,6 +121,7 @@ class ParsedMeasurementCommand:
     intent: MeasurementCommandIntent
     normalized_text: str
     value: Decimal | None = None
+    unit_hint: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,34 +162,203 @@ def _normalize_text(text: str) -> str:
     return normalized
 
 
-def normalize_measurement_number(payload: str) -> Decimal:
+def _split_unit_suffix(parts: list[str]) -> tuple[list[str], str | None]:
+    if not parts:
+        return parts, None
+    unit = _UNIT_SUFFIXES.get(parts[-1])
+    if unit is None:
+        return parts, None
+    return parts[:-1], unit
+
+
+def _extract_spoken_sign(parts: list[str]) -> tuple[int, list[str]]:
+    if not parts:
+        return 1, parts
+    if parts[0] == "минус":
+        return -1, parts[1:]
+    if parts[0] == "плюс":
+        return 1, parts[1:]
+    return 1, parts
+
+
+def _parse_russian_under_1000(parts: list[str]) -> int | None:
+    if not parts:
+        return None
+    if len(parts) == 1 and parts[0] == "ноль":
+        return 0
+
+    index = 0
+    value = 0
+    if parts[index] in _RUSSIAN_HUNDREDS:
+        value += _RUSSIAN_HUNDREDS[parts[index]]
+        index += 1
+        if index == len(parts):
+            return value
+
+    if index < len(parts):
+        token = parts[index]
+        if token in _RUSSIAN_TEENS:
+            value += _RUSSIAN_TEENS[token]
+            index += 1
+        elif token in _RUSSIAN_TENS:
+            value += _RUSSIAN_TENS[token]
+            index += 1
+            if (
+                index < len(parts)
+                and parts[index] in _RUSSIAN_ONES
+                and _RUSSIAN_ONES[parts[index]] != 0
+            ):
+                value += _RUSSIAN_ONES[parts[index]]
+                index += 1
+        elif token in _RUSSIAN_ONES and _RUSSIAN_ONES[token] != 0:
+            value += _RUSSIAN_ONES[token]
+            index += 1
+        else:
+            return None
+
+    return value if index == len(parts) else None
+
+
+def _parse_russian_cardinal(parts: list[str]) -> int | None:
+    thousand_positions = [
+        index for index, token in enumerate(parts) if token in _RUSSIAN_THOUSANDS
+    ]
+    if len(thousand_positions) > 1:
+        return None
+    if not thousand_positions:
+        return _parse_russian_under_1000(parts)
+
+    position = thousand_positions[0]
+    thousands_parts = parts[:position]
+    remainder_parts = parts[position + 1 :]
+
+    thousands = 1 if not thousands_parts else _parse_russian_under_1000(thousands_parts)
+    if thousands is None or not 1 <= thousands <= 999:
+        return None
+    remainder = 0 if not remainder_parts else _parse_russian_under_1000(remainder_parts)
+    if remainder is None:
+        return None
+    return thousands * 1000 + remainder
+
+
+def _parse_fraction_component(parts: list[str], *, scale: int) -> int | None:
+    digits = len(str(scale)) - 1
+    if len(parts) == digits and all(token in _RUSSIAN_ONES for token in parts):
+        value = 0
+        for token in parts:
+            value = value * 10 + _RUSSIAN_ONES[token]
+        return value
+
+    value = _parse_russian_cardinal(parts)
+    if value is None or not 0 <= value < scale:
+        return None
+    return value
+
+
+def _parse_explicit_russian_fraction(parts: list[str]) -> Decimal | None:
+    marker_positions = [
+        index for index, token in enumerate(parts) if token in _RUSSIAN_WHOLE_MARKERS
+    ]
+    if not marker_positions:
+        return None
+    if len(marker_positions) != 1:
+        raise AmbiguousMeasurementCommand("spoken value contains multiple whole-part markers")
+
+    marker_position = marker_positions[0]
+    if marker_position == 0 or marker_position >= len(parts) - 2:
+        raise MeasurementCommandError("spoken fraction is incomplete")
+
+    scale = _RUSSIAN_FRACTION_SCALES.get(parts[-1])
+    if scale is None:
+        raise MeasurementCommandError("spoken fraction requires an explicit decimal scale")
+
+    whole = _parse_russian_cardinal(parts[:marker_position])
+    fraction = _parse_fraction_component(parts[marker_position + 1 : -1], scale=scale)
+    if whole is None or fraction is None:
+        raise MeasurementCommandError("spoken fraction is not a supported Russian number")
+
+    fraction_digits = len(str(scale)) - 1
+    return Decimal(f"{whole}.{fraction:0{fraction_digits}d}")
+
+
+def _parse_compact_two_digit_fraction(parts: list[str]) -> int | None:
+    if len(parts) == 2 and parts[0] == "ноль" and parts[1] in _RUSSIAN_ONES:
+        return _RUSSIAN_ONES[parts[1]]
+
+    value = _parse_russian_cardinal(parts)
+    if value is None or not 10 <= value <= 99:
+        return None
+    return value
+
+
+def _parse_russian_measurement_words(parts: list[str]) -> Decimal:
+    explicit_fraction = _parse_explicit_russian_fraction(parts)
+    if explicit_fraction is not None:
+        return explicit_fraction
+
+    if _parse_russian_cardinal(parts) is not None:
+        raise MeasurementCommandError(
+            "standalone spoken whole value requires explicit numeric or decimal structure"
+        )
+
+    candidates: set[Decimal] = set()
+    for split_at in range(1, len(parts)):
+        whole_candidate = _parse_russian_cardinal(parts[:split_at])
+        fraction_candidate = _parse_compact_two_digit_fraction(parts[split_at:])
+        if whole_candidate is None or fraction_candidate is None:
+            continue
+        candidates.add(Decimal(f"{whole_candidate}.{fraction_candidate:02d}"))
+
+    if len(candidates) > 1:
+        raise AmbiguousMeasurementCommand("spoken value has multiple valid interpretations")
+    if len(candidates) == 1:
+        return candidates.pop()
+    raise MeasurementCommandError("measurement value must be numeric or supported Russian words")
+
+
+def _normalize_measurement_payload(payload: str) -> tuple[Decimal, str | None]:
     normalized = _normalize_text(payload)
-    parts = normalized.split()
-    if parts and parts[-1] in {"мм", "mm"}:
-        parts = parts[:-1]
+    parts, unit_hint = _split_unit_suffix(normalized.split())
+    if not parts:
+        raise MeasurementCommandError("measurement value is missing")
+
+    had_spoken_sign = parts[0] in {"минус", "плюс"}
+    spoken_sign, parts = _extract_spoken_sign(parts)
     if not parts:
         raise MeasurementCommandError("measurement value is missing")
 
     numeric_mentions = _NUMERIC_LIKE_RE.findall(" ".join(parts))
-    if len(numeric_mentions) > 1:
-        raise AmbiguousMeasurementCommand("command contains multiple numeric values")
-    if len(parts) != 1:
-        raise MeasurementCommandError("measurement value must be one numeric token")
+    if numeric_mentions:
+        if len(numeric_mentions) > 1:
+            raise AmbiguousMeasurementCommand("command contains multiple numeric values")
+        if len(parts) != 1:
+            raise MeasurementCommandError("numeric measurement value must be one token")
 
-    token = parts[0]
-    if "," in token and "." in token:
-        raise AmbiguousMeasurementCommand("mixed decimal separators are ambiguous")
-    if not _NUMBER_RE.fullmatch(token):
-        raise MeasurementCommandError("measurement value must be numeric")
+        token = parts[0]
+        if had_spoken_sign and token.startswith(("+", "-")):
+            raise AmbiguousMeasurementCommand("measurement value contains multiple signs")
+        if "," in token and "." in token:
+            raise AmbiguousMeasurementCommand("mixed decimal separators are ambiguous")
+        if not _NUMBER_RE.fullmatch(token):
+            raise MeasurementCommandError("measurement value must be numeric")
 
-    value = Decimal(token.replace(",", "."))
-    if not value.is_finite():
-        raise MeasurementCommandError("measurement value must be finite")
+        value = Decimal(token.replace(",", "."))
+        if not value.is_finite():
+            raise MeasurementCommandError("measurement value must be finite")
+        return value * spoken_sign, unit_hint
+
+    value = _parse_russian_measurement_words(parts)
+    return value * spoken_sign, unit_hint
+
+
+def normalize_measurement_number(payload: str) -> Decimal:
+    """Normalize the numeric value while preserving the legacy public return type."""
+    value, _ = _normalize_measurement_payload(payload)
     return value
 
 
 class MeasurementCommandParser:
-    """Provider-independent parser for the narrow Pass 3 command vocabulary."""
+    """Provider-independent deterministic parser for measurement voice commands."""
 
     _CONFIRM = {"подтвердить", "подтверди", "подтверждаю"}
     _REJECT = {"отклонить", "отклони", "отмена", "отменить"}
@@ -125,10 +369,12 @@ class MeasurementCommandParser:
         if normalized == "замер":
             return ParsedMeasurementCommand(MeasurementCommandIntent.TRIGGER, normalized)
         if normalized.startswith("замер "):
+            value, unit_hint = _normalize_measurement_payload(normalized.removeprefix("замер "))
             return ParsedMeasurementCommand(
                 MeasurementCommandIntent.VALUE,
                 normalized,
-                normalize_measurement_number(normalized.removeprefix("замер ")),
+                value,
+                unit_hint,
             )
         if normalized in self._CONFIRM:
             return ParsedMeasurementCommand(MeasurementCommandIntent.CONFIRM, normalized)
@@ -136,10 +382,12 @@ class MeasurementCommandParser:
             return ParsedMeasurementCommand(MeasurementCommandIntent.REJECT, normalized)
         for prefix in self._CORRECT_PREFIXES:
             if normalized.startswith(prefix):
+                value, unit_hint = _normalize_measurement_payload(normalized.removeprefix(prefix))
                 return ParsedMeasurementCommand(
                     MeasurementCommandIntent.CORRECT,
                     normalized,
-                    normalize_measurement_number(normalized.removeprefix(prefix)),
+                    value,
+                    unit_hint,
                 )
         raise MeasurementCommandError(f"unsupported measurement command: {normalized!r}")
 
@@ -159,6 +407,8 @@ class HandsFreeMeasurementController:
         self._session_id = session_id
         self._context = context
         self._parser = parser or MeasurementCommandParser()
+        self._type_registry = MeasurementTypeRegistry()
+        self._type_registry.validate_complete()
         self._state = HandsFreeMeasurementState()
 
     @property
@@ -167,6 +417,12 @@ class HandsFreeMeasurementController:
 
     def process_voice_command(self, text: str) -> HandsFreeTransition:
         command = self._parser.parse(text)
+        if command.intent in {
+            MeasurementCommandIntent.VALUE,
+            MeasurementCommandIntent.CORRECT,
+        }:
+            self._validate_explicit_unit(command)
+
         if command.intent is MeasurementCommandIntent.TRIGGER:
             return self._trigger(command)
         if command.intent is MeasurementCommandIntent.VALUE:
@@ -179,6 +435,16 @@ class HandsFreeMeasurementController:
         if command.intent is MeasurementCommandIntent.CORRECT:
             return self._correct(command)
         raise AssertionError(f"unhandled command intent: {command.intent}")
+
+    def _validate_explicit_unit(self, command: ParsedMeasurementCommand) -> None:
+        if command.unit_hint is None:
+            return
+        expected_unit = self._type_registry.unit_for(self._context.measurement_type)
+        if command.unit_hint != expected_unit:
+            raise MeasurementCommandError(
+                "explicit unit does not match measurement context: "
+                f"spoken={command.unit_hint!r}, expected={expected_unit!r}"
+            )
 
     def submit_candidate(
         self, *, value: Decimal | int | float | str, source: ProvenanceSource

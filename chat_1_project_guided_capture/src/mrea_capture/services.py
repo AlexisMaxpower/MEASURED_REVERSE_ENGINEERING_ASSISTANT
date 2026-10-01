@@ -20,6 +20,7 @@ from .models import (
     PartContext,
     Project,
     ProjectStatus,
+    VoiceCaptureEvent,
     utc_now,
 )
 from .repositories import CaptureSessionRepository, ProjectRepository
@@ -237,6 +238,64 @@ class CaptureSessionService:
         media_type: str = "image/jpeg",
         extension: str = ".jpg",
     ) -> FrameRecord:
+        return self._capture_measurement_frame(
+            session_id,
+            view=view,
+            image_bytes=image_bytes,
+            camera=camera,
+            captured_at=captured_at,
+            media_type=media_type,
+            extension=extension,
+            voice_event=None,
+        )
+
+    def capture_measurement_frame_from_voice_trigger(
+        self,
+        session_id: UUID,
+        *,
+        view: CaptureViewType,
+        image_bytes: bytes,
+        camera: CameraMetadata,
+        transcript: str | None = None,
+        locale: str | None = None,
+        triggered_at: datetime | None = None,
+        captured_at: datetime | None = None,
+        media_type: str = "image/jpeg",
+        extension: str = ".jpg",
+    ) -> FrameRecord:
+        """Capture a measurement frame while preserving voice-trigger provenance only."""
+
+        timestamp = triggered_at or utc_now()
+        if timestamp.tzinfo is None:
+            raise CaptureWorkflowError("triggered_at must be timezone-aware")
+        voice_event = VoiceCaptureEvent(
+            triggered_at=timestamp,
+            transcript=transcript,
+            locale=locale,
+        )
+        return self._capture_measurement_frame(
+            session_id,
+            view=view,
+            image_bytes=image_bytes,
+            camera=camera,
+            captured_at=captured_at,
+            media_type=media_type,
+            extension=extension,
+            voice_event=voice_event,
+        )
+
+    def _capture_measurement_frame(
+        self,
+        session_id: UUID,
+        *,
+        view: CaptureViewType,
+        image_bytes: bytes,
+        camera: CameraMetadata,
+        captured_at: datetime | None,
+        media_type: str,
+        extension: str,
+        voice_event: VoiceCaptureEvent | None,
+    ) -> FrameRecord:
         session = self._repository.get(session_id)
         self._progress_for(session, view)
         clean = active_clean_reference(session, view)
@@ -259,6 +318,7 @@ class CaptureSessionService:
             captured_at=captured_at or utc_now(),
             camera=camera,
             source_clean_reference_frame_id=clean.frame_id,
+            voice_event=voice_event,
         )
         session.frames.append(frame)
         self._repository.save(session)

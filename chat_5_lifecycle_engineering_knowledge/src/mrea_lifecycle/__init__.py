@@ -104,6 +104,21 @@ from .relational import (
     SQLiteLifecycleQueryRepository,
 )
 from .repository import LifecycleRepository
+from .revision_comparison import (
+    RevisionComparisonDetailsResult,
+    RevisionComparisonSnapshot,
+    RevisionFailureFact,
+    RevisionManufacturingFact,
+    RevisionTestFact,
+    SQLiteRevisionComparisonEngineeringKnowledgeRepository,
+)
+from .revision_explanation import (
+    RevisionChangeExplanation,
+    RevisionChangeFact,
+    RevisionChangeSource,
+    build_revision_change_explanation,
+    explain_revision_changes,
+)
 from .services import (
     CADRevisionPreparationService,
     FailureService,
@@ -190,13 +205,21 @@ __all__ = [
     "ReadOnlyLifecycleHttpAPI",
     "ReplacementChainEntry",
     "Revision",
+    "RevisionChangeExplanation",
+    "RevisionChangeFact",
+    "RevisionChangeSource",
     "RevisionComparison",
+    "RevisionComparisonDetailsResult",
     "RevisionComparisonResult",
+    "RevisionComparisonSnapshot",
+    "RevisionFailureFact",
     "RevisionLineageEntry",
+    "RevisionManufacturingFact",
     "RevisionOrigin",
     "RevisionOutcomeSummary",
     "RevisionQueryResult",
     "RevisionService",
+    "RevisionTestFact",
     "SQLITE_RELATIONAL_SCHEMA_VERSION",
     "SQLITE_SNAPSHOT_SCHEMA_VERSION",
     "SQLiteEngineeringKnowledgeRepository",
@@ -205,9 +228,12 @@ __all__ = [
     "SQLiteLifecycleReadOnlySession",
     "SQLiteLifecycleStore",
     "SQLiteMaterializedEngineeringKnowledgeRepository",
+    "SQLiteRevisionComparisonEngineeringKnowledgeRepository",
     "SQLiteSchemaMigration",
     "TestRecord",
     "TestService",
     "build_read_only_lifecycle_http_app",
+    "build_revision_change_explanation",
+    "explain_revision_changes",
     "inspect_lifecycle_database",
 ]

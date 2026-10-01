@@ -2,158 +2,99 @@
 
 ## Snapshot
 
-- Date: **2026-10-01**
-- Branch: `chat-5/pass-14`
+- Date: **2026-10-02**
+- Branch: `chat-5/pass-16`
 - Slice: **Lifecycle & Engineering Knowledge**
-- Authorization: **direct user instruction — Pass 14**
-- Central baseline checked before work: `main` @ `d6758d3a4c5eb2116ac2e48c3a77e65c10688b12`
-- Central state at start: **Round 13 closed/integrated; next full worker pass ready**
-- Tested implementation SHA: `8f5394c9ad2ffe1bfefc02021b78a9c7a17320d0`
-- MREA CI: `36811581113` — **SUCCESS**
-- State: **Pass 14 implementation verified; documentation published; final freeze pending**
+- Authorization: **direct user instruction — Pass 16**
+- Shared central state at worker start: `main` @ `99d8c6d9322f3669a43226e4fd2675fe683ab9f6`
+- Required cumulative Chat-5 dependency: frozen `chat-5/pass-15` @ `70ac1fa5331df47525e42ad4f2d848abddb268fe`
+- Tested implementation SHA: `cce9819eba0117bc1401c28e765b6ce2444efed7`
+- MREA CI: `36933325252` — **SUCCESS**
+- Chat 5 / Lifecycle: **85 passed in 5.85s**
+- Contracts / canonical fixtures: **SUCCESS**
+- Chat 4 / Generic CAD gate: **SUCCESS**
+- Integration / Chat 4 -> Chat 5: **SUCCESS**
+- State: **Pass 16 implementation verified; final handoff/freeze pending**
 
 ## Baseline discipline
 
-Pass 14 was branched directly from current shared `main`, not from `chat-5/pass-13` worker history. `main` remained at the same baseline through implementation verification.
+Shared `main` still contains the Round-14 closure state and did not yet contain frozen Chat-5 Pass 15 when Pass 16 was authorized. Pass 16 therefore branches from the frozen Pass-15 head so the required structured revision-comparison dependency is preserved instead of being silently discarded.
 
-All changes are under `chat_5_lifecycle_engineering_knowledge/`.
+No files outside `chat_5_lifecycle_engineering_knowledge/` are changed by Pass 16.
 
-## Gap closed in Pass 14
+## Gap closed
 
-The product already had `RevisionComparisonResult` and deterministic `RevisionComparison` in the original in-memory projection layer. The durable SQLite knowledge/read-only surface introduced later did not expose equivalent comparison capability.
+Pass 15 exposes durable structured factual comparison. Pass 16 adds the first explicit revision-explanation layer: a deterministic evidence-backed explanation of exactly which committed facts differ between two revisions and which stored records/artifacts support each side.
 
-This created two truths for the same intended factual operation:
+## Delivered surface
 
-```text
-in-memory projection → revision comparison available
-committed durable read model → revision comparison unavailable
-```
+`mrea_lifecycle.revision_explanation` provides:
 
-Pass 14 closes that gap by reusing the existing result shape and preserving historical projection semantics over committed relational facts.
+- `RevisionChangeSource`;
+- `RevisionChangeFact`;
+- `RevisionChangeExplanation`;
+- `build_revision_change_explanation(...)`;
+- `explain_revision_changes(...)`.
 
-## Pass 14 architecture
+The package root exports these public symbols.
 
-### Durable comparison repository
+The explanation reuses one snapshot-guarded `compare_revision_details(...)` result. It does not perform an independent second read that could mix generations.
 
-Added `SQLiteRevisionComparisonEngineeringKnowledgeRepository`, extending the current materialized engineering knowledge repository.
+## Supported factual deltas
 
-`compare_revisions(left_revision_id, right_revision_id)` reads only committed read-model facts and returns the existing `RevisionComparisonResult`:
+Stable ordered differences may cover:
 
-- left/right revision IDs;
-- distinct sorted manufacturing materials;
-- exact failure counts;
-- exact test counts;
-- revision-level `LifecycleState`.
+- revision metadata/provenance;
+- persisted CAD verification/runtime truth;
+- materials;
+- manufacturing methods;
+- manufacturing records;
+- tests plus exact test artifact IDs;
+- failures plus exact evidence artifact IDs;
+- deterministic lifecycle state.
 
-No ranking, recommendation, score, causal interpretation or AI inference is produced.
+For manufacturing/tests/failures, evidence includes exact persisted record IDs. Test and failure categories also preserve exact stored artifact IDs.
 
-### Input integrity
+## Integrity boundary
 
-The comparison requires:
+The explanation verifies that its emitted category sequence exactly matches the durable comparison's `changed_categories`. Divergence raises `LifecycleKnowledgeIntegrityError` rather than returning a partial or contradictory explanation.
 
-1. both revision IDs exist in the committed read model;
-2. both revisions share the same `part_id`.
+Existing missing-revision and cross-part validation remains fail closed.
 
-Missing revisions and cross-part comparisons raise `ValueError` and fail closed.
+## Non-inference boundary
 
-### Preserved state semantics
+Pass 16 does not:
 
-Pass 14 intentionally preserves the historical `LifecycleStateProjection` behavior rather than inventing a new state definition:
+- rank or score revisions;
+- recommend a preferred revision;
+- infer causality between a revision change and a test/failure;
+- promote estimated causes into confirmed causes;
+- synthesize or infer geometry;
+- add semantic search, embeddings or an LLM.
 
-- a failure newer than the latest installation projects `FAILED`;
-- a later installation/test can project the revision back to `ACTIVE` while failure history remains counted;
-- otherwise the latest canonical revision event maps to `DRAFT`, `MANUFACTURED`, `ACTIVE` or `FAILED` as before.
+It is a structured factual evidence layer for later knowledge/AI work.
 
-Event ordering is deterministic by `(occurred_at, sequence)`.
+## Compatibility
 
-### Snapshot consistency
+Unchanged:
 
-Comparison uses the Pass-13 `_SnapshotGuardedConnection`.
+- `core/contracts/**` and canonical fixtures;
+- SQLite relational and snapshot schemas;
+- cursor formats;
+- HTTP schema/routes;
+- Chat 1–4 code;
+- workflows;
+- manufacturing-eligibility policy;
+- snapshot-drift fail-closed semantics.
 
-Because comparison needs multiple SQL statements, every statement is guarded before execute and after fetch. If another writer commits between those statements, the next guard detects generation drift and raises `LifecycleReadOnlyStaleError`; a mixed-generation comparison is not returned.
+## Pass 16 delta
 
-`SQLiteLifecycleReadOnlySession.refresh()` explicitly accepts the new committed generation.
+Before final handoff, Pass 16 changed only:
 
-### HTTP surface
+- `docs/PASS_16_REVISION_CHANGE_EXPLANATION.md`;
+- `docs/IMPLEMENTATION_STATE.md`;
+- `src/mrea_lifecycle/__init__.py`;
+- `src/mrea_lifecycle/revision_explanation.py`;
+- `tests/test_revision_change_explanation.py`.
 
-Added additive GET route:
-
-```text
-/v1/knowledge/revision-comparison?left_revision_id=...&right_revision_id=...
-```
-
-The route opens the same fresh guarded read-only session used by existing knowledge endpoints and serializes the existing dataclass result.
-
-Missing parameters, unexpected parameters, missing revisions and cross-part inputs map through the existing `400 invalid_request` boundary.
-
-`LIFECYCLE_HTTP_API_SCHEMA_VERSION` remains `mrea.lifecycle-http.v1`; existing routes and payloads are unchanged.
-
-### No schema / shared-contract change
-
-- `SQLITE_RELATIONAL_SCHEMA_VERSION` remains `4`;
-- no SQLite migration;
-- no change to `core/contracts/**`;
-- no canonical fixture change;
-- no cursor format change;
-- no Chat 1–4 change;
-- no workflow change.
-
-## Regression coverage
-
-`tests/test_revision_comparison_durable.py` verifies:
-
-1. durable comparison preserves existing material/count/state semantics;
-2. failure followed by a later installation/test projects ACTIVE as in the original in-memory implementation;
-3. missing revision is rejected;
-4. cross-part comparison is rejected;
-5. an external writer commit makes the old read-only session fail closed;
-6. `refresh()` accepts the new generation and comparison reflects it.
-
-`tests/test_revision_comparison_http.py` verifies:
-
-1. GET comparison serialization and snapshot metadata;
-2. required parameters;
-3. cross-part rejection;
-4. unexpected parameter rejection;
-5. existing HTTP schema version is preserved.
-
-## Verification
-
-Tested implementation SHA:
-
-```text
-8f5394c9ad2ffe1bfefc02021b78a9c7a17320d0
-```
-
-Workflow:
-
-```text
-MREA CI / 36811581113 — SUCCESS
-```
-
-Required results:
-
-- `Chat 5 / Lifecycle` — **SUCCESS**;
-- `Contracts / canonical fixtures` — **SUCCESS**;
-- `Chat 4 / Generic CAD gate` — **SUCCESS**;
-- `Integration / Chat 4 -> Chat 5` — **SUCCESS**.
-
-## Shared-contract impact
-
-None.
-
-## Standing SOLIDWORKS host qualification
-
-Unchanged. Standing real-host qualification remains owned by the dedicated workflow authority; Pass 14 neither infers nor mirrors it.
-
-## Remaining intentional limitations
-
-- revision ranking/recommendation;
-- semantic/AI interpretation;
-- external client authn/authz;
-- deployment/TLS/CORS/rate-limit policy;
-- field-device synchronization.
-
-## Freeze rule
-
-`ORCHESTRATOR_HANDOFF.md` is the final worker mutation for Pass 14. After that commit, `chat-5/pass-14` is frozen. Final CI must be verified on that exact branch HEAD without a follow-up mutation.
+`ORCHESTRATOR_HANDOFF.md` is the final worker mutation. After that commit, the branch is frozen and exact-head CI must be verified without further worker changes.

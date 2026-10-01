@@ -147,6 +147,18 @@ class CanonicalContractBuilder:
 
     @staticmethod
     def _measurement_capture_frame(frame: FrameRecord, *, view_id: str) -> dict[str, Any]:
+        voice_event = None
+        if frame.voice_event is not None:
+            voice_event = {
+                "event_id": _opaque(frame.voice_event.voice_event_id),
+                "command": frame.voice_event.command.value,
+                "triggered_at": _timestamp(frame.voice_event.triggered_at),
+            }
+            if frame.voice_event.transcript is not None:
+                voice_event["transcript"] = frame.voice_event.transcript
+            if frame.voice_event.locale is not None:
+                voice_event["locale"] = frame.voice_event.locale
+
         return {
             "frame_id": _opaque(frame.frame_id),
             "view_id": view_id,
@@ -160,5 +172,5 @@ class CanonicalContractBuilder:
             ),
             "captured_at": _timestamp(frame.captured_at),
             "camera_metadata": frame.camera.model_dump(mode="json", exclude_none=True),
-            "voice_event": None,
+            "voice_event": voice_event,
         }

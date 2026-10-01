@@ -1,11 +1,11 @@
 # Chat 5 — Lifecycle & Engineering Knowledge
 
-Статус: **Pass 14 durable revision comparison implemented**  
+Статус: **Pass 15 structured revision comparison details implemented**  
 Проект: **MREA — Measured Reverse Engineering Assistant**  
 Источник истины: **repository/GitHub + MREA SSOT**  
-Авторизация Pass 14: **direct user instruction**  
-Рабочая ветка: `chat-5/pass-14`  
-Центральный baseline Pass 14: `main` @ `d6758d3a4c5eb2116ac2e48c3a77e65c10688b12`
+Авторизация Pass 15: **direct user instruction**  
+Рабочая ветка: `chat-5/pass-15`  
+Центральный baseline Pass 15: `main` @ `99d8c6d9322f3669a43226e4fd2675fe683ab9f6`
 
 ## Назначение области
 
@@ -21,89 +21,87 @@ Revision
 → snapshot-bound keyset pagination
 → materialized analytical read model
 → guarded read-only query session
-→ durable revision comparison
+→ compact + structured revision comparison
 → local/internal GET-only HTTP transport
-→ optional authenticated HTTP cursor boundary
 ```
 
 ## Актуальная orchestration truth
 
-Round 13 закрыт и интегрирован центральным оркестратором. Pass 14 начат непосредственно от актуального `main` @ `d6758d3a...`; исторические worker branches не использовались как implementation baseline.
+Round 14 закрыт и интегрирован. Pass 15 начат непосредственно от актуального closure baseline `main` @ `99d8c6d9...`; старые worker branches не использовались как implementation baseline.
 
-Pass 14 изменяет только `chat_5_lifecycle_engineering_knowledge/`. Shared contracts, canonical fixtures, Chat 1–4, workflows и SQLite schema не меняются.
+Все изменения Pass 15 находятся внутри `chat_5_lifecycle_engineering_knowledge/`. Shared contracts, canonical fixtures, Chat 1–4, workflows и SQLite schema не меняются.
 
 ## Реализовано
 
 ### Lifecycle / persistence
 
-- Revision / Manufacturing / Installation / Test / Failure domain;
-- PhysicalPartInstance identity/state machine;
-- exact failure/evidence linkage;
-- lifecycle repository + unit of work;
-- authoritative SQLite snapshot;
-- normalized relational read model;
-- backup/restore and guarded read-only session.
+- revision/manufacturing/installation/test/failure domain;
+- physical instance lifecycle and deterministic state machine;
+- exact test/failure/evidence linkage;
+- authoritative SQLite snapshot + normalized relational read model;
+- backup/restore;
+- snapshot-drift guarded read-only sessions.
 
 ### CAD → lifecycle truth
 
-- canonical numerical CAD verification отделена от runtime evidence;
-- runtime `VERIFIED | FAILED | UNVERIFIED` сохраняется через persistence/read model;
-- runtime-gated manufacturing eligibility fail-closed;
-- numerical VERIFIED не повышает runtime UNVERIFIED до VERIFIED.
+- numerical verification отделена от runtime evidence;
+- runtime `VERIFIED | FAILED | UNVERIFIED` сохраняется как факт;
+- manufacturing eligibility fail-closed;
+- knowledge/read surfaces не повышают unverified runtime truth.
 
 ### Engineering knowledge
 
 - revision lineage/outcomes;
-- durable revision comparison;
+- compact durable revision comparison;
+- structured factual revision comparison;
 - equipment/position history;
-- exact failure-pattern groups;
+- failure-pattern groups;
 - replacement chains;
-- snapshot/query-bound pagination;
-- materialized revision/failure aggregates;
-- GET-only WSGI read transport;
-- optional HMAC-SHA256 cursor authentication.
+- snapshot-bound pagination/materialized aggregates;
+- GET-only WSGI transport with optional authenticated cursors.
 
-### Pass 14 — durable revision comparison
+## Pass 15 — structured revision comparison details
 
-Исторический `RevisionComparison` существовал только как in-memory projection. Pass 14 переносит ту же factual semantics на committed SQLite read model без новой предметной логики.
+Pass 14 восстановил durable comparison, но его результат был намеренно компактным: материалы, counts и lifecycle state. Pass 15 добавляет отдельный additive factual snapshot для инженерного side-by-side review.
 
-`SQLiteLifecycleReadOnlySession.knowledge.compare_revisions(left_revision_id, right_revision_id)` возвращает существующий `RevisionComparisonResult`:
+`SQLiteLifecycleReadOnlySession.knowledge.compare_revision_details(left_revision_id, right_revision_id)` возвращает для каждой стороны только уже сохранённые Chat-5 facts:
 
-- revision IDs;
-- distinct sorted manufacturing materials;
-- exact failure count;
-- exact test count;
-- revision-level lifecycle state по исторической deterministic projection semantics.
+- revision metadata: code, created time, parent, origin, notes, source CAD artifact;
+- persisted CAD verification/runtime status fields when they exist;
+- manufacturing records: material, method, batch, machine, print profile, contractor, cost, post-processing;
+- tests with exact artifact IDs;
+- failures with exact evidence IDs and stored cause/feature fields;
+- deterministic revision-level lifecycle state.
 
-Обе ревизии должны существовать и принадлежать одному `part_id`. Missing/cross-part inputs fail closed.
+Результат содержит deterministic `changed_categories`, но не содержит ranking, score, recommendation или causal inference.
 
-Все SQL statements проходят через Pass-13 snapshot guard. Если committed generation меняется во время long-lived session, comparison не смешивает поколения: возникает `LifecycleReadOnlyStaleError`, после чего требуется `refresh()`.
+Geometry намеренно не синтезируется: текущая durable Chat-5 schema не содержит утверждённого upstream geometry comparison payload. Геометрия может появиться здесь только после явного approved contract/read-model source, а не через локальную догадку.
 
 ### HTTP boundary
 
-Добавлен GET endpoint:
+Добавлен additive GET endpoint:
 
 ```text
-/v1/knowledge/revision-comparison
+/v1/knowledge/revision-comparison-details
   ?left_revision_id=<id>
   &right_revision_id=<id>
 ```
 
-Он использует тот же read-only session/repository и существующую JSON serialization. Invalid/missing/cross-part inputs возвращаются как `400 invalid_request`. HTTP schema остаётся `mrea.lifecycle-http.v1`, потому что это additive GET route без изменения существующих payload contracts.
+Он использует существующий guarded read-only session. Missing/cross-part/unexpected inputs fail closed как `400 invalid_request`. `mrea.lifecycle-http.v1` не меняется: существующие routes/payloads не изменены.
 
-## Проверка Pass 14
+## Проверка Pass 15 implementation
 
 Tested implementation SHA:
 
 ```text
-8f5394c9ad2ffe1bfefc02021b78a9c7a17320d0
+a0372ac3e7e4036a1b17d600cc3c29b3d09bb5a4
 ```
 
 MREA CI:
 
 ```text
-36811581113 — SUCCESS
-Chat 5 / Lifecycle: SUCCESS
+36816060128 — SUCCESS
+Chat 5 / Lifecycle: 82 passed in 3.54s
 Contracts / canonical fixtures: SUCCESS
 Chat 4 / Generic CAD gate: SUCCESS
 Integration / Chat 4 -> Chat 5: SUCCESS
@@ -111,19 +109,16 @@ Integration / Chat 4 -> Chat 5: SUCCESS
 
 ## Documentation
 
-- `docs/PASS_14_DURABLE_REVISION_COMPARISON.md`
-- `docs/BUILD_REUSE_CHECK_PASS14_REVISION_COMPARISON.md`
+- `docs/PASS_15_STRUCTURED_REVISION_COMPARISON.md`
+- `docs/BUILD_REUSE_CHECK_PASS15_REVISION_COMPARISON.md`
 - `docs/IMPLEMENTATION_STATE.md`
-- historical Pass 3–13 docs remain authoritative for their slices.
+- historical Pass 3–14 docs remain authoritative for their slices.
 
 ## Still intentionally out of scope
 
-- ranking revisions or recommending a preferred revision;
-- causal/semantic interpretation of failures or tests;
-- client authentication/authorization;
-- TLS / reverse-proxy / CORS / rate-limiting policy;
-- secret provisioning/storage policy;
-- framework-specific application shell;
-- AI / semantic interpretation;
+- geometry comparison without approved upstream durable facts;
+- revision ranking/recommendation;
+- causal/semantic/AI interpretation;
+- client authn/authz and deployment edge policy;
 - field-device synchronization;
 - shared contract expansion for physical-only events.

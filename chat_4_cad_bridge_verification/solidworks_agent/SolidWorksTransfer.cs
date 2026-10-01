@@ -25,6 +25,7 @@ namespace Mrea.SolidWorksCadAgent
             var entitySpecs = request.entities.ToDictionary(item => item.entity_id, item => item, StringComparer.Ordinal);
             var dimensions = new Dictionary<string, dynamic>(StringComparer.Ordinal);
             var bindings = new List<DimensionBindingDto>();
+            var constraintConflicts = new List<string>();
 
             sketchManager.AddToDB = true;
             try
@@ -53,9 +54,15 @@ namespace Mrea.SolidWorksCadAgent
                     ToSystemValue(dimension.value, dimension.unit),
                     (int)swSetValueInConfiguration_e.swSetValue_InThisConfiguration,
                     null);
-                if (setStatus != (int)swSetValueReturnStatus_e.swSetValue_Successful)
+                if (setStatus == (int)swSetValueReturnStatus_e.swSetValue_DrivenDimension)
+                {
+                    constraintConflicts.Add(dimension.dimension_id);
+                }
+                else if (setStatus != (int)swSetValueReturnStatus_e.swSetValue_Successful)
+                {
                     throw new InvalidOperationException(
                         "Failed to set dimension " + dimension.dimension_id + "; SetSystemValue3 status=" + setStatus);
+                }
 
                 dimensions.Add(dimension.dimension_id, modelDimension);
                 bindings.Add(new DimensionBindingDto
@@ -104,7 +111,7 @@ namespace Mrea.SolidWorksCadAgent
                 read_back = new ReadBackDto
                 {
                     dimensions = readBack,
-                    constraint_conflicts = new List<string>()
+                    constraint_conflicts = constraintConflicts
                 },
                 artifacts = new List<ArtifactDto>
                 {
