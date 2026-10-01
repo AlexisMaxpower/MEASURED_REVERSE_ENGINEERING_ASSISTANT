@@ -1,11 +1,11 @@
 # Chat 5 — Lifecycle & Engineering Knowledge
 
-Статус: **Pass 15 structured revision comparison details implemented**  
+Статус: **Pass 17 revision-change explanation HTTP implemented**  
 Проект: **MREA — Measured Reverse Engineering Assistant**  
 Источник истины: **repository/GitHub + MREA SSOT**  
-Авторизация Pass 15: **direct user instruction**  
-Рабочая ветка: `chat-5/pass-15`  
-Центральный baseline Pass 15: `main` @ `99d8c6d9322f3669a43226e4fd2675fe683ab9f6`
+Авторизация Pass 17: **direct user instruction**  
+Рабочая ветка: `chat-5/pass-17`  
+Центральный baseline Pass 17: `main` @ `933d925c69944d40859ae1f9ff80d7a3ecb7f760`
 
 ## Назначение области
 
@@ -22,14 +22,15 @@ Revision
 → materialized analytical read model
 → guarded read-only query session
 → compact + structured revision comparison
+→ source-backed revision-change explanation
 → local/internal GET-only HTTP transport
 ```
 
 ## Актуальная orchestration truth
 
-Round 14 закрыт и интегрирован. Pass 15 начат непосредственно от актуального closure baseline `main` @ `99d8c6d9...`; старые worker branches не использовались как implementation baseline.
+Round 16 закрыт и интегрирован. Pass 17 начинается непосредственно от актуального closure baseline `main` @ `933d925c...`; исторические worker/integration branches не используются как implementation baseline.
 
-Все изменения Pass 15 находятся внутри `chat_5_lifecycle_engineering_knowledge/`. Shared contracts, canonical fixtures, Chat 1–4, workflows и SQLite schema не меняются.
+Все изменения Pass 17 находятся внутри `chat_5_lifecycle_engineering_knowledge/`. Shared contracts, canonical fixtures, Chat 1–4, workflows и SQLite schema не меняются.
 
 ## Реализовано
 
@@ -54,63 +55,54 @@ Round 14 закрыт и интегрирован. Pass 15 начат непос
 - revision lineage/outcomes;
 - compact durable revision comparison;
 - structured factual revision comparison;
+- deterministic source-backed revision-change explanation;
 - equipment/position history;
 - failure-pattern groups;
 - replacement chains;
 - snapshot-bound pagination/materialized aggregates;
 - GET-only WSGI transport with optional authenticated cursors.
 
-## Pass 15 — structured revision comparison details
+## Pass 15–17 revision knowledge chain
 
-Pass 14 восстановил durable comparison, но его результат был намеренно компактным: материалы, counts и lifecycle state. Pass 15 добавляет отдельный additive factual snapshot для инженерного side-by-side review.
+### Pass 15 — structured revision comparison
 
-`SQLiteLifecycleReadOnlySession.knowledge.compare_revision_details(left_revision_id, right_revision_id)` возвращает для каждой стороны только уже сохранённые Chat-5 facts:
+`SQLiteLifecycleReadOnlySession.knowledge.compare_revision_details(left_revision_id, right_revision_id)` exposes committed metadata, CAD truth fields, manufacturing records, tests, failures, exact artifact/evidence IDs and deterministic lifecycle state for both revisions.
 
-- revision metadata: code, created time, parent, origin, notes, source CAD artifact;
-- persisted CAD verification/runtime status fields when they exist;
-- manufacturing records: material, method, batch, machine, print profile, contractor, cost, post-processing;
-- tests with exact artifact IDs;
-- failures with exact evidence IDs and stored cause/feature fields;
-- deterministic revision-level lifecycle state.
+The result has deterministic `changed_categories` and intentionally omits ranking, recommendation, causal inference and fabricated geometry.
 
-Результат содержит deterministic `changed_categories`, но не содержит ranking, score, recommendation или causal inference.
+### Pass 16 — source-backed revision-change explanation
 
-Geometry намеренно не синтезируется: текущая durable Chat-5 schema не содержит утверждённого upstream geometry comparison payload. Геометрия может появиться здесь только после явного approved contract/read-model source, а не через локальную догадку.
+`explain_revision_changes(...)` converts one guarded structured comparison into ordered factual deltas. Every delta preserves exact source revision IDs and, where applicable, exact manufacturing/test/failure record IDs and exact stored artifact/evidence IDs.
 
-### HTTP boundary
+The explanation verifies that emitted category order exactly matches the underlying durable comparison. It does not perform a second independent read, rank revisions or infer why a result occurred.
 
-Добавлен additive GET endpoint:
+### Pass 17 — HTTP transport completion
+
+Added additive GET endpoint:
 
 ```text
-/v1/knowledge/revision-comparison-details
+/v1/knowledge/revision-change-explanation
   ?left_revision_id=<id>
   &right_revision_id=<id>
 ```
 
-Он использует существующий guarded read-only session. Missing/cross-part/unexpected inputs fail closed как `400 invalid_request`. `mrea.lifecycle-http.v1` не меняется: существующие routes/payloads не изменены.
+The route delegates directly to the Pass-16 explanation inside the existing guarded read-only session and existing deterministic JSON serializer.
 
-## Проверка Pass 15 implementation
+Fail-closed request behavior is preserved:
 
-Tested implementation SHA:
+- missing/blank parameters -> `400 invalid_request`;
+- cross-part or missing revisions -> `400 invalid_request`;
+- unexpected parameters -> `400 invalid_request`;
+- non-GET methods -> `405 method_not_allowed`;
+- stale/unavailable read model -> existing `409/503` boundaries.
 
-```text
-a0372ac3e7e4036a1b17d600cc3c29b3d09bb5a4
-```
-
-MREA CI:
-
-```text
-36816060128 — SUCCESS
-Chat 5 / Lifecycle: 82 passed in 3.54s
-Contracts / canonical fixtures: SUCCESS
-Chat 4 / Generic CAD gate: SUCCESS
-Integration / Chat 4 -> Chat 5: SUCCESS
-```
+`LIFECYCLE_HTTP_API_SCHEMA_VERSION` remains `mrea.lifecycle-http.v1`; existing routes and payloads are unchanged.
 
 ## Documentation
 
 - `docs/PASS_15_STRUCTURED_REVISION_COMPARISON.md`
-- `docs/BUILD_REUSE_CHECK_PASS15_REVISION_COMPARISON.md`
+- `docs/PASS_16_REVISION_CHANGE_EXPLANATION.md`
+- `docs/PASS_17_REVISION_CHANGE_EXPLANATION_HTTP.md`
 - `docs/IMPLEMENTATION_STATE.md`
 - historical Pass 3–14 docs remain authoritative for their slices.
 
@@ -118,7 +110,7 @@ Integration / Chat 4 -> Chat 5: SUCCESS
 
 - geometry comparison without approved upstream durable facts;
 - revision ranking/recommendation;
-- causal/semantic/AI interpretation;
+- causal/semantic/AI interpretation beyond deterministic stored-fact projection;
 - client authn/authz and deployment edge policy;
 - field-device synchronization;
 - shared contract expansion for physical-only events.
