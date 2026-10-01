@@ -16,7 +16,11 @@ from .hands_free import (
     normalize_measurement_number,
 )
 from .models import FeatureAnchor, MeasurementSession, MeasurementType, PhysicalMeasurement, ProvenanceSource
-from .repository import InMemoryMeasurementSessionRepository
+from .repository import (
+    InMemoryMeasurementSessionRepository,
+    MeasurementSessionRepository,
+    SqliteMeasurementSessionRepository,
+)
 from .service import MeasurementSessionService
 from .type_registry import MeasurementTypeRegistry, MeasurementTypeSemantics
 
@@ -35,6 +39,7 @@ __all__ = [
     "MeasurementCommandIntent",
     "MeasurementCommandParser",
     "MeasurementSession",
+    "MeasurementSessionRepository",
     "MeasurementSessionService",
     "MeasurementType",
     "MeasurementTypeRegistry",
@@ -42,5 +47,6 @@ __all__ = [
     "ParsedMeasurementCommand",
     "PhysicalMeasurement",
     "ProvenanceSource",
+    "SqliteMeasurementSessionRepository",
     "normalize_measurement_number",
 ]
