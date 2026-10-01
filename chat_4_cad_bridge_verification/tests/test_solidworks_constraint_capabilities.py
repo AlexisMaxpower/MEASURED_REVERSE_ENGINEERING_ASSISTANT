@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import unittest
 
-from mrea_cad_bridge import evaluate_solidworks_constraint_support_v1
+from mrea_cad_bridge import (
+    build_solidworks_capabilities_v1,
+    evaluate_solidworks_constraint_support_v1,
+)
 
 
 ENTITIES = {
@@ -27,6 +30,28 @@ class SolidWorksConstraintCapabilityTests(unittest.TestCase):
     def evaluate(self, item):
         return evaluate_solidworks_constraint_support_v1(item, ENTITIES)
 
+    def test_rules_are_explicit_machine_readable_and_caller_safe(self):
+        manifest = build_solidworks_capabilities_v1()
+        rules = manifest["constraints"]["rules"]
+        self.assertTrue(rules["constraint_id_required"])
+        self.assertTrue(rules["distinct_entity_ids"])
+        self.assertTrue(rules["references_must_exist"])
+        self.assertEqual(
+            rules["types"]["HORIZONTAL"]["entity_type_patterns"],
+            [["LINE"]],
+        )
+        self.assertEqual(
+            rules["types"]["EQUAL"]["entity_type_patterns"],
+            [["LINE", "LINE"]],
+        )
+        self.assertNotIn(
+            ["LINE", "LINE"],
+            rules["types"]["TANGENT"]["entity_type_patterns"],
+        )
+        rules["types"]["TANGENT"]["entity_type_patterns"].clear()
+        fresh = build_solidworks_capabilities_v1()
+        self.assertTrue(fresh["constraints"]["rules"]["types"]["TANGENT"]["entity_type_patterns"])
+
     def test_verified_tangent_line_circle_is_supported(self):
         decision = self.evaluate(constraint("TANGENT", ["L1", "C1"]))
         self.assertTrue(decision.supported)
@@ -38,6 +63,13 @@ class SolidWorksConstraintCapabilityTests(unittest.TestCase):
         self.assertTrue(decision.supported)
         self.assertEqual(decision.code, "SUPPORTED")
         self.assertEqual(decision.entity_types, ("CIRCLE", "ARC"))
+
+    def test_missing_constraint_id_is_rejected_before_worker(self):
+        item = constraint("HORIZONTAL", ["L1"])
+        item["constraint_id"] = ""
+        decision = self.evaluate(item)
+        self.assertFalse(decision.supported)
+        self.assertEqual(decision.code, "CONSTRAINT_ID_INVALID")
 
     def test_nonverified_status_has_machine_readable_reason(self):
         decision = self.evaluate(
