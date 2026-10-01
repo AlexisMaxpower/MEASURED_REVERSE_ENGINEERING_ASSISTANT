@@ -6,6 +6,7 @@ namespace Mrea.SolidWorksCadAgent
     {
         public string protocol_version { get; set; }
         public string adapter_name { get; set; }
+        public string worker_capabilities_sha256 { get; set; }
         public string constraint_capabilities_sha256 { get; set; }
         public string sketch_package_id { get; set; }
         public string output_directory { get; set; }
