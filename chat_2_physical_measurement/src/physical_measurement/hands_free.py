@@ -276,8 +276,12 @@ def _parse_explicit_russian_fraction(parts: list[str]) -> Decimal | None:
 
 
 def _parse_compact_two_digit_fraction(parts: list[str]) -> int | None:
-    if len(parts) == 2 and all(token in _RUSSIAN_ONES for token in parts):
-        return _RUSSIAN_ONES[parts[0]] * 10 + _RUSSIAN_ONES[parts[1]]
+    if (
+        len(parts) == 2
+        and parts[0] == "ноль"
+        and parts[1] in _RUSSIAN_ONES
+    ):
+        return _RUSSIAN_ONES[parts[1]]
 
     value = _parse_russian_cardinal(parts)
     if value is None or not 10 <= value <= 99:
@@ -289,10 +293,6 @@ def _parse_russian_measurement_words(parts: list[str]) -> Decimal:
     explicit_fraction = _parse_explicit_russian_fraction(parts)
     if explicit_fraction is not None:
         return explicit_fraction
-
-    whole = _parse_russian_cardinal(parts)
-    if whole is not None:
-        return Decimal(whole)
 
     candidates: set[Decimal] = set()
     for split_at in range(1, len(parts)):
@@ -315,6 +315,7 @@ def normalize_measurement_number(payload: str) -> Decimal:
     if not parts:
         raise MeasurementCommandError("measurement value is missing")
 
+    had_spoken_sign = parts[0] in {"минус", "плюс"}
     spoken_sign, parts = _extract_spoken_sign(parts)
     if not parts:
         raise MeasurementCommandError("measurement value is missing")
@@ -327,7 +328,7 @@ def normalize_measurement_number(payload: str) -> Decimal:
             raise MeasurementCommandError("numeric measurement value must be one token")
 
         token = parts[0]
-        if spoken_sign != 1 and token.startswith(("+", "-")):
+        if had_spoken_sign and token.startswith(("+", "-")):
             raise AmbiguousMeasurementCommand("measurement value contains multiple signs")
         if "," in token and "." in token:
             raise AmbiguousMeasurementCommand("mixed decimal separators are ambiguous")
