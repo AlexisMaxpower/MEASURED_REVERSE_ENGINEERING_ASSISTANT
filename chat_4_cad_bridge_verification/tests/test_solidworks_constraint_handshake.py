@@ -59,9 +59,13 @@ class SolidWorksConstraintCapabilityHandshakeTests(unittest.TestCase):
             validate_body.index("request.constraint_capabilities_sha256"),
             validate_body.index("ValidateConstraintEnvelope(request);"),
         )
+
+        main_start = program.index("private static int Main")
+        main_end = program.index("private static JavaScriptSerializer NewSerializer")
+        main_body = program[main_start:main_end]
         self.assertLess(
-            program.index("ValidateConstraintEnvelope(request);"),
-            program.index("SolidWorksSession.Open(request)"),
+            main_body.index("ValidateRequestEnvelope(request);"),
+            main_body.index("SolidWorksSession.Open(request)"),
         )
 
     def test_csharp_constraint_envelope_contains_declared_fail_closed_subset(self):
@@ -78,9 +82,9 @@ class SolidWorksConstraintCapabilityHandshakeTests(unittest.TestCase):
             "PERPENDICULAR",
             "CONCENTRIC",
             "EQUAL",
-            "TANGENT",
         ):
             self.assertIn(f'constraint.type == "{constraint_type}"', envelope)
+        self.assertIn('constraint.type != "TANGENT"', envelope)
         self.assertIn("Duplicate constraint_id", envelope)
         self.assertIn("Constraint contains duplicate entity_ids", envelope)
         self.assertIn("Constraint references unknown entity", envelope)
