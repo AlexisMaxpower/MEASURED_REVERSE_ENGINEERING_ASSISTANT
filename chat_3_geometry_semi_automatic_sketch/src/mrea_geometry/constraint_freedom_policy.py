@@ -41,11 +41,17 @@ class ConstraintFreedomAnalyzer(_BaseConstraintFreedomAnalyzer):
                     )
                     pairs.append((distance, first_ordinal, second_ordinal))
             pairs.sort(key=lambda item: (item[0], item[1], item[2]))
+            nearest_distance, first_ordinal, second_ordinal = pairs[0]
+            if nearest_distance > self.ambiguity_tolerance_mm:
+                # Entity-only COINCIDENT does not identify endpoint ordinals. Proximity is
+                # not itself a topology witness: if no endpoint pair is already coincident
+                # within the declared tolerance, exact local DOF must fail closed rather
+                # than guessing which endpoints the relation was intended to bind.
+                return None
             if len(pairs) > 1 and (
-                abs(pairs[1][0] - pairs[0][0]) <= self.ambiguity_tolerance_mm
+                abs(pairs[1][0] - nearest_distance) <= self.ambiguity_tolerance_mm
             ):
                 return None
-            _, first_ordinal, second_ordinal = pairs[0]
             return (
                 lambda vector, first_id=first_id, second_id=second_id,
                 first_ordinal=first_ordinal, second_ordinal=second_ordinal: (
