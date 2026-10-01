@@ -42,6 +42,17 @@ The broader worker fingerprint is checked first in `Program.ValidateRequestEnvel
 
 A missing or mismatched worker fingerprint fails with invalid-input semantics before `SolidWorksSession.Open(request)` and therefore before any COM startup or CAD mutation.
 
+## Implementation binding
+
+The fingerprint must describe executable behavior rather than only a parallel declaration.
+
+Pass-12 hardening therefore binds implementation to the same projection in two ways:
+
+- Python `_SUPPORTED_ENTITY_TYPES` and `_SUPPORTED_DIMENSION_TYPES` are derived directly from `build_solidworks_worker_capability_projection_v1()` instead of being maintained as independent hard-coded sets;
+- CI reads the actual C# `SolidWorksTransfer.cs` implementation and verifies that its entity guard, dimension guard, unit guards and `RelationId(...)` mapping match the projection used to calculate the fingerprint.
+
+This prevents a future implementation-only edit from leaving the compatibility hash green while runtime support silently changes.
+
 ## Test guard
 
 `tests/test_solidworks_worker_handshake.py` verifies:
@@ -49,10 +60,14 @@ A missing or mismatched worker fingerprint fails with invalid-input semantics be
 1. deterministic expected full-worker SHA-256;
 2. the exact projection scope;
 3. caller-safe projection snapshots;
-4. Python request propagation of both fingerprints;
-5. exact Python/C# worker hash parity;
-6. validation before SOLIDWORKS COM startup;
-7. C# protocol-model field parity.
+4. Python preflight entity/dimension sets are derived from the projection;
+5. Python request propagation of both fingerprints;
+6. exact Python/C# worker hash parity;
+7. validation before SOLIDWORKS COM startup;
+8. C# entity and dimension guards match the declared projection;
+9. C# linear/angular unit guards match the declared units;
+10. C# relation mapping matches every declared supported constraint;
+11. C# protocol-model field parity.
 
 ## Ownership / contract boundary
 

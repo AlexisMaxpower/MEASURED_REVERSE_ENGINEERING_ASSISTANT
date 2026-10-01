@@ -5,6 +5,7 @@ import re
 from types import SimpleNamespace
 import unittest
 
+import mrea_cad_bridge.solidworks_agent as solidworks_agent_module
 from mrea_cad_bridge.solidworks_agent import (
     SolidWorksAgentConfig,
     build_solidworks_agent_request,
@@ -62,6 +63,17 @@ class SolidWorksWorkerCapabilityHandshakeTests(unittest.TestCase):
         self.assertIn("TANGENT", fresh["constraints"]["supported"])
         self.assertEqual(solidworks_worker_capabilities_sha256_v1(), EXPECTED_WORKER_SHA256)
 
+    def test_python_preflight_support_sets_are_derived_from_projection(self):
+        projection = build_solidworks_worker_capability_projection_v1()
+        self.assertEqual(
+            solidworks_agent_module._SUPPORTED_ENTITY_TYPES,
+            frozenset(projection["geometry_entities"]["supported"]),
+        )
+        self.assertEqual(
+            solidworks_agent_module._SUPPORTED_DIMENSION_TYPES,
+            frozenset(projection["verified_dimensions"]["supported"]),
+        )
+
     def test_agent_request_carries_full_and_constraint_fingerprints(self):
         package = SimpleNamespace(
             sketch_package_id="SP-WORKER-HANDSHAKE-001",
@@ -106,6 +118,68 @@ class SolidWorksWorkerCapabilityHandshakeTests(unittest.TestCase):
         self.assertLess(
             program.index("ValidateRequestEnvelope(request);"),
             program.index("SolidWorksSession.Open(request)"),
+        )
+
+    def test_csharp_entity_and_dimension_guards_match_projection(self):
+        root = Path(__file__).resolve().parents[1]
+        transfer = (root / "solidworks_agent" / "SolidWorksTransfer.cs").read_text(
+            encoding="utf-8"
+        )
+        projection = build_solidworks_worker_capability_projection_v1()
+
+        entity_match = re.search(
+            r'if \((?P<condition>entity\.type != .*?)\)\s*'
+            r'throw new NotSupportedException\("Vendor agent supports POINT/LINE/CIRCLE/ARC only:',
+            transfer,
+            flags=re.S,
+        )
+        self.assertIsNotNone(entity_match)
+        csharp_entities = set(
+            re.findall(r'entity\.type != "([A-Z]+)"', entity_match.group("condition"))
+        )
+        self.assertEqual(
+            csharp_entities,
+            set(projection["geometry_entities"]["supported"]),
+        )
+
+        dimension_match = re.search(
+            r'if \((?P<condition>dimension\.type != .*?)\)\s*'
+            r'throw new NotSupportedException\("Unsupported dimension type:',
+            transfer,
+            flags=re.S,
+        )
+        self.assertIsNotNone(dimension_match)
+        csharp_dimensions = set(
+            re.findall(
+                r'dimension\.type != "([A-Z]+)"',
+                dimension_match.group("condition"),
+            )
+        )
+        self.assertEqual(
+            csharp_dimensions,
+            set(projection["verified_dimensions"]["supported"]),
+        )
+        self.assertIn('if (dimension.unit != "deg")', transfer)
+        self.assertIn('else if (dimension.unit != "mm")', transfer)
+        self.assertEqual(
+            set(projection["verified_dimensions"]["units"].values()),
+            {"mm", "deg"},
+        )
+
+    def test_csharp_relation_mapping_matches_declared_supported_constraints(self):
+        root = Path(__file__).resolve().parents[1]
+        transfer = (root / "solidworks_agent" / "SolidWorksTransfer.cs").read_text(
+            encoding="utf-8"
+        )
+        projection = build_solidworks_worker_capability_projection_v1()
+
+        relation_start = transfer.index("private static string RelationId")
+        relation_end = transfer.index("private static dynamic CreateEntity")
+        relation_body = transfer[relation_start:relation_end]
+        relation_types = set(re.findall(r'case "([A-Z]+)"', relation_body))
+        self.assertEqual(
+            relation_types,
+            set(projection["constraints"]["supported"]),
         )
 
     def test_protocol_model_carries_worker_fingerprint_field(self):
