@@ -1,0 +1,78 @@
+name: Chat 4A all published results archive
+
+on:
+  push:
+    branches:
+      - chat-4/pass-15-full-archive
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout archive branch with history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch all primary Chat 4A pass refs
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin '+refs/heads/chat-4/pass-*:refs/remotes/origin/chat-4/pass-*'
+
+      - name: Build complete Chat 4A published-results payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="archive_payload"
+          mkdir -p "$ROOT/LATEST_CUMULATIVE_SNAPSHOT" "$ROOT/HISTORICAL_PASS_BRANCHES"
+
+          latest_ref="origin/chat-4/pass-15"
+          latest_sha="$(git rev-parse "$latest_ref")"
+          git archive "$latest_sha" chat_4_cad_bridge_verification | tar -x -C "$ROOT/LATEST_CUMULATIVE_SNAPSHOT"
+
+          printf 'branch\tsha\n' > "$ROOT/CHAT4A_BRANCH_MANIFEST.tsv"
+
+          while IFS= read -r ref; do
+            branch="${ref#origin/}"
+            case "$branch" in
+              chat-4/pass-15-full-archive) continue ;;
+            esac
+            sha="$(git rev-parse "$ref")"
+            safe="${branch//\//__}"
+            mkdir -p "$ROOT/HISTORICAL_PASS_BRANCHES/$safe"
+            if git cat-file -e "$sha:chat_4_cad_bridge_verification" 2>/dev/null; then
+              git archive "$sha" chat_4_cad_bridge_verification | tar -x -C "$ROOT/HISTORICAL_PASS_BRANCHES/$safe"
+              printf '%s\t%s\n' "$branch" "$sha" >> "$ROOT/CHAT4A_BRANCH_MANIFEST.tsv"
+            fi
+          done < <(git for-each-ref --format='%(refname:short)' 'refs/remotes/origin/chat-4/pass-*' | sort -V)
+
+          cat > "$ROOT/README_CHAT4A_ARCHIVE.txt" <<'EOF'
+          MREA Chat 4A recovery archive
+
+          Scope:
+          - Primary Chat 4 / Chat 4A only: branches matching chat-4/pass-*
+          - Chat 4B branches chat-4b/pass-* are intentionally excluded.
+          - LATEST_CUMULATIVE_SNAPSHOT is the complete chat_4_cad_bridge_verification subtree from chat-4/pass-15.
+          - HISTORICAL_PASS_BRANCHES preserves every published primary Chat 4A pass-branch snapshot still present in GitHub, including side-reconcile/work branches where applicable.
+          - CHAT4A_BRANCH_MANIFEST.tsv maps every archived branch to its exact Git commit SHA.
+          - Pass-1-era baseline work has no dedicated chat-4/pass-1 branch in the current repository; its surviving code/docs are preserved in later cumulative snapshots.
+          EOF
+
+          find "$ROOT" -type f -print0 | sort -z | xargs -0 sha256sum > "$ROOT/SHA256SUMS.txt"
+
+          echo "Archived branch snapshots:"
+          cat "$ROOT/CHAT4A_BRANCH_MANIFEST.tsv"
+          echo "Total files: $(find "$ROOT" -type f | wc -l)"
+
+      - name: Upload complete Chat 4A recovery archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: MREA_CHAT4A_ALL_PUBLISHED_RESULTS_2026-10-01
+          path: archive_payload/
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 9
