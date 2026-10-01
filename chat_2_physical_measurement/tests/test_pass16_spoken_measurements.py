@@ -72,16 +72,17 @@ def build_controller() -> tuple[MeasurementSessionService, str, HandsFreeMeasure
     return service, session.session_id, controller
 
 
-def test_spoken_whole_number_is_deterministic() -> None:
-    assert normalize_measurement_number("сорок два") == Decimal("42")
-    assert normalize_measurement_number("две тысячи сто сорок два") == Decimal("2142")
+def test_spoken_whole_without_decimal_structure_remains_fail_closed() -> None:
+    with pytest.raises(MeasurementCommandError):
+        normalize_measurement_number("сорок два")
+    with pytest.raises(MeasurementCommandError):
+        normalize_measurement_number("две тысячи сто сорок два")
 
 
 def test_compact_caliper_style_spoken_decimal_is_supported() -> None:
     assert normalize_measurement_number("сорок два восемнадцать") == Decimal("42.18")
     assert normalize_measurement_number("сто двадцать три сорок пять") == Decimal("123.45")
     assert normalize_measurement_number("сто один ноль пять") == Decimal("101.05")
-    assert normalize_measurement_number("сорок два один восемь") == Decimal("42.18")
 
 
 def test_explicit_spoken_fraction_preserves_decimal_scale() -> None:
@@ -93,18 +94,22 @@ def test_explicit_spoken_fraction_preserves_decimal_scale() -> None:
 
 def test_spoken_sign_and_common_unit_suffixes_are_supported() -> None:
     assert normalize_measurement_number("минус сорок два восемнадцать миллиметра") == Decimal("-42.18")
-    assert normalize_measurement_number("плюс сорок два градуса") == Decimal("42")
+    assert normalize_measurement_number("плюс сорок два восемнадцать градуса") == Decimal("42.18")
 
 
 def test_mixed_or_under_specified_spoken_forms_fail_closed() -> None:
     with pytest.raises(MeasurementCommandError):
         normalize_measurement_number("сорок два пять")
     with pytest.raises(MeasurementCommandError):
+        normalize_measurement_number("сорок два один восемь")
+    with pytest.raises(MeasurementCommandError):
         normalize_measurement_number("сорок два 18")
     with pytest.raises(MeasurementCommandError):
         normalize_measurement_number("сорок две целых восемнадцать")
     with pytest.raises(AmbiguousMeasurementCommand):
         normalize_measurement_number("минус -42")
+    with pytest.raises(AmbiguousMeasurementCommand):
+        normalize_measurement_number("плюс -42")
 
 
 def test_existing_numeric_forms_remain_compatible() -> None:
