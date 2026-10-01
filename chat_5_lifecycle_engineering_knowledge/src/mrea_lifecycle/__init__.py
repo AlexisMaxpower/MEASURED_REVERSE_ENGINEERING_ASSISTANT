@@ -65,7 +65,6 @@ from .models import (
     PhysicalLifecycleEventType,
     PhysicalPartInstance,
     PhysicalPartState,
-    PhysicalPartStateProjection,
     PhysicalTestOutcome,
     Revision,
     RevisionOrigin,
@@ -81,6 +80,7 @@ from .persistence import (
 from .physical import (
     PhysicalEquipmentRegistry,
     PhysicalPartLifecycleService,
+    PhysicalPartStateProjection,
     PhysicalPartTimeline,
 )
 from .projections import (
