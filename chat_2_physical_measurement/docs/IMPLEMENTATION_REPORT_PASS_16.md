@@ -21,10 +21,9 @@ Extended `normalize_measurement_number(...)` with a finite, auditable Russian gr
 Supported examples include:
 
 ```text
-сорок два                          -> 42
 сорок два восемнадцать             -> 42.18
+сто двадцать три сорок пять         -> 123.45
 сто один ноль пять                 -> 101.05
-сорок два один восемь              -> 42.18
 сорок две целых восемнадцать сотых -> 42.18
 ноль целых пять сотых              -> 0.05
 два целых пять тысячных            -> 2.005
@@ -32,7 +31,7 @@ Supported examples include:
 
 Also supported:
 
-- cardinal values through thousands;
+- whole-number components through thousands inside explicit/compact decimal forms;
 - spoken `минус` / `плюс`;
 - common `мм/mm/миллиметр...` and `градус...` suffixes;
 - the existing numeric comma/dot forms unchanged;
@@ -44,13 +43,15 @@ The parser deliberately does not guess under-specified forms.
 
 Examples that fail closed:
 
+- standalone word-only `сорок два` remains unsupported by this pass;
 - `сорок два пять` — fractional scale is ambiguous;
+- digit-by-digit non-leading-zero forms such as `сорок два один восемь`;
 - mixed word/numeric payloads such as `сорок два 18`;
 - incomplete explicit fractions;
 - unsupported descriptive words such as `примерно`;
 - conflicting sign representations.
 
-Compact spoken decimals use an explicit two-decimal measurement convention only when the full token sequence is not already a valid whole-number cardinal. Thus `сорок два` is `42`, while `сорок два восемнадцать` is `42.18`.
+Compact spoken decimals use an explicit two-decimal measurement convention. A sub-ten hundredths group must be spoken with a leading zero (`ноль пять` -> `.05`). This prevents the parser from reinterpreting `сорок два пять` as a shorter whole part plus a guessed fraction.
 
 ## Truth boundary
 
@@ -85,7 +86,7 @@ Final handoff is recorded separately in `ORCHESTRATOR_HANDOFF.md` after executab
 
 `tests/test_pass16_spoken_measurements.py` covers:
 
-1. whole spoken cardinals;
+1. preservation of the previous fail-closed standalone word-only behavior;
 2. compact two-decimal caliper speech;
 3. explicit tenths/hundredths/thousandths;
 4. spoken signs and unit suffixes;
@@ -108,6 +109,7 @@ No Change Request is required for this pass.
 
 - this is text normalization after speech recognition; no speech-recognition provider is added;
 - grammar is intentionally finite rather than general Russian NLP;
+- standalone word-only values remain unsupported; this pass targets measurement-style decimal speech;
 - compact fractional speech is two-decimal only; other scales require explicit `десятых/сотых/тысячных` wording;
 - millions and larger cardinals are not supported;
 - controller restart-state durability remains separate future work.
