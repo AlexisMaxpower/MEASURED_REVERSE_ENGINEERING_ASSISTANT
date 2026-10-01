@@ -48,10 +48,15 @@ class SolidWorksConstraintCapabilityHandshakeTests(unittest.TestCase):
         )
         self.assertIsNotNone(match)
         self.assertEqual(match.group(1), EXPECTED_SHA256)
-        self.assertIn("request.constraint_capabilities_sha256", program)
-        self.assertIn("Constraint capability fingerprint mismatch", program)
+
+        validate_start = program.index("private static void ValidateRequestEnvelope")
+        validate_end = program.index("private static string StartupFailureCode")
+        validate_body = program[validate_start:validate_end]
+        self.assertIn("request.constraint_capabilities_sha256", validate_body)
+        self.assertIn("Constraint capability fingerprint mismatch", validate_body)
+
         self.assertLess(
-            program.index("request.constraint_capabilities_sha256"),
+            program.index("ValidateRequestEnvelope(request);"),
             program.index("SolidWorksSession.Open(request)"),
         )
 
