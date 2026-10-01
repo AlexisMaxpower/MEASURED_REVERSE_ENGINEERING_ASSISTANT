@@ -30,6 +30,38 @@ _CAPABILITIES: dict[str, Any] = {
         ],
         "unsupported": ["COINCIDENT", "SYMMETRIC"],
         "supported_status": "VERIFIED",
+        "rules": {
+            "constraint_id_required": True,
+            "distinct_entity_ids": True,
+            "references_must_exist": True,
+            "types": {
+                "HORIZONTAL": {"entity_type_patterns": [["LINE"]]},
+                "VERTICAL": {"entity_type_patterns": [["LINE"]]},
+                "PARALLEL": {"entity_type_patterns": [["LINE", "LINE"]]},
+                "PERPENDICULAR": {"entity_type_patterns": [["LINE", "LINE"]]},
+                "CONCENTRIC": {
+                    "entity_type_patterns": [
+                        ["CIRCLE", "CIRCLE"],
+                        ["CIRCLE", "ARC"],
+                        ["ARC", "CIRCLE"],
+                        ["ARC", "ARC"],
+                    ]
+                },
+                "EQUAL": {"entity_type_patterns": [["LINE", "LINE"]]},
+                "TANGENT": {
+                    "entity_type_patterns": [
+                        ["LINE", "CIRCLE"],
+                        ["LINE", "ARC"],
+                        ["CIRCLE", "LINE"],
+                        ["CIRCLE", "CIRCLE"],
+                        ["CIRCLE", "ARC"],
+                        ["ARC", "LINE"],
+                        ["ARC", "CIRCLE"],
+                        ["ARC", "ARC"],
+                    ]
+                },
+            },
+        },
         "limitations": {
             "EQUAL": "LINE/LINE only",
             "TANGENT": "exactly two LINE/CIRCLE/ARC entities with at least one CIRCLE/ARC; LINE/LINE and POINT participation are rejected",
@@ -110,14 +142,30 @@ def evaluate_solidworks_constraint_support_v1(
     constraint: Mapping[str, Any],
     entities_by_id: Mapping[str, Mapping[str, Any]],
 ) -> SolidWorksConstraintSupportDecision:
-    """Evaluate the exact fail-closed constraint subset without invoking the CAD worker."""
+    """Evaluate the fingerprinted fail-closed constraint subset without invoking the CAD worker."""
 
-    constraint_id = str(constraint.get("constraint_id", "<unknown>"))
+    constraint_id_raw = constraint.get("constraint_id")
+    constraint_id = constraint_id_raw if isinstance(constraint_id_raw, str) else "<unknown>"
     constraint_type_raw = constraint.get("type")
     constraint_type = str(constraint_type_raw) if constraint_type_raw is not None else None
     status_raw = constraint.get("status")
     status = str(status_raw) if status_raw is not None else None
     raw_entity_ids = constraint.get("entity_ids")
+    rules = _CAPABILITIES["constraints"]["rules"]
+
+    if rules["constraint_id_required"] and (
+        not isinstance(constraint_id_raw, str) or not constraint_id_raw
+    ):
+        return _decision(
+            supported=False,
+            code="CONSTRAINT_ID_INVALID",
+            constraint_id=constraint_id,
+            constraint_type=constraint_type,
+            status=status,
+            entity_ids=(),
+            entity_types=(),
+            message="constraint_id must be a non-empty string",
+        )
 
     if raw_entity_ids is None:
         entity_ids: tuple[str, ...] = ()
@@ -147,7 +195,8 @@ def evaluate_solidworks_constraint_support_v1(
             message=f"constraint status must be VERIFIED; got {status!r}",
         )
 
-    if constraint_type not in _CAPABILITIES["constraints"]["supported"]:
+    type_rules = rules["types"]
+    if constraint_type not in type_rules:
         return _decision(
             supported=False,
             code="TYPE_UNSUPPORTED",
@@ -159,7 +208,7 @@ def evaluate_solidworks_constraint_support_v1(
             message=f"constraint type {constraint_type!r} is not supported by the SOLIDWORKS vendor slice",
         )
 
-    if len(set(entity_ids)) != len(entity_ids):
+    if rules["distinct_entity_ids"] and len(set(entity_ids)) != len(entity_ids):
         return _decision(
             supported=False,
             code="ENTITY_IDS_DUPLICATE",
@@ -171,127 +220,55 @@ def evaluate_solidworks_constraint_support_v1(
             message="constraint contains duplicate entity_ids",
         )
 
-    unknown = tuple(entity_id for entity_id in entity_ids if entity_id not in entities_by_id)
-    if unknown:
+    if rules["references_must_exist"]:
+        unknown = tuple(entity_id for entity_id in entity_ids if entity_id not in entities_by_id)
+        if unknown:
+            return _decision(
+                supported=False,
+                code="ENTITY_UNKNOWN",
+                constraint_id=constraint_id,
+                constraint_type=constraint_type,
+                status=status,
+                entity_ids=entity_ids,
+                entity_types=(),
+                message=f"constraint references unknown entities: {unknown!r}",
+            )
+
+    entity_types = tuple(entities_by_id[entity_id].get("type") for entity_id in entity_ids)
+    patterns = tuple(
+        tuple(pattern)
+        for pattern in type_rules[constraint_type]["entity_type_patterns"]
+    )
+    valid_arities = {len(pattern) for pattern in patterns}
+    if len(entity_ids) not in valid_arities:
         return _decision(
             supported=False,
-            code="ENTITY_UNKNOWN",
+            code="ARITY_UNSUPPORTED",
             constraint_id=constraint_id,
             constraint_type=constraint_type,
             status=status,
             entity_ids=entity_ids,
-            entity_types=(),
-            message=f"constraint references unknown entities: {unknown!r}",
+            entity_types=entity_types,
+            message=(
+                f"{constraint_type} requires entity arity in "
+                f"{sorted(valid_arities)!r}"
+            ),
         )
 
-    entity_types = tuple(entities_by_id[entity_id].get("type") for entity_id in entity_ids)
-
-    if constraint_type in {"HORIZONTAL", "VERTICAL"}:
-        if len(entity_ids) != 1:
-            return _decision(
-                supported=False,
-                code="ARITY_UNSUPPORTED",
-                constraint_id=constraint_id,
-                constraint_type=constraint_type,
-                status=status,
-                entity_ids=entity_ids,
-                entity_types=entity_types,
-                message=f"{constraint_type} requires exactly one entity",
-            )
-        if entity_types != ("LINE",):
-            return _decision(
-                supported=False,
-                code="GEOMETRY_UNSUPPORTED",
-                constraint_id=constraint_id,
-                constraint_type=constraint_type,
-                status=status,
-                entity_ids=entity_ids,
-                entity_types=entity_types,
-                message=f"{constraint_type} requires one LINE",
-            )
-
-    elif constraint_type in {"PARALLEL", "PERPENDICULAR", "EQUAL"}:
-        if len(entity_ids) != 2:
-            return _decision(
-                supported=False,
-                code="ARITY_UNSUPPORTED",
-                constraint_id=constraint_id,
-                constraint_type=constraint_type,
-                status=status,
-                entity_ids=entity_ids,
-                entity_types=entity_types,
-                message=f"{constraint_type} requires exactly two entities",
-            )
-        if entity_types != ("LINE", "LINE"):
-            return _decision(
-                supported=False,
-                code="GEOMETRY_UNSUPPORTED",
-                constraint_id=constraint_id,
-                constraint_type=constraint_type,
-                status=status,
-                entity_ids=entity_ids,
-                entity_types=entity_types,
-                message=f"{constraint_type} requires two LINE entities",
-            )
-
-    elif constraint_type == "CONCENTRIC":
-        if len(entity_ids) != 2:
-            return _decision(
-                supported=False,
-                code="ARITY_UNSUPPORTED",
-                constraint_id=constraint_id,
-                constraint_type=constraint_type,
-                status=status,
-                entity_ids=entity_ids,
-                entity_types=entity_types,
-                message="CONCENTRIC requires exactly two entities",
-            )
-        if any(item not in {"CIRCLE", "ARC"} for item in entity_types):
-            return _decision(
-                supported=False,
-                code="GEOMETRY_UNSUPPORTED",
-                constraint_id=constraint_id,
-                constraint_type=constraint_type,
-                status=status,
-                entity_ids=entity_ids,
-                entity_types=entity_types,
-                message="CONCENTRIC requires two CIRCLE/ARC entities",
-            )
-
-    elif constraint_type == "TANGENT":
-        if len(entity_ids) != 2:
-            return _decision(
-                supported=False,
-                code="ARITY_UNSUPPORTED",
-                constraint_id=constraint_id,
-                constraint_type=constraint_type,
-                status=status,
-                entity_ids=entity_ids,
-                entity_types=entity_types,
-                message="TANGENT requires exactly two entities",
-            )
-        if any(item not in {"LINE", "CIRCLE", "ARC"} for item in entity_types):
-            return _decision(
-                supported=False,
-                code="GEOMETRY_UNSUPPORTED",
-                constraint_id=constraint_id,
-                constraint_type=constraint_type,
-                status=status,
-                entity_ids=entity_ids,
-                entity_types=entity_types,
-                message="TANGENT supports LINE/CIRCLE/ARC only",
-            )
-        if all(item == "LINE" for item in entity_types):
-            return _decision(
-                supported=False,
-                code="GEOMETRY_UNSUPPORTED",
-                constraint_id=constraint_id,
-                constraint_type=constraint_type,
-                status=status,
-                entity_ids=entity_ids,
-                entity_types=entity_types,
-                message="TANGENT requires at least one CIRCLE/ARC",
-            )
+    if entity_types not in patterns:
+        return _decision(
+            supported=False,
+            code="GEOMETRY_UNSUPPORTED",
+            constraint_id=constraint_id,
+            constraint_type=constraint_type,
+            status=status,
+            entity_ids=entity_ids,
+            entity_types=entity_types,
+            message=(
+                f"{constraint_type} does not support entity type pattern "
+                f"{entity_types!r}"
+            ),
+        )
 
     return _decision(
         supported=True,
