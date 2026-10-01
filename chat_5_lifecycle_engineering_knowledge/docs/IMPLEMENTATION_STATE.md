@@ -2,195 +2,148 @@
 
 ## Snapshot
 
-- Date: **2026-09-29**
-- Branch: `chat-5/pass-3`
+- Date: **2026-10-01**
+- Branch: `chat-5/pass-11`
 - Slice: **Lifecycle & Engineering Knowledge**
-- SSOT: **MREA v0.1 + orchestration addendum v0.2**
-- Orchestrator directive: **OD-2026-09-29-003**
-- Accepted baseline: **Pass 2 ACCEPTED**
-- State: **Pass 3 physical part instance lifecycle implemented; acceptance pending CI/handoff**
+- Authorization: **direct user instruction — Pass 11**
+- Central repository baseline checked before work: `main` @ `c034f7583d4e1f130f827d94a43762f3cad1a7e5`
+- Central directive observed: `OD-2026-09-30-004`
+- Tested implementation SHA: `d6ec8ff2582003b06e7df756cb25dedefab726f7`
+- MREA CI: `36797102144` — **SUCCESS**
+- State: **implementation verified; final handoff/freeze pending**
 
-## Accepted baseline
+## Baseline reconciliation
 
-Still active and unchanged:
+Pass 10.1 and corrected Round-4 Pass 8 had diverged from common Chat-5 Pass-8 ancestry.
 
-- Revision / Manufacturing / Installation / Test / Failure domain;
-- CAD-linked Revision preparation;
-- CAD verification manufacturing eligibility gate;
-- canonical `LifecycleEvent v1` outbound adapter;
-- revision-level timeline/state/comparison/knowledge queries;
-- real Chat 4 -> Chat 5 boundary gate.
-
-Pass 2 independent CI was green before Pass 3 began, including:
-- `Contracts / canonical fixtures`;
-- `Chat 5 / Lifecycle`;
-- `Integration / Chat 4 -> Chat 5`.
-
-## Pass 3 additions
-
-### Physical identity
-
-`PhysicalPartInstance` is a slice-local identity for one real manufactured item.
-
-It retains:
-- `instance_id`;
-- `part_id`;
-- `revision_id`;
-- `manufacturing_id`;
-- material;
-- manufacturing method;
-- manufactured timestamp;
-- batch/machine/print profile snapshot where available.
-
-A physical instance can only be registered from an existing `ManufacturingRecord`, so a failed/unverified CAD revision still cannot bypass the existing manufacturing eligibility gate.
-
-### Internal physical state machine
-
-States:
+Pass 11 does not extend either stale shared tree blindly. It was rebuilt as:
 
 ```text
-MANUFACTURED
-INSTALLED
-TESTED
-ACTIVE
-FAILED
-REMOVED
-SUPERSEDED
+current main
+→ file-level replay of Chat-5-owned cumulative Pass 9–10.1 surface
+→ corrected Round-4 runtime-truth files from frozen chat-5/pass-8
+→ Pass-11 aggregate keyset delta
 ```
 
-Normal progression:
+Preserved from current `main`:
+
+- Chat-6-owned `ORCHESTRATOR_DIRECTIVE.md`;
+- Chat-6 `FIX_REQUIRED` control document;
+- shared contracts/fixtures;
+- root integration tests;
+- workflows;
+- all Chat 1–4 and Chat 6/7/8 surfaces.
+
+The frozen `chat-5/pass-8` ref was not mutated.
+
+## Preserved lifecycle truth
+
+The cumulative line includes the corrected Round-4 runtime boundary:
+
+- `CADRuntimeStatus = VERIFIED | FAILED | UNVERIFIED`;
+- runtime evidence persists through snapshot and normalized read model;
+- runtime VERIFIED requires real-host execution evidence;
+- runtime FAILED/UNVERIFIED blocks manufacturing when runtime evidence is supplied;
+- canonical numerical verification remains separate;
+- generic flows without a runtime gate remain backward compatible.
+
+## Pass 11 addition
+
+`failure_patterns_page()` now participates in the Pass-10.1 keyset adapter.
+
+New v2 aggregate key:
 
 ```text
-MANUFACTURED -> INSTALLED -> TESTED -> ACTIVE
+(
+  occurrence_count,
+  failure_type,
+  damage_location,
+  cause_null_rank,
+  cause_sort
+)
 ```
 
-Supported service exits:
+Sort direction:
 
 ```text
-INSTALLED / TESTED / ACTIVE -> FAILED -> REMOVED -> SUPERSEDED
-INSTALLED / TESTED / ACTIVE -> REMOVED -> SUPERSEDED
+occurrence_count DESC
+failure_type ASC
+damage_location ASC
+cause_null_rank ASC
+cause_sort ASC
 ```
 
-Rules are fail-closed:
-- activation requires the latest physical test to be explicitly `PASSED`;
-- timestamps cannot move backward for one physical instance;
-- a physical installation must carry non-empty equipment/position;
-- one equipment/position cannot contain two non-removed physical instances;
-- supersession requires the old instance to be `REMOVED`;
-- replacement must be a different instance of the same part;
-- replacement must occupy the same equipment/position.
+The grouped result is produced in a CTE; v2 continuation applies key predicates to grouped rows and uses `LIMIT + 1` without OFFSET.
 
-### Exact evidence linkage
+## Legacy cursor continuity
 
-`Installation`, `TestRecord`, and `FailureRecord` now support optional `instance_id`.
+A valid `mrea.knowledge-cursor.v1` supplied to `failure_patterns_page()` remains on the exact historical grouped OFFSET query/order.
 
-The Pass 3 physical path requires this identity and checks:
-- revision equality;
-- manufacturing equality;
-- installation equality for tests/failures;
-- failure evidence remains attached to the exact `FailureRecord` and exact physical instance.
+New traversals emit v2.
 
-Legacy revision-level callers remain compatible because `instance_id` is optional outside the physical-instance application path.
+The query/filter fingerprint and committed snapshot binding remain unchanged.
 
-### Physical event stream
+## Tests added
 
-Added internal `PhysicalLifecycleEvent` and `PhysicalLifecycleEventType`.
+`tests/test_failure_pattern_keyset_pagination.py` verifies:
 
-Physical events are independent from shared `LifecycleEvent v1` and include:
-- concrete `instance_id`;
-- revision/manufacturing identity;
-- installation/test/failure references;
-- equipment/position context;
-- explicit test outcome;
-- replacement instance identity for supersession.
+1. v2 aggregate cursor emission;
+2. complete grouped traversal without duplicates/gaps;
+3. count-descending and deterministic tie continuation;
+4. explicit NULL/empty-cause tie-breaking;
+5. v2 continuation SQL has key predicates and no OFFSET;
+6. v1 cursor remains on the legacy OFFSET path;
+7. malformed aggregate keysets fail closed.
 
-This avoids changing the Chat-6-owned shared lifecycle contract merely to represent internal real-world states.
+## Verification
 
-### Projections
-
-Added:
-- `PhysicalPartTimeline`;
-- `PhysicalPartStateProjection`;
-- `PhysicalEquipmentRegistry`;
-- `PhysicalPartLifecycleService`.
-
-## Shared contract compatibility
-
-No shared contract or canonical fixture was changed.
-
-Canonical lifecycle export remains limited to:
+Exact implementation SHA:
 
 ```text
-REVISION_CREATED
-MANUFACTURED
-INSTALLED
-TESTED
-FAILED
+d6ec8ff2582003b06e7df756cb25dedefab726f7
 ```
 
-Internal states/events such as `ACTIVATED`, `REMOVED`, and `SUPERSEDED` are not exported as canonical `LifecycleEvent v1`.
+GitHub workflow:
 
-## Build / Reuse decision
+```text
+MREA CI / 36797102144
+```
 
-No new dependency was added.
+Result: **SUCCESS**.
 
-Pass 3 deliberately reuses:
-- existing `InMemoryLifecycleStore`;
-- existing `InstallationService`;
-- existing `TestService`;
-- existing `FailureService`;
-- existing `ManufacturingService` eligibility invariant;
-- existing canonical lifecycle adapter.
+Required Chat-5 gates on that exact SHA:
 
-A separate physical-instance service/state machine was added only for behavior not represented by the shared v1 contract.
+- `Chat 5 / Lifecycle` — **SUCCESS**;
+- `Contracts / canonical fixtures` — **SUCCESS**;
+- `Chat 4 / Generic CAD gate` — **SUCCESS**;
+- `Integration / Chat 4 -> Chat 5` — **SUCCESS**.
 
-## New deterministic tests
+The other slice unit jobs also passed. Cross-slice jobs unrelated to Chat 5 were skipped by their branch filters, as defined by the existing shared workflow.
 
-`tests/test_physical_instance_lifecycle.py` covers:
+## Shared-contract impact
 
-1. manufacturing record -> physical instance identity;
-2. install -> test -> active;
-3. failure with exact instance/revision/evidence linkage;
-4. removal;
-5. replacement/supersession by a new instance;
-6. equipment/position registry update;
-7. canonical export remaining thin;
-8. activation before test rejected;
-9. failed test cannot activate;
-10. backward-time transition rejected;
-11. occupied equipment/position rejected without partial canonical mutation;
-12. supersession before removal rejected.
+None.
 
-## Files added in Pass 3
+No canonical fixture or shared schema change is required.
 
-- `src/mrea_lifecycle/physical.py`;
-- `tests/test_physical_instance_lifecycle.py`;
-- `docs/PASS_3_PHYSICAL_PART_INSTANCE_LIFECYCLE.md`.
+## External runtime truth
 
-## Files modified in Pass 3
+Unchanged:
 
-- `src/mrea_lifecycle/models.py`;
-- `src/mrea_lifecycle/store.py`;
-- `src/mrea_lifecycle/__init__.py`;
-- `README.md`;
-- `docs/IMPLEMENTATION_STATE.md`;
-- `ORCHESTRATOR_HANDOFF.md` at final freeze.
+```text
+REAL_SOLIDWORKS_2026_HOST = EXTERNAL_GATE_UNVERIFIED
+PRODUCTION_CSHARP_INTEROP_BUILD = UNVERIFIED
+NATIVE_SLDPRT_GENERATION_READBACK = UNVERIFIED
+```
 
-## Not implemented
+## Remaining intentional limitations
 
-- production persistence;
-- repository abstraction;
-- REST/API;
-- concurrency/versioning;
-- migrations;
-- AI / semantic failure analysis;
-- shared physical-instance event contract.
+- materialized analytical aggregates;
+- external client authn/authz;
+- deployment/TLS/CORS/rate-limit policy;
+- semantic/AI interpretation;
+- field-device synchronization.
 
-## Acceptance gate
+## Freeze rule
 
-Before handoff:
-- Chat 5 suite must be green;
-- canonical contract job must remain green;
-- real `Integration / Chat 4 -> Chat 5` must remain green.
-
-Handoff then freezes `chat-5/pass-3`.
+`ORCHESTRATOR_HANDOFF.md` is the final worker mutation for Pass 11. After it is published, `chat-5/pass-11` is frozen. The CI generated by that handoff commit is external verification of the final HEAD and is not followed by a documentation-only mutation merely to record its own result.

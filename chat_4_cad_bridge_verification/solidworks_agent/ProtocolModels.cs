@@ -6,12 +6,14 @@ namespace Mrea.SolidWorksCadAgent
     {
         public string protocol_version { get; set; }
         public string adapter_name { get; set; }
+        public string constraint_capabilities_sha256 { get; set; }
         public string sketch_package_id { get; set; }
         public string output_directory { get; set; }
         public string part_template_path { get; set; }
         public bool attach_to_running { get; set; }
         public bool allow_launch { get; set; }
         public List<EntitySpec> entities { get; set; }
+        public List<ConstraintSpec> constraints { get; set; }
         public List<DimensionSpec> dimensions { get; set; }
     }
 
@@ -25,10 +27,21 @@ namespace Mrea.SolidWorksCadAgent
     {
         public string entity_id { get; set; }
         public string type { get; set; }
+        public PointSpec point { get; set; }
         public PointSpec start { get; set; }
         public PointSpec end { get; set; }
         public PointSpec center { get; set; }
         public double radius { get; set; }
+        public double start_angle_deg { get; set; }
+        public double end_angle_deg { get; set; }
+    }
+
+    internal sealed class ConstraintSpec
+    {
+        public string constraint_id { get; set; }
+        public string type { get; set; }
+        public List<string> entity_ids { get; set; }
+        public string status { get; set; }
     }
 
     internal sealed class DimensionSpec

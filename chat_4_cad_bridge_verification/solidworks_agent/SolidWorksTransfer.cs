@@ -22,6 +22,7 @@ namespace Mrea.SolidWorksCadAgent
             dynamic model = session.Model;
             dynamic sketchManager = model.SketchManager;
             var entities = new Dictionary<string, dynamic>(StringComparer.Ordinal);
+            var entitySpecs = request.entities.ToDictionary(item => item.entity_id, item => item, StringComparer.Ordinal);
             var dimensions = new Dictionary<string, dynamic>(StringComparer.Ordinal);
             var bindings = new List<DimensionBindingDto>();
 
@@ -36,9 +37,15 @@ namespace Mrea.SolidWorksCadAgent
                 sketchManager.AddToDB = false;
             }
 
+            ApplyConstraints(
+                model,
+                entities,
+                entitySpecs,
+                request.constraints ?? new List<ConstraintSpec>());
+
             foreach (var dimension in request.dimensions)
             {
-                dynamic modelDimension = CreateDimension(model, entities, dimension);
+                dynamic modelDimension = CreateDimension(model, entities, entitySpecs, dimension);
                 var vendorName = SafeDimensionName(dimension.dimension_id);
                 modelDimension.Name = vendorName;
 
@@ -122,16 +129,45 @@ namespace Mrea.SolidWorksCadAgent
 
         private static void ValidateSlice(AgentRequest request)
         {
-            var ids = new HashSet<string>(StringComparer.Ordinal);
+            var entitySpecs = new Dictionary<string, EntitySpec>(StringComparer.Ordinal);
             foreach (var entity in request.entities)
             {
                 if (entity == null || string.IsNullOrWhiteSpace(entity.entity_id))
                     throw new InvalidDataException("Every entity requires entity_id.");
-                if (!ids.Add(entity.entity_id))
+                if (entitySpecs.ContainsKey(entity.entity_id))
                     throw new InvalidDataException("Duplicate entity_id: " + entity.entity_id);
-                if (entity.type != "LINE" && entity.type != "CIRCLE")
-                    throw new NotSupportedException("Pass 2 agent supports LINE/CIRCLE only: " + entity.type);
+                entitySpecs.Add(entity.entity_id, entity);
+                if (entity.type != "POINT" && entity.type != "LINE" && entity.type != "CIRCLE" && entity.type != "ARC")
+                    throw new NotSupportedException("Vendor agent supports POINT/LINE/CIRCLE/ARC only: " + entity.type);
+
+                if (entity.type == "POINT")
+                    RequirePoint(entity.point, entity.entity_id + ".point");
+                else if (entity.type == "LINE")
+                {
+                    RequirePoint(entity.start, entity.entity_id + ".start");
+                    RequirePoint(entity.end, entity.entity_id + ".end");
+                    RequireNonDegenerateLine(entity, entity.entity_id);
+                }
+                else if (entity.type == "CIRCLE")
+                {
+                    RequirePoint(entity.center, entity.entity_id + ".center");
+                    RequirePositiveFinite(entity.radius, entity.entity_id + ".radius");
+                }
+                else if (entity.type == "ARC")
+                {
+                    RequirePoint(entity.center, entity.entity_id + ".center");
+                    RequirePositiveFinite(entity.radius, entity.entity_id + ".radius");
+                    RequireFinite(entity.start_angle_deg, entity.entity_id + ".start_angle_deg");
+                    RequireFinite(entity.end_angle_deg, entity.entity_id + ".end_angle_deg");
+                    var span = PositiveModulo(entity.end_angle_deg - entity.start_angle_deg, 360.0);
+                    if (span < 1e-12)
+                        throw new InvalidDataException(
+                            "ARC start/end angles resolve to a full/zero circle; use CIRCLE instead: " + entity.entity_id);
+                }
             }
+
+            foreach (var constraint in request.constraints ?? new List<ConstraintSpec>())
+                ValidateConstraint(constraint, entitySpecs);
 
             var dimensionIds = new HashSet<string>(StringComparer.Ordinal);
             foreach (var dimension in request.dimensions)
@@ -140,24 +176,183 @@ namespace Mrea.SolidWorksCadAgent
                     throw new InvalidDataException("Every verified dimension requires dimension_id.");
                 if (!dimensionIds.Add(dimension.dimension_id))
                     throw new InvalidDataException("Duplicate dimension_id: " + dimension.dimension_id);
-                if (dimension.unit != "mm")
-                    throw new NotSupportedException("Pass 2 real-host slice currently supports mm dimensions only: " + dimension.unit);
-                if (dimension.type != "DISTANCE" && dimension.type != "DIAMETER" && dimension.type != "RADIUS")
-                    throw new NotSupportedException("Unsupported Pass 2 dimension type: " + dimension.type);
+                if (dimension.type != "DISTANCE" && dimension.type != "DIAMETER" && dimension.type != "RADIUS" && dimension.type != "ANGLE")
+                    throw new NotSupportedException("Unsupported dimension type: " + dimension.type);
                 if (dimension.entity_ids == null || dimension.entity_ids.Count == 0)
                     throw new InvalidDataException("Dimension has no entity_ids: " + dimension.dimension_id);
                 foreach (var entityId in dimension.entity_ids)
-                    if (!ids.Contains(entityId))
+                    if (!entitySpecs.ContainsKey(entityId))
                         throw new InvalidDataException("Dimension references unknown entity: " + entityId);
+
+                if (dimension.type == "ANGLE")
+                {
+                    if (dimension.unit != "deg")
+                        throw new NotSupportedException("ANGLE dimension requires deg: " + dimension.dimension_id);
+                    if (!(dimension.value > 0.0 && dimension.value < 180.0))
+                        throw new NotSupportedException("ANGLE dimension requires 0 < value < 180 deg: " + dimension.dimension_id);
+                    if (dimension.entity_ids.Count != 2)
+                        throw new NotSupportedException("ANGLE dimension requires exactly two LINE entities: " + dimension.dimension_id);
+                    if (entitySpecs[dimension.entity_ids[0]].type != "LINE" || entitySpecs[dimension.entity_ids[1]].type != "LINE")
+                        throw new NotSupportedException("ANGLE dimension supports LINE/LINE only: " + dimension.dimension_id);
+                    RequireAngularLinePair(entitySpecs[dimension.entity_ids[0]], entitySpecs[dimension.entity_ids[1]], dimension.dimension_id);
+                }
+                else if (dimension.unit != "mm")
+                {
+                    throw new NotSupportedException(
+                        "Linear/radial real-host dimensions require mm: " + dimension.dimension_id + " unit=" + dimension.unit);
+                }
+            }
+        }
+
+        private static void ValidateConstraint(
+            ConstraintSpec constraint,
+            IDictionary<string, EntitySpec> entitySpecs)
+        {
+            if (constraint == null || string.IsNullOrWhiteSpace(constraint.constraint_id))
+                throw new InvalidDataException("Every constraint requires constraint_id.");
+            if (constraint.status != "VERIFIED")
+                throw new NotSupportedException(
+                    "Real-host constraint must be VERIFIED: " + constraint.constraint_id + " status=" + constraint.status);
+            if (constraint.entity_ids == null || constraint.entity_ids.Count == 0)
+                throw new InvalidDataException("Constraint has no entity_ids: " + constraint.constraint_id);
+            if (constraint.entity_ids.Distinct(StringComparer.Ordinal).Count() != constraint.entity_ids.Count)
+                throw new InvalidDataException("Constraint contains duplicate entity_ids: " + constraint.constraint_id);
+            foreach (var entityId in constraint.entity_ids)
+                if (!entitySpecs.ContainsKey(entityId))
+                    throw new InvalidDataException("Constraint references unknown entity: " + entityId);
+
+            if (constraint.type == "HORIZONTAL" || constraint.type == "VERTICAL")
+            {
+                if (constraint.entity_ids.Count != 1 || entitySpecs[constraint.entity_ids[0]].type != "LINE")
+                    throw new NotSupportedException(constraint.type + " requires one LINE: " + constraint.constraint_id);
+                return;
+            }
+
+            if (constraint.type == "PARALLEL" || constraint.type == "PERPENDICULAR" || constraint.type == "EQUAL")
+            {
+                if (constraint.entity_ids.Count != 2 ||
+                    entitySpecs[constraint.entity_ids[0]].type != "LINE" ||
+                    entitySpecs[constraint.entity_ids[1]].type != "LINE")
+                    throw new NotSupportedException(constraint.type + " requires two LINE entities: " + constraint.constraint_id);
+                return;
+            }
+
+            if (constraint.type == "CONCENTRIC")
+            {
+                if (constraint.entity_ids.Count != 2)
+                    throw new NotSupportedException("CONCENTRIC requires two CIRCLE/ARC entities: " + constraint.constraint_id);
+                foreach (var entityId in constraint.entity_ids)
+                {
+                    var type = entitySpecs[entityId].type;
+                    if (type != "CIRCLE" && type != "ARC")
+                        throw new NotSupportedException("CONCENTRIC requires two CIRCLE/ARC entities: " + constraint.constraint_id);
+                }
+                return;
+            }
+
+            if (constraint.type == "TANGENT")
+            {
+                if (constraint.entity_ids.Count != 2)
+                    throw new NotSupportedException("TANGENT requires exactly two entities: " + constraint.constraint_id);
+
+                var firstType = entitySpecs[constraint.entity_ids[0]].type;
+                var secondType = entitySpecs[constraint.entity_ids[1]].type;
+                var firstSupported = firstType == "LINE" || firstType == "CIRCLE" || firstType == "ARC";
+                var secondSupported = secondType == "LINE" || secondType == "CIRCLE" || secondType == "ARC";
+                if (!firstSupported || !secondSupported)
+                    throw new NotSupportedException(
+                        "TANGENT supports LINE/CIRCLE/ARC only: " + constraint.constraint_id);
+                if (firstType == "LINE" && secondType == "LINE")
+                    throw new NotSupportedException(
+                        "TANGENT requires at least one CIRCLE/ARC: " + constraint.constraint_id);
+                return;
+            }
+
+            throw new NotSupportedException(
+                "Unsupported fail-closed canonical constraint type: " + constraint.type + " id=" + constraint.constraint_id);
+        }
+
+        private static void ApplyConstraints(
+            dynamic model,
+            IDictionary<string, dynamic> entities,
+            IDictionary<string, EntitySpec> entitySpecs,
+            IEnumerable<ConstraintSpec> constraints)
+        {
+            dynamic activeSketch = model.GetActiveSketch2();
+            if (activeSketch == null)
+                throw new InvalidOperationException("No active sketch while applying canonical constraints.");
+            dynamic relationManager = activeSketch.RelationManager;
+            if (relationManager == null)
+                throw new InvalidOperationException("Active sketch did not expose RelationManager.");
+
+            foreach (var constraint in constraints)
+            {
+                ValidateConstraint(constraint, entitySpecs);
+                model.ClearSelection2(true);
+                try
+                {
+                    for (var index = 0; index < constraint.entity_ids.Count; index++)
+                    {
+                        dynamic entity = entities[constraint.entity_ids[index]];
+                        if (!entity.Select4(index > 0, null))
+                            throw new InvalidOperationException(
+                                "Failed to select entity for constraint " + constraint.constraint_id + ": " + constraint.entity_ids[index]);
+                    }
+
+                    var before = (int)relationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swAll);
+                    model.SketchAddConstraints(RelationId(constraint.type));
+                    model.EditRebuild3();
+                    var after = (int)relationManager.GetRelationsCount((int)swSketchRelationFilterType_e.swAll);
+                    if (after <= before)
+                        throw new InvalidOperationException(
+                            "SOLIDWORKS did not create relation for constraint " + constraint.constraint_id);
+
+                    var overDefining = (int)relationManager.GetRelationsCount(
+                        (int)swSketchRelationFilterType_e.swOverDefining);
+                    if (overDefining > 0)
+                        throw new InvalidOperationException(
+                            "Constraint caused an over-defining sketch: " + constraint.constraint_id);
+                }
+                finally
+                {
+                    model.ClearSelection2(true);
+                }
+            }
+        }
+
+        private static string RelationId(string constraintType)
+        {
+            switch (constraintType)
+            {
+                case "HORIZONTAL": return "sgHORIZONTAL2D";
+                case "VERTICAL": return "sgVERTICAL2D";
+                case "PARALLEL": return "sgPARALLEL";
+                case "PERPENDICULAR": return "sgPERPENDICULAR";
+                case "CONCENTRIC": return "sgCONCENTRIC";
+                case "EQUAL": return "sgSAMELENGTH";
+                case "TANGENT": return "sgTANGENT";
+                default:
+                    throw new NotSupportedException("Unsupported relation mapping: " + constraintType);
             }
         }
 
         private static dynamic CreateEntity(dynamic sketchManager, EntitySpec entity)
         {
+            if (entity.type == "POINT")
+            {
+                RequirePoint(entity.point, entity.entity_id + ".point");
+                dynamic point = sketchManager.CreatePoint(
+                    MmToM(entity.point.x), MmToM(entity.point.y), 0.0);
+                if (point == null)
+                    throw new InvalidOperationException("CreatePoint failed for " + entity.entity_id);
+                return point;
+            }
+
             if (entity.type == "LINE")
             {
                 RequirePoint(entity.start, entity.entity_id + ".start");
                 RequirePoint(entity.end, entity.entity_id + ".end");
+                RequireNonDegenerateLine(entity, entity.entity_id);
                 dynamic segment = sketchManager.CreateLine(
                     MmToM(entity.start.x), MmToM(entity.start.y), 0.0,
                     MmToM(entity.end.x), MmToM(entity.end.y), 0.0);
@@ -169,12 +364,35 @@ namespace Mrea.SolidWorksCadAgent
             if (entity.type == "CIRCLE")
             {
                 RequirePoint(entity.center, entity.entity_id + ".center");
-                if (!(entity.radius > 0.0))
-                    throw new InvalidDataException("Circle radius must be > 0 for " + entity.entity_id);
+                RequirePositiveFinite(entity.radius, entity.entity_id + ".radius");
                 dynamic segment = sketchManager.CreateCircleByRadius(
                     MmToM(entity.center.x), MmToM(entity.center.y), 0.0, MmToM(entity.radius));
                 if (segment == null)
                     throw new InvalidOperationException("CreateCircleByRadius failed for " + entity.entity_id);
+                return segment;
+            }
+
+            if (entity.type == "ARC")
+            {
+                RequirePoint(entity.center, entity.entity_id + ".center");
+                RequirePositiveFinite(entity.radius, entity.entity_id + ".radius");
+                RequireFinite(entity.start_angle_deg, entity.entity_id + ".start_angle_deg");
+                RequireFinite(entity.end_angle_deg, entity.entity_id + ".end_angle_deg");
+
+                var startRadians = entity.start_angle_deg * Math.PI / 180.0;
+                var endRadians = entity.end_angle_deg * Math.PI / 180.0;
+                var startX = entity.center.x + entity.radius * Math.Cos(startRadians);
+                var startY = entity.center.y + entity.radius * Math.Sin(startRadians);
+                var endX = entity.center.x + entity.radius * Math.Cos(endRadians);
+                var endY = entity.center.y + entity.radius * Math.Sin(endRadians);
+
+                dynamic segment = sketchManager.CreateArc(
+                    MmToM(entity.center.x), MmToM(entity.center.y), 0.0,
+                    MmToM(startX), MmToM(startY), 0.0,
+                    MmToM(endX), MmToM(endY), 0.0,
+                    (short)1);
+                if (segment == null)
+                    throw new InvalidOperationException("CreateArc failed for " + entity.entity_id);
                 return segment;
             }
 
@@ -184,6 +402,7 @@ namespace Mrea.SolidWorksCadAgent
         private static dynamic CreateDimension(
             dynamic model,
             IDictionary<string, dynamic> entities,
+            IDictionary<string, EntitySpec> entitySpecs,
             DimensionSpec spec)
         {
             model.ClearSelection2(true);
@@ -222,6 +441,18 @@ namespace Mrea.SolidWorksCadAgent
                     throw new InvalidOperationException("Failed to select arc/circle for radius " + spec.dimension_id);
                 displayDimension = model.AddRadialDimension2(0.015, 0.025, 0.0);
             }
+            else if (spec.type == "ANGLE" && spec.entity_ids.Count == 2)
+            {
+                var firstSpec = entitySpecs[spec.entity_ids[0]];
+                var secondSpec = entitySpecs[spec.entity_ids[1]];
+                RequireAngularLinePair(firstSpec, secondSpec, spec.dimension_id);
+                dynamic firstLine = entities[spec.entity_ids[0]];
+                dynamic secondLine = entities[spec.entity_ids[1]];
+                if (!firstLine.Select4(false, null) || !secondLine.Select4(true, null))
+                    throw new InvalidOperationException("Failed to select two lines for angle " + spec.dimension_id);
+                var placement = AngularDimensionPlacement(firstSpec, secondSpec, spec.value);
+                displayDimension = model.AddDimension2(MmToM(placement.x), MmToM(placement.y), 0.0);
+            }
             else
             {
                 throw new NotSupportedException(
@@ -234,6 +465,75 @@ namespace Mrea.SolidWorksCadAgent
             if (modelDimension == null)
                 throw new InvalidOperationException("SOLIDWORKS did not expose model dimension for " + spec.dimension_id);
             return modelDimension;
+        }
+
+        private static PointSpec AngularDimensionPlacement(EntitySpec first, EntitySpec second, double requestedAngleDeg)
+        {
+            RequireAngularLinePair(first, second, "ANGLE");
+
+            var rX = first.end.x - first.start.x;
+            var rY = first.end.y - first.start.y;
+            var sX = second.end.x - second.start.x;
+            var sY = second.end.y - second.start.y;
+            var cross = rX * sY - rY * sX;
+            if (Math.Abs(cross) < 1e-12)
+                throw new NotSupportedException("ANGLE dimension requires non-parallel lines.");
+
+            var qMinusPX = second.start.x - first.start.x;
+            var qMinusPY = second.start.y - first.start.y;
+            var t = (qMinusPX * sY - qMinusPY * sX) / cross;
+            var intersectionX = first.start.x + t * rX;
+            var intersectionY = first.start.y + t * rY;
+
+            var rLength = Math.Sqrt(rX * rX + rY * rY);
+            var sLength = Math.Sqrt(sX * sX + sY * sY);
+            var uX = rX / rLength;
+            var uY = rY / rLength;
+            var vX = sX / sLength;
+            var vY = sY / sLength;
+            var dot = Math.Max(-1.0, Math.Min(1.0, uX * vX + uY * vY));
+            var directedSectorDeg = Math.Acos(dot) * 180.0 / Math.PI;
+            var supplementaryDeg = 180.0 - directedSectorDeg;
+
+            var useSumBisector = Math.Abs(requestedAngleDeg - directedSectorDeg) <= Math.Abs(requestedAngleDeg - supplementaryDeg);
+            var bisectorX = useSumBisector ? uX + vX : uX - vX;
+            var bisectorY = useSumBisector ? uY + vY : uY - vY;
+            var bisectorLength = Math.Sqrt(bisectorX * bisectorX + bisectorY * bisectorY);
+            if (bisectorLength < 1e-12)
+                throw new NotSupportedException("ANGLE dimension could not derive an unambiguous sector bisector.");
+
+            bisectorX /= bisectorLength;
+            bisectorY /= bisectorLength;
+            var offsetMm = Math.Max(10.0, Math.Min(50.0, 0.25 * (rLength + sLength)));
+            return new PointSpec
+            {
+                x = intersectionX + bisectorX * offsetMm,
+                y = intersectionY + bisectorY * offsetMm
+            };
+        }
+
+        private static void RequireAngularLinePair(EntitySpec first, EntitySpec second, string dimensionId)
+        {
+            if (first == null || second == null || first.type != "LINE" || second.type != "LINE")
+                throw new NotSupportedException("ANGLE dimension supports LINE/LINE only: " + dimensionId);
+            RequireNonDegenerateLine(first, first.entity_id);
+            RequireNonDegenerateLine(second, second.entity_id);
+            var rX = first.end.x - first.start.x;
+            var rY = first.end.y - first.start.y;
+            var sX = second.end.x - second.start.x;
+            var sY = second.end.y - second.start.y;
+            var cross = rX * sY - rY * sX;
+            var scale = Math.Sqrt((rX * rX + rY * rY) * (sX * sX + sY * sY));
+            if (scale <= 0.0 || Math.Abs(cross) / scale < 1e-10)
+                throw new NotSupportedException("ANGLE dimension requires non-parallel LINE entities: " + dimensionId);
+        }
+
+        private static void RequireNonDegenerateLine(EntitySpec entity, string name)
+        {
+            var dx = entity.end.x - entity.start.x;
+            var dy = entity.end.y - entity.start.y;
+            if (dx * dx + dy * dy <= 1e-24)
+                throw new InvalidDataException("LINE must have distinct endpoints: " + name);
         }
 
         private static void SaveNativePart(dynamic model, string outputPath)
@@ -272,8 +572,27 @@ namespace Mrea.SolidWorksCadAgent
         {
             if (point == null)
                 throw new InvalidDataException(name + " is required.");
-            if (double.IsNaN(point.x) || double.IsInfinity(point.x) || double.IsNaN(point.y) || double.IsInfinity(point.y))
-                throw new InvalidDataException(name + " must contain finite coordinates.");
+            RequireFinite(point.x, name + ".x");
+            RequireFinite(point.y, name + ".y");
+        }
+
+        private static void RequireFinite(double value, string name)
+        {
+            if (double.IsNaN(value) || double.IsInfinity(value))
+                throw new InvalidDataException(name + " must be finite.");
+        }
+
+        private static void RequirePositiveFinite(double value, string name)
+        {
+            RequireFinite(value, name);
+            if (!(value > 0.0))
+                throw new InvalidDataException(name + " must be > 0.");
+        }
+
+        private static double PositiveModulo(double value, double modulo)
+        {
+            var result = value % modulo;
+            return result < 0.0 ? result + modulo : result;
         }
 
         private static double ToSystemValue(double value, string unit)

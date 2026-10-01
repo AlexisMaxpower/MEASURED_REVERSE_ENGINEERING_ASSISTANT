@@ -8,6 +8,8 @@ import tempfile
 from typing import Any, Mapping, Protocol
 
 from .contracts import MappedSketchPackage
+from .solidworks_capabilities import evaluate_solidworks_constraint_support_v1
+from .solidworks_constraint_handshake import SOLIDWORKS_CONSTRAINT_CAPABILITIES_SHA256
 from .vendor import (
     CadAdapterError,
     CadAdapterResult,
@@ -18,8 +20,8 @@ from .vendor import (
 
 SOLIDWORKS_AGENT_PROTOCOL = "mrea.solidworks-agent.v1"
 SOLIDWORKS_ADAPTER_NAME = "SOLIDWORKS_2026"
-_SUPPORTED_ENTITY_TYPES = frozenset({"LINE", "CIRCLE"})
-_SUPPORTED_DIMENSION_TYPES = frozenset({"DISTANCE", "DIAMETER", "RADIUS"})
+_SUPPORTED_ENTITY_TYPES = frozenset({"POINT", "LINE", "CIRCLE", "ARC"})
+_SUPPORTED_DIMENSION_TYPES = frozenset({"DISTANCE", "DIAMETER", "RADIUS", "ANGLE"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,13 +113,63 @@ def _verified_dimension_contracts(package: MappedSketchPackage) -> tuple[Mapping
     )
 
 
-def _preflight(package: MappedSketchPackage) -> None:
-    if package.constraints:
+def _validate_constraint_support(
+    constraint: Mapping[str, Any],
+    entities_by_id: Mapping[str, Mapping[str, Any]],
+) -> None:
+    decision = evaluate_solidworks_constraint_support_v1(constraint, entities_by_id)
+    if decision.supported:
+        return
+    raise CadAdapterError(
+        "SOLIDWORKS constraint preflight failed "
+        f"[{decision.code}] {decision.constraint_id}: {decision.message}"
+    )
+
+
+def _validate_dimension_support(
+    dimension: Mapping[str, Any],
+    entities_by_id: Mapping[str, Mapping[str, Any]],
+) -> None:
+    dimension_id = str(dimension.get("dimension_id", "<unknown>"))
+    dimension_type = dimension.get("type")
+    unit = dimension.get("unit")
+    entity_ids = tuple(dimension.get("entity_ids") or ())
+
+    if dimension_type == "ANGLE":
+        if unit != "deg":
+            raise CadAdapterError(
+                f"SOLIDWORKS ANGLE dimension {dimension_id} requires canonical unit 'deg'"
+            )
+        if len(entity_ids) != 2:
+            raise CadAdapterError(
+                f"SOLIDWORKS ANGLE dimension {dimension_id} requires exactly two LINE entities"
+            )
+        if any(
+            entities_by_id.get(entity_id, {}).get("type") != "LINE"
+            for entity_id in entity_ids
+        ):
+            raise CadAdapterError(
+                f"SOLIDWORKS ANGLE dimension {dimension_id} supports LINE/LINE only"
+            )
+        try:
+            value = float(dimension.get("value"))
+        except (TypeError, ValueError) as exc:
+            raise CadAdapterError(
+                f"SOLIDWORKS ANGLE dimension {dimension_id} requires a numeric value"
+            ) from exc
+        if not 0.0 < value < 180.0:
+            raise CadAdapterError(
+                f"SOLIDWORKS ANGLE dimension {dimension_id} requires 0 < value < 180 deg"
+            )
+        return
+
+    if unit != "mm":
         raise CadAdapterError(
-            "SOLIDWORKS Pass 2 slice does not yet implement canonical constraints; "
-            "non-empty constraints must not be silently ignored"
+            f"SOLIDWORKS {dimension_type} dimension {dimension_id} requires canonical unit 'mm'"
         )
 
+
+def _preflight(package: MappedSketchPackage) -> None:
     verified_dimensions = _verified_dimension_contracts(package)
     verified_entity_ids = {
         entity_id
@@ -151,7 +203,7 @@ def _preflight(package: MappedSketchPackage) -> None:
     )
     if unsupported_entities:
         raise CadAdapterError(
-            "SOLIDWORKS Pass 2 golden slice supports LINE/CIRCLE only; "
+            "SOLIDWORKS vendor slice supports canonical POINT/LINE/CIRCLE/ARC only; "
             f"unsupported entities: {unsupported_entities!r}"
         )
 
@@ -164,22 +216,17 @@ def _preflight(package: MappedSketchPackage) -> None:
     )
     if unsupported_dimensions:
         raise CadAdapterError(
-            "SOLIDWORKS Pass 2 golden slice does not support verified dimension types: "
+            "SOLIDWORKS vendor slice does not support verified dimension types: "
             f"{unsupported_dimensions!r}"
         )
 
-    unsupported_units = sorted(
-        {
-            str(dimension.get("unit"))
-            for dimension in verified_dimensions
-            if dimension.get("unit") != "mm"
-        }
-    )
-    if unsupported_units:
-        raise CadAdapterError(
-            "SOLIDWORKS Pass 2 real-host slice supports verified mm dimensions only; "
-            f"unsupported units: {unsupported_units!r}"
-        )
+    entities_by_id = {
+        str(entity.get("entity_id")): entity for entity in package.entity_contracts
+    }
+    for constraint in package.constraints:
+        _validate_constraint_support(constraint, entities_by_id)
+    for dimension in verified_dimensions:
+        _validate_dimension_support(dimension, entities_by_id)
 
 
 def build_solidworks_agent_request(
@@ -194,6 +241,7 @@ def build_solidworks_agent_request(
     return {
         "protocol_version": SOLIDWORKS_AGENT_PROTOCOL,
         "adapter_name": SOLIDWORKS_ADAPTER_NAME,
+        "constraint_capabilities_sha256": SOLIDWORKS_CONSTRAINT_CAPABILITIES_SHA256,
         "sketch_package_id": package.sketch_package_id,
         "output_directory": str(config.output_directory.resolve()),
         "part_template_path": (
@@ -204,6 +252,7 @@ def build_solidworks_agent_request(
         "attach_to_running": config.attach_to_running,
         "allow_launch": config.allow_launch,
         "entities": [dict(entity) for entity in package.entity_contracts],
+        "constraints": [dict(constraint) for constraint in package.constraints],
         "dimensions": [dict(dimension) for dimension in verified_dimensions],
     }
 

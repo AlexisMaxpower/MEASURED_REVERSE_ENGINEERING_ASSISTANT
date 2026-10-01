@@ -11,6 +11,7 @@ namespace Mrea.SolidWorksCadAgent
     {
         private const string ProtocolVersion = "mrea.solidworks-agent.v1";
         private const string AdapterName = "SOLIDWORKS_2026";
+        private const string ConstraintCapabilitiesSha256 = "02a33af48298669e3563ce467b6cd6d8f2586d073baa3de6baa45749fc92a3d8";
 
         private const int ExitSuccess = 0;
         private const int ExitInvalidInput = 20;
@@ -197,11 +198,21 @@ namespace Mrea.SolidWorksCadAgent
                 throw new InvalidDataException("Unsupported protocol_version: " + request.protocol_version);
             if (request.adapter_name != AdapterName)
                 throw new InvalidDataException("Unsupported adapter_name: " + request.adapter_name);
+            if (!string.Equals(
+                request.constraint_capabilities_sha256,
+                ConstraintCapabilitiesSha256,
+                StringComparison.Ordinal))
+                throw new InvalidDataException(
+                    "Constraint capability fingerprint mismatch; expected=" +
+                    ConstraintCapabilitiesSha256 +
+                    " actual=" +
+                    (request.constraint_capabilities_sha256 ?? "<missing>"));
             if (string.IsNullOrWhiteSpace(request.sketch_package_id))
                 throw new InvalidDataException("sketch_package_id is required.");
             if (string.IsNullOrWhiteSpace(request.output_directory))
                 throw new InvalidDataException("output_directory is required.");
             request.entities = request.entities ?? new List<EntitySpec>();
+            request.constraints = request.constraints ?? new List<ConstraintSpec>();
             request.dimensions = request.dimensions ?? new List<DimensionSpec>();
         }
 
