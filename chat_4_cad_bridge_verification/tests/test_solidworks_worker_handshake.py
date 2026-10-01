@@ -208,8 +208,16 @@ class SolidWorksWorkerCapabilityHandshakeTests(unittest.TestCase):
             set(rules["types"]),
             {"HORIZONTAL", "VERTICAL", "PARALLEL", "PERPENDICULAR", "CONCENTRIC", "EQUAL", "TANGENT"},
         )
-        for constraint_type in rules["types"]:
+        for constraint_type in (
+            "HORIZONTAL",
+            "VERTICAL",
+            "PARALLEL",
+            "PERPENDICULAR",
+            "CONCENTRIC",
+            "EQUAL",
+        ):
             self.assertIn(f'constraint.type == "{constraint_type}"', envelope)
+        self.assertIn('constraint.type != "TANGENT"', envelope)
         self.assertIn("Duplicate constraint_id", envelope)
         self.assertIn("Constraint contains duplicate entity_ids", envelope)
         self.assertIn("Constraint references unknown entity", envelope)
