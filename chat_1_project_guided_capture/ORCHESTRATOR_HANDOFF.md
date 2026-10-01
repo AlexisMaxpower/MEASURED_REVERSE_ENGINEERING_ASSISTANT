@@ -1,209 +1,90 @@
 # ORCHESTRATOR HANDOFF — Chat 1
 
-**Pass:** 3  
-**Directive:** `OD-2026-09-29-003`  
-**Branch:** `chat-1/pass-3`  
-**Baseline main SHA:** `c3452d7fa68c9c5c3716db5fef71172e9c3b9532`  
-**Implementation / pre-handoff SHA:** `13241df21ed501e6697d773e5c672be0e3c8359e`  
-**Final branch SHA:** the branch HEAD containing this handoff; this commit freezes the branch  
-**Date:** 2026-09-29  
-**From:** Chat 1 — Project & Guided Capture  
-**To:** Chat 6 — Orchestrator / Repository Integrator  
+**Pass:** 13  
+**Directive:** `OD-2026-10-01-005`  
+**Branch:** `chat-1/pass-13`  
+**Certified baseline main SHA:** `4edde5c644755734a2ccf6e8f1c1b6ab9a63424d`  
+**Implementation / pre-handoff SHA:** `7c0b260d64e504d58ae1dc69e409a63d9549b516`  
+**Date:** 2026-10-01  
+**Role:** Chat 1 — Project & Guided Capture  
 **Contract baseline:** `mrea.contracts.v1`
+
+## Completion state
+
+```text
+CHAT_1_PASS_13 = READINESS_HANDOFF_PUBLISHED_AND_FROZEN
+PRODUCT_CODE_DELTA = NONE
+CURRENT_FEATURE_TASK = NONE
+```
+
+Pass 13 is intentionally a control/readiness pass. `OD-2026-10-01-005` superseded the historical Round-4 freeze and required the next worker pass to resolve the certified repository state, use a new branch from current `main`, and not invent a feature when no current Chat-1 task exists.
+
+No repository-owned Chat-1 feature task or `FIX_REQUIRED` existed at pass start, so no product behavior was invented.
 
 ## Delivered
 
-Pass 3 implements the first deterministic Guided Capture Quality baseline required by OD-003:
+- created canonical worker branch `chat-1/pass-13` from exact certified `main` `4edde5c644755734a2ccf6e8f1c1b6ab9a63424d`;
+- verified current central state: Round 12 closed, no software blockers, next full worker pass ready;
+- retained the integrated Chat-1 product surface unchanged;
+- added `docs/PASS13_BASELINE_READINESS_2026-10-01.md` with baseline, ownership/invariant and gate evidence;
+- replaced the stale historical handoff in this worker branch with this truthful Pass-13 handoff.
+
+## Product / contract delta
 
 ```text
-immutable clean reference
-+ optional calibration evidence
-+ optional MeasurementMatProfile
-→ deterministic OpenCV diagnostic metrics
-→ machine-readable quality findings
-→ ACCEPT / WARN / REJECT
-→ persisted internal quality analysis
-→ optional Russian actionable guidance
+Chat 1 runtime code: unchanged
+Chat 1 tests: unchanged
+Shared contracts: unchanged
+Canonical fixtures: unchanged
+Root integration tests: unchanged
+Adjacent slices: unchanged
 ```
 
-## Ownership and contract boundary
+No measurement, geometry, CAD or lifecycle ownership moved into Chat 1.
 
-No shared contract, canonical fixture, Chat-6-owned CI file or integration test was modified.
+## Preserved invariants
 
-Quality analysis remains internal to Chat 1 and is explicitly diagnostic. It does not:
+- recapture/replacement remains explicit lineage, never silent mutation;
+- provenance remains attributable to the correct capture generation;
+- verified downstream physical facts are not rewritten by recapture;
+- `CapturePackage v1` compatibility remains intact;
+- shared contracts and shared CI were not modified.
 
-- create or alter `PhysicalMeasurement`;
-- claim metric/dimensional truth;
-- infer sketch/CAD geometry;
-- overwrite clean-reference evidence;
-- add fields to `CapturePackage v1`.
+## Authoritative pre-handoff CI
 
-`CanonicalContractBuilder` continues to ignore internal quality state, preserving the accepted Chat 1 → Chat 2 boundary.
+Exact pre-handoff SHA:
 
-## Domain/result model
+`7c0b260d64e504d58ae1dc69e409a63d9549b516`
 
-Added:
+MREA CI run:
 
-- `CaptureQualityVerdict`: `ACCEPT`, `WARN`, `REJECT`;
-- `QualitySeverity`;
-- `QualityReasonCode`;
-- `CaptureQualityMetrics`;
-- `CaptureQualityFinding`;
-- `CaptureQualityResult`.
+`36805905525` — **SUCCESS**
 
-`CaptureSession` now persists `quality_analyses` and validates:
+Required gates:
 
-- one current-baseline result per immutable source frame;
-- source frame exists in the session;
-- result view matches source frame view.
-
-## Analyzer and policy
-
-Added `quality.py` with:
-
-- `CaptureQualityPolicy` (`chat1.capture-quality.v1`);
-- `CaptureQualityAnalyzer` protocol;
-- `OpenCvCaptureQualityAnalyzer`;
-- `CaptureQualityService`;
-- `CaptureQualityError`;
-- `RussianQualityGuidanceAdapter`.
-
-Signals:
-
-1. blur/focus proxy — variance of Laplacian;
-2. mean luma;
-3. dark clipping fraction;
-4. bright clipping fraction;
-5. localized glare/highlight proxy;
-6. edge density / low-scene-detail proxy;
-7. border-edge ratio / framing proxy;
-8. optional ChArUco corner visibility from existing calibration evidence.
-
-Framing deliberately does not perform object segmentation. Glare deliberately remains a conservative image proxy rather than photometric/specular truth.
-
-## Verdict behavior
-
-Every finding contains:
-
-- machine-readable reason code;
-- severity (`WARN` / `REJECT`);
-- metric name;
-- observed value;
-- threshold;
-- comparison operator.
-
-Aggregation is deterministic:
-
-```text
-any REJECT finding -> REJECT
-else any finding    -> WARN
-else                -> ACCEPT
-```
-
-Russian guidance is produced by a presentation adapter from reason codes; user-facing text is not hidden inside the decision logic.
-
-## Provenance / persistence
-
-Each result records:
-
-- deterministic `analysis_id`;
-- immutable source `frame_id`;
-- view;
-- calibration ID when used;
-- mat ID when available;
-- policy version.
-
-`CaptureQualityService` reads source bytes through `ArtifactStore`, preserves them unchanged and is idempotent for the same source/calibration/mat context. A conflicting reanalysis context is explicit rather than silently replacing provenance.
-
-## Deterministic fixture coverage
-
-New tests cover:
-
-- sharp/balanced/centered image → `ACCEPT`;
-- strong Gaussian blur → `REJECT` / `BLUR`;
-- severe underexposure → `REJECT` / `UNDEREXPOSED`;
-- severe overexposure → `REJECT` / `OVEREXPOSED`;
-- localized highlights → `WARN` / `GLARE_RISK`;
-- full-frame border activity → `WARN` / `FRAMING_BORDER_ACTIVITY`;
-- low ChArUco corner visibility → `REJECT` / `LOW_MARKER_VISIBILITY`;
-- deterministic repeated analysis;
-- service persistence and idempotency;
-- immutable original source bytes;
-- unchanged canonical CapturePackage before/after quality analysis;
-- explicit decode failure for invalid bytes.
-
-## Local tests executed
-
-Focused Pass 3 quality suite:
-
-```text
-pytest -q tests/test_quality.py
-........                                                                 [100%]
-8 passed
-```
-
-Quality + baseline capture subset:
-
-```text
-pytest -q tests/test_quality.py tests/test_project_service.py tests/test_capture_plan.py tests/test_manual_capture.py
-..................                                                       [100%]
-18 passed
-```
-
-The archive-restored local workspace lacks repository-root `core/contracts`, so three pre-existing schema-loading tests cannot complete there. This limitation is environmental to that local workspace; full branch CI below ran against the complete repository and is authoritative.
-
-## GitHub Actions evidence before handoff freeze
-
-Workflow: `MREA CI`  
-Run ID: `36619586794`  
-Run number: `107`  
-Head SHA: `13241df21ed501e6697d773e5c672be0e3c8359e`
-
-Required Pass 3 gates:
-
-- `Contracts / canonical fixtures` — **SUCCESS**;
 - `Chat 1 / Capture` — **SUCCESS**;
+- `Contracts / canonical fixtures` — **SUCCESS**;
 - `Integration / Chat 1 -> Chat 2` — **SUCCESS**.
 
-Other executable slice jobs on the same run also completed successfully. Integration gates unrelated to the Chat 1 branch were conditionally skipped as intended by CI policy.
+The Capture -> Measurement boundary gate actually executed and completed successfully. Unrelated boundary/golden jobs were skipped according to branch policy.
 
-Per Pass 3 process, this handoff is the final branch mutation. Chat 6 owns independent post-handoff/PR CI evidence and acceptance review.
+An earlier readiness commit `47d1e38724eb5f7163875eba074ed55ab56e87f6` also passed the same required gates in run `36805805798`; the later exact pre-handoff run above is authoritative.
 
-## Files changed in Pass 3
+## Files changed in Pass 13
 
-- `src/mrea_capture/models.py`;
-- `src/mrea_capture/quality.py`;
-- `src/mrea_capture/__init__.py`;
-- `tests/test_quality.py`;
-- `docs/BUILD_REUSE_CHECK_PASS3_GUIDED_QUALITY.md`;
-- `docs/IMPLEMENTATION_REPORT_PASS3_GUIDED_QUALITY_2026-09-29.md`;
-- `docs/IMPLEMENTATION_STATE.md`;
-- `README.md`;
-- `ORCHESTRATOR_HANDOFF.md` (this final freeze commit).
+- `chat_1_project_guided_capture/docs/PASS13_BASELINE_READINESS_2026-10-01.md`;
+- `chat_1_project_guided_capture/ORCHESTRATOR_HANDOFF.md` — this final freeze commit.
 
-## Known limitations
+## Branch identity note
 
-- policy thresholds are deterministic software defaults, not yet calibrated on a real phone-camera dataset;
-- Laplacian blur score depends on scene content and resolution;
-- glare detection is a proxy, not photometric/specular modeling;
-- framing is edge-based, not object segmentation;
-- no lens-distortion-aware quality normalization yet;
-- no native/mobile runtime validation yet;
-- current persisted baseline keeps one quality result per immutable source frame/context;
-- quality verdict does not automatically mutate existing `CaptureViewStatus` transitions.
+Canonical Pass-13 worker branch is only:
 
-## Open Change Requests
+`chat-1/pass-13`
 
-None.
+Two unused branch refs, `chat-1/pass-13-readiness` and `chat-1/pass-13-control`, were created from the same certified baseline during setup and contain no Pass-13 commits. They are not implementation or acceptance targets and must not be replayed.
 
-## Acceptance requested from Chat 6
+## Next action
 
-Please verify:
+A later Chat-1 product pass must begin from the then-current certified `main` under a current central/user feature task. It must not extend historical `chat-1/pass-4` or this readiness-only branch as a product baseline unless central orchestration explicitly directs otherwise.
 
-1. `OD-2026-09-29-003` Guided Capture Quality requirements are satisfied;
-2. ownership/truth boundaries remain intact;
-3. `CapturePackage v1` compatibility and Chat 1 → Chat 2 gate remain accepted;
-4. branch/PR CI remains green after the frozen handoff commit;
-5. if accepted, integrate Pass 3 and issue the next Chat 1 directive.
-
-**Branch freeze:** no further Chat 1 commits will be pushed to `chat-1/pass-3` unless Chat 6 explicitly returns `FIX_REQUIRED`.
+**Freeze:** this handoff is the final mutation of `chat-1/pass-13`. Further branch changes require an explicit new central task or `FIX_REQUIRED`.
