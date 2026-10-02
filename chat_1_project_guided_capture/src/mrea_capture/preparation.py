@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from datetime import datetime
 from enum import StrEnum
+from uuid import UUID
 
 from pydantic import Field, model_validator
 
-from .models import CaptureViewType, StrictModel
+from .models import CameraMetadata, CaptureViewType, FrameRecord, StrictModel
+from .services import CaptureSessionService
 
 
 class CapturePreparationCheckCode(StrEnum):
@@ -152,6 +155,92 @@ class CapturePreparationService:
     @classmethod
     def action_for(cls, code: CapturePreparationCheckCode) -> CapturePreparationAction:
         return cls._ACTIONS[code]
+
+
+class CapturePreparationGateError(RuntimeError):
+    """Raised before any capture mutation when required setup evidence is not ready."""
+
+    def __init__(self, result: CapturePreparationResult) -> None:
+        self.result = result
+        first = result.findings[0]
+        super().__init__(
+            f"capture preparation blocked for {result.view.value}: "
+            f"{first.code.value}/{first.status.value}"
+        )
+
+
+class PreparedCleanReferenceCapture(StrictModel):
+    """Ephemeral application result coupling preflight outcome to the captured frame."""
+
+    preparation: CapturePreparationResult
+    frame: FrameRecord
+
+
+class CapturePreparationCaptureService:
+    """Application facade that enforces preparation before clean-reference mutation."""
+
+    def __init__(
+        self,
+        capture_service: CaptureSessionService,
+        preparation_service: CapturePreparationService | None = None,
+    ) -> None:
+        self._capture_service = capture_service
+        self._preparation_service = preparation_service or CapturePreparationService()
+
+    def capture_clean_reference(
+        self,
+        session_id: UUID,
+        *,
+        observation: CapturePreparationObservation,
+        image_bytes: bytes,
+        camera: CameraMetadata,
+        captured_at: datetime | None = None,
+        media_type: str = "image/jpeg",
+        extension: str = ".jpg",
+    ) -> PreparedCleanReferenceCapture:
+        preparation = self._require_ready(observation)
+        frame = self._capture_service.capture_clean_reference(
+            session_id,
+            view=observation.view,
+            image_bytes=image_bytes,
+            camera=camera,
+            captured_at=captured_at,
+            media_type=media_type,
+            extension=extension,
+        )
+        return PreparedCleanReferenceCapture(preparation=preparation, frame=frame)
+
+    def recapture_clean_reference(
+        self,
+        session_id: UUID,
+        *,
+        observation: CapturePreparationObservation,
+        image_bytes: bytes,
+        camera: CameraMetadata,
+        captured_at: datetime | None = None,
+        media_type: str = "image/jpeg",
+        extension: str = ".jpg",
+    ) -> PreparedCleanReferenceCapture:
+        preparation = self._require_ready(observation)
+        frame = self._capture_service.recapture_clean_reference(
+            session_id,
+            view=observation.view,
+            image_bytes=image_bytes,
+            camera=camera,
+            captured_at=captured_at,
+            media_type=media_type,
+            extension=extension,
+        )
+        return PreparedCleanReferenceCapture(preparation=preparation, frame=frame)
+
+    def _require_ready(
+        self,
+        observation: CapturePreparationObservation,
+    ) -> CapturePreparationResult:
+        result = self._preparation_service.evaluate(observation)
+        if not result.ready:
+            raise CapturePreparationGateError(result)
+        return result
 
 
 class RussianCapturePreparationGuidanceAdapter:

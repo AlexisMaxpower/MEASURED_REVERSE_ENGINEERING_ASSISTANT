@@ -16,6 +16,7 @@ from .read_only import (
     LifecycleReadOnlyStaleError,
     SQLiteLifecycleReadOnlySession,
 )
+from .revision_explanation import explain_revision_changes
 
 
 LIFECYCLE_HTTP_API_SCHEMA_VERSION = "mrea.lifecycle-http.v1"
@@ -296,6 +297,27 @@ class ReadOnlyLifecycleHttpAPI:
                     lambda session: self._success(
                         session,
                         session.knowledge.compare_revision_details(
+                            left_revision_id,
+                            right_revision_id,
+                        ),
+                    )
+                )
+            if path == "/v1/knowledge/revision-change-explanation":
+                _validate_query_keys(
+                    query,
+                    allowed={"left_revision_id", "right_revision_id"},
+                )
+                left_revision_id = _single_query_value(
+                    query, "left_revision_id", required=True
+                )
+                right_revision_id = _single_query_value(
+                    query, "right_revision_id", required=True
+                )
+                return self._with_session(
+                    lambda session: self._success(
+                        session,
+                        explain_revision_changes(
+                            session.knowledge,
                             left_revision_id,
                             right_revision_id,
                         ),

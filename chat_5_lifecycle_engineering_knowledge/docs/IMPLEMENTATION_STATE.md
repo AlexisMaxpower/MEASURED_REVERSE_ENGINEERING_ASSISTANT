@@ -3,98 +3,98 @@
 ## Snapshot
 
 - Date: **2026-10-02**
-- Branch: `chat-5/pass-16`
+- Branch: `chat-5/pass-17`
 - Slice: **Lifecycle & Engineering Knowledge**
-- Authorization: **direct user instruction — Pass 16**
-- Shared central state at worker start: `main` @ `99d8c6d9322f3669a43226e4fd2675fe683ab9f6`
-- Required cumulative Chat-5 dependency: frozen `chat-5/pass-15` @ `70ac1fa5331df47525e42ad4f2d848abddb268fe`
-- Tested implementation SHA: `cce9819eba0117bc1401c28e765b6ce2444efed7`
-- MREA CI: `36933325252` — **SUCCESS**
-- Chat 5 / Lifecycle: **85 passed in 5.85s**
+- Authorization: **direct user instruction — Pass 17**
+- Orchestration directive: `OD-2026-10-02-009`
+- Shared baseline at worker start: `main` @ `933d925c69944d40859ae1f9ff80d7a3ecb7f760`
+- Tested implementation SHA: `803cfb3284e438d072e5fa10664f3a689f3582be`
+- MREA CI: `36940876273` — **SUCCESS**
+- Chat 5 / Lifecycle: **88 passed in 3.42s**
 - Contracts / canonical fixtures: **SUCCESS**
 - Chat 4 / Generic CAD gate: **SUCCESS**
 - Integration / Chat 4 -> Chat 5: **SUCCESS**
-- State: **Pass 16 implementation verified; final handoff/freeze pending**
+- State: **Pass 17 implementation verified; final handoff/freeze pending**
 
 ## Baseline discipline
 
-Shared `main` still contains the Round-14 closure state and did not yet contain frozen Chat-5 Pass 15 when Pass 16 was authorized. Pass 16 therefore branches from the frozen Pass-15 head so the required structured revision-comparison dependency is preserved instead of being silently discarded.
+Round 16 was already closed and integrated when Pass 17 started. The worker branch was created directly from the then-current shared `main` @ `933d925c69944d40859ae1f9ff80d7a3ecb7f760`, as required by `OD-2026-10-02-009`.
 
-No files outside `chat_5_lifecycle_engineering_knowledge/` are changed by Pass 16.
+No historical Pass-15/16 worker or integration branch was used as the implementation base.
+
+No files outside `chat_5_lifecycle_engineering_knowledge/` are changed by Pass 17.
 
 ## Gap closed
 
-Pass 15 exposes durable structured factual comparison. Pass 16 adds the first explicit revision-explanation layer: a deterministic evidence-backed explanation of exactly which committed facts differ between two revisions and which stored records/artifacts support each side.
+Pass 16 added deterministic source-backed revision-change explanation as an internal Python knowledge surface. Pass 17 exposes that exact factual explanation through the existing local/internal GET-only HTTP adapter so transport consumers do not need to reconstruct explanation semantics from lower-level comparison payloads.
 
 ## Delivered surface
 
-`mrea_lifecycle.revision_explanation` provides:
+Added route:
 
-- `RevisionChangeSource`;
-- `RevisionChangeFact`;
-- `RevisionChangeExplanation`;
-- `build_revision_change_explanation(...)`;
-- `explain_revision_changes(...)`.
+```text
+GET /v1/knowledge/revision-change-explanation
+  ?left_revision_id=<id>
+  &right_revision_id=<id>
+```
 
-The package root exports these public symbols.
+The handler:
 
-The explanation reuses one snapshot-guarded `compare_revision_details(...)` result. It does not perform an independent second read that could mix generations.
+1. validates the exact two required query parameters;
+2. opens the existing guarded `SQLiteLifecycleReadOnlySession`;
+3. calls `explain_revision_changes(session.knowledge, ...)`;
+4. serializes the existing `RevisionChangeExplanation` through the existing deterministic JSON serializer;
+5. returns the standard `mrea.lifecycle-http.v1` envelope with the accepted snapshot version.
 
-## Supported factual deltas
+No duplicate comparison/explanation model or secondary read path is introduced.
 
-Stable ordered differences may cover:
+## Factual evidence preserved over HTTP
 
-- revision metadata/provenance;
-- persisted CAD verification/runtime truth;
-- materials;
-- manufacturing methods;
-- manufacturing records;
-- tests plus exact test artifact IDs;
-- failures plus exact evidence artifact IDs;
-- deterministic lifecycle state.
+Serialized explanation facts retain only already committed Chat-5 evidence:
 
-For manufacturing/tests/failures, evidence includes exact persisted record IDs. Test and failure categories also preserve exact stored artifact IDs.
+- revision IDs;
+- manufacturing/test/failure record IDs where applicable;
+- exact stored test artifact IDs;
+- exact stored failure evidence artifact IDs;
+- deterministic lifecycle states;
+- ordered factual changed categories and fields.
 
-## Integrity boundary
+The route does not add ranking, recommendation, score, causal inference, geometry inference or semantic/AI interpretation.
 
-The explanation verifies that its emitted category sequence exactly matches the durable comparison's `changed_categories`. Divergence raises `LifecycleKnowledgeIntegrityError` rather than returning a partial or contradictory explanation.
+## Fail-closed behavior
 
-Existing missing-revision and cross-part validation remains fail closed.
+Existing HTTP boundaries remain authoritative:
 
-## Non-inference boundary
+- missing or blank revision IDs -> `400 invalid_request`;
+- missing revisions -> `400 invalid_request`;
+- cross-part revision pair -> `400 invalid_request`;
+- duplicate/unexpected parameters -> `400 invalid_request`;
+- non-GET methods -> `405 method_not_allowed`;
+- stale read model -> `409 read_model_stale`;
+- unavailable read model -> `503 read_model_unavailable`.
 
-Pass 16 does not:
-
-- rank or score revisions;
-- recommend a preferred revision;
-- infer causality between a revision change and a test/failure;
-- promote estimated causes into confirmed causes;
-- synthesize or infer geometry;
-- add semantic search, embeddings or an LLM.
-
-It is a structured factual evidence layer for later knowledge/AI work.
+The Pass-16 category-integrity guard remains inside the explanation builder and prevents contradictory explanation output.
 
 ## Compatibility
 
 Unchanged:
 
 - `core/contracts/**` and canonical fixtures;
-- SQLite relational and snapshot schemas;
-- cursor formats;
-- HTTP schema/routes;
+- SQLite relational schema and authoritative snapshot schema;
+- cursor formats and cursor authentication;
+- manufacturing-eligibility rules;
+- lifecycle transition semantics;
 - Chat 1–4 code;
-- workflows;
-- manufacturing-eligibility policy;
-- snapshot-drift fail-closed semantics.
+- workflow definitions;
+- existing HTTP routes and response payloads;
+- `LIFECYCLE_HTTP_API_SCHEMA_VERSION = mrea.lifecycle-http.v1`.
 
-## Pass 16 delta
+## Pass 17 delta before freeze
 
-Before final handoff, Pass 16 changed only:
-
-- `docs/PASS_16_REVISION_CHANGE_EXPLANATION.md`;
+- `README.md`;
+- `docs/PASS_17_REVISION_CHANGE_EXPLANATION_HTTP.md`;
 - `docs/IMPLEMENTATION_STATE.md`;
-- `src/mrea_lifecycle/__init__.py`;
-- `src/mrea_lifecycle/revision_explanation.py`;
-- `tests/test_revision_change_explanation.py`.
+- `src/mrea_lifecycle/http_api.py`;
+- `tests/test_revision_change_explanation_http.py`.
 
-`ORCHESTRATOR_HANDOFF.md` is the final worker mutation. After that commit, the branch is frozen and exact-head CI must be verified without further worker changes.
+`ORCHESTRATOR_HANDOFF.md` is the final worker mutation. After that commit the branch is frozen and exact-head CI is verified without another worker change.
