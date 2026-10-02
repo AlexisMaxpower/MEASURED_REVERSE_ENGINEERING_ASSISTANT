@@ -26,6 +26,7 @@ from .vendor import (
 
 SOLIDWORKS_AGENT_PROTOCOL = "mrea.solidworks-agent.v1"
 SOLIDWORKS_ADAPTER_NAME = "SOLIDWORKS_2026"
+_SOLIDWORKS_2026_REVISION_MAJOR = 34
 _WORKER_CAPABILITY_PROJECTION = build_solidworks_worker_capability_projection_v1()
 _SUPPORTED_ENTITY_TYPES = frozenset(
     _WORKER_CAPABILITY_PROJECTION["geometry_entities"]["supported"]
@@ -52,6 +53,48 @@ class SolidWorksAgentConfig:
 class SolidWorksAgentRunner(Protocol):
     def run(self, request: Mapping[str, Any]) -> Mapping[str, Any]:
         ...
+
+
+def _validate_subprocess_success_claims(response: Mapping[str, Any]) -> None:
+    """Fail closed when an OK subprocess response contradicts the worker's process truth."""
+
+    if response.get("status") != "OK":
+        return
+
+    if response.get("real_host_executed") is not True:
+        raise CadAdapterError(
+            "SOLIDWORKS CAD Agent successful subprocess response must confirm "
+            "real_host_executed=true"
+        )
+
+    exit_code = response.get("exit_code")
+    if type(exit_code) is not int or exit_code != 0:
+        raise CadAdapterError(
+            "SOLIDWORKS CAD Agent successful subprocess response must report integer "
+            f"exit_code=0; got {exit_code!r}"
+        )
+
+    version = response.get("solidworks_version")
+    if not isinstance(version, str) or not version.strip():
+        raise CadAdapterError(
+            "SOLIDWORKS CAD Agent successful subprocess response must report a non-empty "
+            "solidworks_version"
+        )
+
+    major_text = version.strip().split(".", 1)[0]
+    try:
+        revision_major = int(major_text)
+    except ValueError as exc:
+        raise CadAdapterError(
+            "SOLIDWORKS CAD Agent successful subprocess response returned an invalid "
+            f"solidworks_version: {version!r}"
+        ) from exc
+
+    if revision_major != _SOLIDWORKS_2026_REVISION_MAJOR:
+        raise CadAdapterError(
+            "SOLIDWORKS CAD Agent successful subprocess response version mismatch: "
+            f"expected revision major {_SOLIDWORKS_2026_REVISION_MAJOR}, got {version!r}"
+        )
 
 
 class SubprocessSolidWorksAgentRunner:
@@ -109,11 +152,18 @@ class SubprocessSolidWorksAgentRunner:
             except (OSError, json.JSONDecodeError) as exc:
                 raise CadAdapterError("SOLIDWORKS CAD Agent returned invalid JSON") from exc
 
+            if not isinstance(response, Mapping):
+                raise CadAdapterError(
+                    "SOLIDWORKS CAD Agent response JSON must be an object"
+                )
+
             if completed.returncode != 0 and response.get("status") == "OK":
                 raise CadAdapterError(
                     "SOLIDWORKS CAD Agent exited non-zero while claiming OK: "
                     f"{completed.returncode}"
                 )
+
+            _validate_subprocess_success_claims(response)
             return response
 
 
