@@ -29,14 +29,17 @@ from .field_status import (
     build_physical_field_status,
     get_physical_field_status,
 )
+from .field_status_http import (
+    PHYSICAL_FIELD_STATUS_ROUTE,
+    PhysicalFieldStatusLifecycleHttpAPI,
+    build_read_only_lifecycle_http_app,
+)
 from .http_api import (
     LIFECYCLE_HTTP_API_SCHEMA_VERSION,
     LifecycleHttpMethodNotAllowedError,
     LifecycleHttpNotFoundError,
     LifecycleHttpRequestError,
     LifecycleHttpResponse,
-    ReadOnlyLifecycleHttpAPI,
-    build_read_only_lifecycle_http_app,
 )
 from .http_cursor import (
     HTTP_CURSOR_FORMAT_VERSION,
@@ -137,6 +140,8 @@ from .sqlite_schema import SQLITE_RELATIONAL_SCHEMA_VERSION, SQLiteSchemaMigrati
 from .store import InMemoryLifecycleStore, LifecycleInvariantError
 from .unit_of_work import LifecycleUnitOfWork
 
+ReadOnlyLifecycleHttpAPI = PhysicalFieldStatusLifecycleHttpAPI
+
 __all__ = [
     "CANONICAL_LIFECYCLE_EVENT_SCHEMA_VERSION",
     "CANONICAL_LIFECYCLE_EVENT_TYPES",
@@ -198,9 +203,11 @@ __all__ = [
     "MIN_HTTP_CURSOR_KEY_BYTES",
     "ManufacturingRecord",
     "ManufacturingService",
+    "PHYSICAL_FIELD_STATUS_ROUTE",
     "PhysicalEquipmentRegistry",
     "PhysicalEventQueryResult",
     "PhysicalFieldStatus",
+    "PhysicalFieldStatusLifecycleHttpAPI",
     "PhysicalLifecycleEvent",
     "PhysicalLifecycleEventType",
     "PhysicalPartInstance",
