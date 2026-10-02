@@ -1,11 +1,11 @@
 # Chat 5 — Lifecycle & Engineering Knowledge
 
-Статус: **Pass 17 revision-change explanation HTTP implemented**  
+Статус: **Pass 18 durable physical field-status projection implemented**  
 Проект: **MREA — Measured Reverse Engineering Assistant**  
 Источник истины: **repository/GitHub + MREA SSOT**  
-Авторизация Pass 17: **direct user instruction**  
-Рабочая ветка: `chat-5/pass-17`  
-Центральный baseline Pass 17: `main` @ `933d925c69944d40859ae1f9ff80d7a3ecb7f760`
+Авторизация Pass 18: **direct user instruction**  
+Рабочая ветка: `chat-5/pass-18`  
+Центральный baseline Pass 18: `main` @ `af4bf4ce9e3c5da0f8e6ecdc185425b5985e4223`
 
 ## Назначение области
 
@@ -17,6 +17,7 @@ Revision
 → PhysicalPartInstance
 → Installed / Tested / Active
 → Failed / Removed / Superseded
+→ deterministic current field status
 → deterministic engineering knowledge queries
 → snapshot-bound keyset pagination
 → materialized analytical read model
@@ -28,9 +29,9 @@ Revision
 
 ## Актуальная orchestration truth
 
-Round 16 закрыт и интегрирован. Pass 17 начинается непосредственно от актуального closure baseline `main` @ `933d925c...`; исторические worker/integration branches не используются как implementation baseline.
+Round 17 закрыт и интегрирован. Pass 18 начинается непосредственно от актуального closure baseline `main` @ `af4bf4ce...`; исторические worker/integration branches не используются как implementation baseline.
 
-Все изменения Pass 17 находятся внутри `chat_5_lifecycle_engineering_knowledge/`. Shared contracts, canonical fixtures, Chat 1–4, workflows и SQLite schema не меняются.
+Все изменения Pass 18 находятся внутри `chat_5_lifecycle_engineering_knowledge/`. Shared contracts, canonical fixtures, Chat 1–4, workflows и SQLite schema не меняются.
 
 ## Реализовано
 
@@ -41,7 +42,8 @@ Round 16 закрыт и интегрирован. Pass 17 начинается 
 - exact test/failure/evidence linkage;
 - authoritative SQLite snapshot + normalized relational read model;
 - backup/restore;
-- snapshot-drift guarded read-only sessions.
+- snapshot-drift guarded read-only sessions;
+- deterministic current field-status projection for one physical instance.
 
 ### CAD → lifecycle truth
 
@@ -68,41 +70,39 @@ Round 16 закрыт и интегрирован. Pass 17 начинается 
 
 `SQLiteLifecycleReadOnlySession.knowledge.compare_revision_details(left_revision_id, right_revision_id)` exposes committed metadata, CAD truth fields, manufacturing records, tests, failures, exact artifact/evidence IDs and deterministic lifecycle state for both revisions.
 
-The result has deterministic `changed_categories` and intentionally omits ranking, recommendation, causal inference and fabricated geometry.
-
 ### Pass 16 — source-backed revision-change explanation
 
-`explain_revision_changes(...)` converts one guarded structured comparison into ordered factual deltas. Every delta preserves exact source revision IDs and, where applicable, exact manufacturing/test/failure record IDs and exact stored artifact/evidence IDs.
-
-The explanation verifies that emitted category order exactly matches the underlying durable comparison. It does not perform a second independent read, rank revisions or infer why a result occurred.
+`explain_revision_changes(...)` converts one guarded structured comparison into ordered factual deltas with exact source records/artifacts and without ranking, recommendation or causal inference.
 
 ### Pass 17 — HTTP transport completion
 
-Added additive GET endpoint:
+`GET /v1/knowledge/revision-change-explanation` exposes the same Pass-16 explanation through the guarded read-only HTTP adapter without duplicating comparison semantics.
 
-```text
-/v1/knowledge/revision-change-explanation
-  ?left_revision_id=<id>
-  &right_revision_id=<id>
-```
+## Pass 18 — durable physical field status
 
-The route delegates directly to the Pass-16 explanation inside the existing guarded read-only session and existing deterministic JSON serializer.
+`get_physical_field_status(session.queries, instance_id)` builds one current physical state from the already persisted physical timeline.
 
-Fail-closed request behavior is preserved:
+The result preserves:
 
-- missing/blank parameters -> `400 invalid_request`;
-- cross-part or missing revisions -> `400 invalid_request`;
-- unexpected parameters -> `400 invalid_request`;
-- non-GET methods -> `405 method_not_allowed`;
-- stale/unavailable read model -> existing `409/503` boundaries.
+- exact physical instance, revision and manufacturing identity;
+- current `PhysicalPartState`;
+- exact timestamp and event ID/sequence that established that state;
+- latest persisted installation/test/failure linkage;
+- latest persisted equipment/position context;
+- exact replacement/notes/test-outcome fields when they belong to the latest event.
 
-`LIFECYCLE_HTTP_API_SCHEMA_VERSION` remains `mrea.lifecycle-http.v1`; existing routes and payloads are unchanged.
+Before emitting a status, the projection verifies stable instance/revision/manufacturing identity, strictly increasing sequence, non-decreasing time and supported event vocabulary. Contradictory durable data fails closed with `LifecycleKnowledgeIntegrityError`.
+
+Location fields are latest-event evidence, not an independent occupancy claim. Existing `equipment_occupancy(...)` remains the current equipment mapping authority.
+
+Pass 18 is deliberately Python/read-model only. HTTP exposure is deferred until the factual field-status projection has been independently integrated, following the same projection-first/transport-second pattern used by Pass 16–17.
 
 ## Documentation
 
 - `docs/PASS_15_STRUCTURED_REVISION_COMPARISON.md`
 - `docs/PASS_16_REVISION_CHANGE_EXPLANATION.md`
 - `docs/PASS_17_REVISION_CHANGE_EXPLANATION_HTTP.md`
+- `docs/PASS_18_PHYSICAL_FIELD_STATUS.md`
 - `docs/IMPLEMENTATION_STATE.md`
 - historical Pass 3–14 docs remain authoritative for their slices.
 
