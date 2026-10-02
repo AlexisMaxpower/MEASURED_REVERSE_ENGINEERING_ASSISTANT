@@ -101,6 +101,11 @@ from .preparation import (
     PreparedCleanReferenceCapture,
     RussianCapturePreparationGuidanceAdapter,
 )
+from .prepared_guidance import (
+    PreparationAwareGuidedAction,
+    PreparationAwareGuidedCaptureReadiness,
+    PreparationAwareGuidedCaptureReadinessService,
+)
 
 __all__ = [
     "ArtifactNotFoundError",
@@ -165,6 +170,9 @@ __all__ = [
     "OpenCvPerspectiveNormalizer",
     "PartContext",
     "PerspectiveNormalizer",
+    "PreparationAwareGuidedAction",
+    "PreparationAwareGuidedCaptureReadiness",
+    "PreparationAwareGuidedCaptureReadinessService",
     "PreparedCleanReferenceCapture",
     "Project",
     "ProjectNotFoundError",

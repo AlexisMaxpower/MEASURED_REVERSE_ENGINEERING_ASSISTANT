@@ -1,109 +1,109 @@
 # Chat 2 — Physical Measurement
 
-Эта директория является изолированной рабочей областью Chat 2 проекта MREA.
+Эта директория — рабочая область Chat 2 проекта MREA.
 
 ## Ownership
 
-Chat 2 отвечает за вертикальный слайс `Physical Measurement`: MeasurementSession, measurement types, annotation UX, feature anchor selection, snapping, OCR pipeline, voice value, user confirmation, caliper detection research, jaw/contact estimation, evidence, provenance и формирование `MeasurementPackage`.
+Chat 2 отвечает за vertical slice `Physical Measurement`:
+
+- `MeasurementSession`;
+- measurement types;
+- annotation UX;
+- feature anchor selection and snapping;
+- OCR pipeline;
+- voice value;
+- user confirmation;
+- caliper detection research;
+- jaw/contact estimation;
+- evidence and provenance;
+- `MeasurementPackage` construction.
 
 Chat 2 не владеет shared contracts и не изменяет их без Change Request для Integrator.
 
-## Координация
+## Coordination authority
 
-Перед каждой следующей итерацией Chat 2 читает:
+Перед новым проходом Chat 2 читает:
 
-1. актуальный `main`;
+1. актуальный shared `main`;
 2. `ORCHESTRATOR_DIRECTIVE.md`;
-3. `core/contracts/mrea_contracts_v1.schema.json`;
-4. `core/contracts/POLICIES_V1.md`;
-5. canonical fixtures в `tests/fixtures/contracts/`;
-6. актуальный Chat 6 pass plan / workflow.
+3. `chat_6_orchestrator/ORCHESTRATION_STATE.md`;
+4. `core/contracts/mrea_contracts_v1.schema.json`;
+5. `core/contracts/POLICIES_V1.md`;
+6. canonical fixtures и repository-owned CI.
 
-При конфликте локальной документации с canonical contract или активной директивой Chat 6 приоритет имеет canonical/Chat 6 source of truth.
+При конфликте локальной документации с canonical contract / orchestration state приоритет имеет общий repository source of truth.
 
-## Структура
+Текущая worker directive на старте Pass 18: `OD-2026-10-02-010`.
+
+## Main implementation surfaces
 
 - `src/physical_measurement/models.py` — internal measurement domain;
 - `src/physical_measurement/service.py` — MeasurementSession application service;
-- `src/physical_measurement/hands_free.py` — provider-independent command parser + hands-free state machine;
-- `src/physical_measurement/boundary.py` — internal measurement → canonical shared-contract adapter;
-- `tests/test_phase_a.py` — manual baseline tests;
-- `tests/test_contract_boundary.py` — canonical boundary tests;
-- `tests/test_pass2_raw_output.py` — deterministic real raw IMAGE_PX output tests;
-- `tests/test_pass3_hands_free.py` — hands-free parser/state-transition tests;
-- `docs/BUILD_REUSE_CHECK_PASS_3.md` — Pass 3 dependency decision;
-- `docs/IMPLEMENTATION_REPORT_PASS_3.md` — Pass 3 implementation report;
-- `ORCHESTRATOR_HANDOFF.md` — final source-of-truth handoff for Chat 6 review.
+- `src/physical_measurement/repository.py` — in-memory + durable SQLite session persistence and pagination;
+- `src/physical_measurement/hands_free.py` — provider-independent voice/candidate state machine;
+- `src/physical_measurement/recovery.py` — fail-closed durable hands-free restart recovery;
+- `src/physical_measurement/anchor_selection.py` — provider-independent manual-pick / snap proposal / explicit-accept workflow;
+- `src/physical_measurement/type_registry.py` — measurement-type semantics;
+- `src/physical_measurement/boundary.py` — internal measurement → canonical `MeasurementPackage` adapter.
 
-## Текущее состояние
+## Accepted baseline through Round 17
 
-### Phase A manual baseline — accepted
+The accepted `main` before Pass 18 already contains:
 
-```text
-MeasurementSession
-→ manual anchor A/B
-→ measurement type
-→ manual numeric value
-→ MANUAL_MEASURED candidate
-→ explicit user confirmation
-→ USER_CONFIRMED verified measurement
-```
+- Phase-A manual measurement baseline;
+- raw `IMAGE_PX` canonical measurement output;
+- complete measurement type registry / anchor cardinality checks;
+- unit-neutral uncertainty handling;
+- provider-independent voice/OCR/device candidate state machine;
+- explicit confirm / reject / correct behavior;
+- deterministic Russian spoken measurement parsing and unit checks;
+- durable SQLite measurement sessions;
+- deterministic enumeration and keyset pagination;
+- durable hands-free restart recovery for exact-context unverified candidates.
 
-Manual candidate не становится verified автоматически.
+## Pass 18 — Phase-B anchor snapping
 
-### Canonical raw measurement boundary — accepted
-
-Chat 2 сохраняет реальные image-space anchors как `IMAGE_PX`. `IMAGE_PX → MAT_XY_MM` normalization принадлежит Chat 3 и использует CapturePackage calibration.
-
-Canonical adapter сохраняет:
-
-- measurement type/value/unit;
-- provenance;
-- `view_id`;
-- reference frame через anchors;
-- evidence frame;
-- uncertainty/instrument;
-- explicit `verified` + `confirmation_source`.
-
-### Pass 3 hands-free domain baseline — implementation
-
-Активная директива: `OD-2026-09-29-003`.
-
-Добавлен provider-independent workflow:
+Pass 18 adds the first provider-independent snapping policy.
 
 ```text
-speech-provider text / OCR value / device value
-→ deterministic parser or direct candidate API
-→ unverified candidate
-→ explicit confirm / reject / correct
-→ verified measurement only after USER_CONFIRMED
+manual IMAGE_PX pick
++ VISION_DETECTED target candidates
+→ same-view/reference filtering
+→ radius filtering
+→ unique nearest proposal OR fail closed
+→ explicit user accept OR keep raw
+→ FeatureAnchor placement
 ```
 
-Поддерживаемый narrow command grammar включает:
+Important truth boundary:
 
-- `замер`;
-- `замер 42,18` / `замер 42.18`;
-- confirm;
-- reject;
-- correct.
+- a detector output is only a proposal;
+- equal-distance alternatives are not silently tie-broken;
+- accepted snap keeps `VISION_DETECTED` source and records `USER_CONFIRMED` separately;
+- keep-raw remains `MANUAL_MEASURED`;
+- measurement verification semantics are unchanged;
+- shared contracts are unchanged.
 
-Неоднозначные числа и illegal state transitions fail-closed. Speech/OCR provider SDK в domain layer отсутствует.
-
-Manual entry остаётся fallback и может заменить pending reported candidate, но также требует explicit confirmation.
+The current `FeatureAnchor` persistence model does not yet contain durable snap-selection provenance. `FeatureAnchorSelection` therefore carries that metadata in the application layer until a dedicated durable-anchor metadata migration is approved.
 
 ## Truth / provenance invariants
 
-1. Voice/OCR/device output — candidate, не verified fact.
-2. Verification требует отдельного explicit user confirmation transition.
-3. Rejected candidate удаляется из active MeasurementSession.
-4. Correction создаёт новый measurement candidate ID и не наследует verified state.
-5. `VISION_DETECTED`, `AI_INFERRED` и derived provenance не принимаются как direct physical-measurement candidates.
-6. Evidence/reference/view linkage сохраняется.
-7. Raw image anchors остаются `IMAGE_PX`.
+1. Voice/OCR/device output is a candidate, not a verified fact.
+2. Physical measurement verification requires explicit user confirmation.
+3. Rejected candidates do not remain active measurement truth.
+4. Correction creates a new candidate ID and never inherits verified state.
+5. `VISION_DETECTED`, `AI_INFERRED` and derived provenance are not accepted as direct physical-measurement values.
+6. Snapping may advise anchor placement but may not silently create an accepted anchor.
+7. Evidence/reference/view linkage is preserved.
+8. Raw measurement anchors remain `IMAGE_PX`; `IMAGE_PX -> MAT_XY_MM` belongs downstream.
+9. Durable session decoding/enumeration/recovery remains fail-closed.
 
-## Следующий рабочий порядок
+## Worker delivery rule
 
-1. Работать только по активной Chat 6 directive и своей pass branch.
-2. Не менять shared contracts/CI без approved Change Request.
-3. Перед handoff выполнить локальные tests и получить доступный GitHub CI evidence.
-4. `ORCHESTRATOR_HANDOFF.md` — последний commit прохода; после handoff branch freeze до `FIX_REQUIRED`.
+- start from current shared `main`;
+- use a new pass branch;
+- stay inside Chat-2 ownership;
+- run Chat-2 plus adjacent contract/boundary gates;
+- publish exact implementation SHA / CI evidence;
+- record `ORCHESTRATOR_HANDOFF.md` last;
+- do not merge directly to `main`.

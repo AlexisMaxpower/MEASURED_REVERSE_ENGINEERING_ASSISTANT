@@ -1,5 +1,14 @@
 """Chat 2 Physical Measurement internal domain package."""
 
+from .anchor_selection import (
+    AmbiguousAnchorSnap,
+    AnchorSelectionError,
+    AnchorSnapProposal,
+    AnchorSnapTarget,
+    FeatureAnchorSelection,
+    FeatureAnchorSelector,
+    ManualAnchorPick,
+)
 from .boundary import CanonicalMeasurementAdapter
 from .hands_free import (
     AmbiguousMeasurementCommand,
@@ -32,10 +41,16 @@ from .service import MeasurementSessionService
 from .type_registry import MeasurementTypeRegistry, MeasurementTypeSemantics
 
 __all__ = [
+    "AmbiguousAnchorSnap",
     "AmbiguousMeasurementCommand",
     "AmbiguousPendingMeasurementRecovery",
+    "AnchorSelectionError",
+    "AnchorSnapProposal",
+    "AnchorSnapTarget",
     "CanonicalMeasurementAdapter",
     "FeatureAnchor",
+    "FeatureAnchorSelection",
+    "FeatureAnchorSelector",
     "HandsFreeMeasurementController",
     "HandsFreeMeasurementState",
     "HandsFreePhase",
@@ -43,6 +58,7 @@ __all__ = [
     "HandsFreeTransition",
     "InMemoryMeasurementSessionRepository",
     "InvalidMeasurementTransition",
+    "ManualAnchorPick",
     "MeasurementCandidateContext",
     "MeasurementCommandError",
     "MeasurementCommandIntent",

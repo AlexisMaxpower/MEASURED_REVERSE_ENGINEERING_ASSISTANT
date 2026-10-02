@@ -23,6 +23,12 @@ from .engineering_knowledge import (
     RevisionOutcomeSummary,
     SQLiteEngineeringKnowledgeRepository,
 )
+from .field_status import (
+    PhysicalFieldStatus,
+    PhysicalTimelineQuery,
+    build_physical_field_status,
+    get_physical_field_status,
+)
 from .http_api import (
     LIFECYCLE_HTTP_API_SCHEMA_VERSION,
     LifecycleHttpMethodNotAllowedError,
@@ -194,6 +200,7 @@ __all__ = [
     "ManufacturingService",
     "PhysicalEquipmentRegistry",
     "PhysicalEventQueryResult",
+    "PhysicalFieldStatus",
     "PhysicalLifecycleEvent",
     "PhysicalLifecycleEventType",
     "PhysicalPartInstance",
@@ -202,6 +209,7 @@ __all__ = [
     "PhysicalPartStateProjection",
     "PhysicalPartTimeline",
     "PhysicalTestOutcome",
+    "PhysicalTimelineQuery",
     "ReadOnlyLifecycleHttpAPI",
     "ReplacementChainEntry",
     "Revision",
@@ -232,8 +240,10 @@ __all__ = [
     "SQLiteSchemaMigration",
     "TestRecord",
     "TestService",
+    "build_physical_field_status",
     "build_read_only_lifecycle_http_app",
     "build_revision_change_explanation",
     "explain_revision_changes",
+    "get_physical_field_status",
     "inspect_lifecycle_database",
 ]

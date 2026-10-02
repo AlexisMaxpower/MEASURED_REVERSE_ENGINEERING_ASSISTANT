@@ -87,7 +87,7 @@ namespace Mrea.SolidWorksCadAgent
             {
                 dynamic dimension = dimensions[spec.dimension_id];
                 var raw = dimension.GetSystemValue3((int)swInConfigurationOpts_e.swThisConfiguration, null);
-                var systemValue = FirstDouble(raw);
+                var systemValue = RequireFiniteSystemValue(raw, spec.dimension_id);
                 readBack.Add(new ReadBackDimensionDto
                 {
                     dimension_id = spec.dimension_id,
@@ -625,13 +625,35 @@ namespace Mrea.SolidWorksCadAgent
 
         private static double MmToM(double value) { return value / 1000.0; }
 
-        private static double FirstDouble(object raw)
+        private static double RequireFiniteSystemValue(object raw, string dimensionId)
         {
-            if (raw is double) return (double)raw;
-            var array = raw as Array;
-            if (array != null && array.Length > 0)
-                return Convert.ToDouble(array.GetValue(0), CultureInfo.InvariantCulture);
-            return Convert.ToDouble(raw, CultureInfo.InvariantCulture);
+            if (raw == null)
+                throw new InvalidOperationException(
+                    "SOLIDWORKS returned no system value for dimension " + dimensionId);
+
+            double value;
+            if (raw is double)
+            {
+                value = (double)raw;
+            }
+            else
+            {
+                var array = raw as Array;
+                if (array == null || array.Length != 1)
+                    throw new InvalidOperationException(
+                        "SOLIDWORKS returned an unexpected system-value payload for dimension " + dimensionId);
+
+                var first = array.GetValue(0);
+                if (!(first is double))
+                    throw new InvalidOperationException(
+                        "SOLIDWORKS returned a non-numeric system value for dimension " + dimensionId);
+                value = (double)first;
+            }
+
+            if (double.IsNaN(value) || double.IsInfinity(value))
+                throw new InvalidOperationException(
+                    "SOLIDWORKS returned a non-finite system value for dimension " + dimensionId);
+            return value;
         }
 
         private static string Sha256(string path)
