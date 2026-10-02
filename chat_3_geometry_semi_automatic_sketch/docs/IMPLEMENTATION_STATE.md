@@ -2,26 +2,26 @@
 
 **Date:** 2026-10-02  
 **Repository:** `AlexisMaxpower/MEASURED_REVERSE_ENGINEERING_ASSISTANT`  
-**Active branch:** `chat-3/pass-18`  
+**Active branch:** `chat-3/pass-19`  
 **Role:** Chat 3 — Geometry & Semi-Automatic Sketch  
-**Pass:** 18  
-**Direct base:** shared `main` @ `af4bf4ce9e3c5da0f8e6ecdc185425b5985e4223`  
-**Directive:** `OD-2026-10-02-010`
+**Pass:** 19  
+**Direct base:** shared `main` @ `701209f8a92c6e4ee6c89ea1a4a5ed4aa6e40f26`  
+**Directive:** `OD-2026-10-02-011`
 
-## Coordination state at Pass-18 start
+## Coordination state at Pass-19 start
 
 Central orchestration reported:
 
 ```text
-ROUND_17_CLOSED = TRUE
+ROUND_18_CLOSED = TRUE
 OPEN_SOFTWARE_BLOCKERS = NONE
 MERGE_TO_MAIN_COMPLETED = TRUE
 NEXT_FULL_WORKER_PASS = READY
 ```
 
-Pass 18 was created directly from that accepted shared `main`; historical worker or integration branches were not used as implementation baselines.
+Pass 19 was created directly from that accepted shared `main`; historical Pass-18 worker or integration branches were not used as implementation baselines.
 
-## Integrated Chat-3 capabilities entering Pass 18
+## Integrated Chat-3 capabilities entering Pass 19
 
 - canonical CapturePackage / MeasurementPackage normalization;
 - IMAGE_PX -> MAT_XY_MM calibration normalization;
@@ -38,37 +38,48 @@ Pass 18 was created directly from that accepted shared `main`; historical worker
 - deterministic SVG Dimensioned View;
 - global read-only constraint-system redundancy/conflict diagnosis;
 - local read-only constraint-freedom / DOF diagnosis;
-- verified ANGLE local-DOF semantics with explicit shared-vertex witness.
+- verified ANGLE local-DOF semantics with explicit shared-vertex witness;
+- explicit trimmed-Arc contact/topology witnesses for COINCIDENT and interior TANGENT relations.
 
-## Pass 18 — Explicit Arc Contact Topology Witnesses
+## Pass 19 — Coupled Endpoint Tangency
 
-Pass 18 prevents exact local-DOF analysis from treating a trimmed `Arc` as an unrestricted full circle when accepted `COINCIDENT` or `TANGENT` relations involve Arc geometry.
+Pass 19 supports a narrow previously deferred case: `TANGENT` at a trimmed Arc endpoint when a separate resolved `COINCIDENT` relation for the same pair explicitly proves the endpoint topology.
 
-### Arc-related COINCIDENT
+### Required witness chain
 
-Supported only when one unique endpoint-to-endpoint witness is already present in current geometry. The witness contributes two coordinate equations. Endpoint-to-interior contact, missing topology, or ambiguous endpoint pairs fail closed.
+Boundary tangency is represented only when:
 
-### Line-Arc TANGENT
+- the same unordered entity pair has resolved `COINCIDENT` and `TANGENT` relations;
+- current geometry exposes exactly one supported endpoint-to-endpoint coincidence witness;
+- current geometry independently establishes the tangent contact/branch;
+- the tangent contact equals that same endpoint witness within the existing numerical ambiguity tolerance.
 
-Supported only when the current tangent contact is numerically established, lies strictly inside the finite Line segment, lies strictly inside the Arc trim span, and is not on either trim boundary.
+### Supported coupled cases
 
-### Arc-Circle / Arc-Arc TANGENT
+- Line-Arc endpoint tangency;
+- Arc-Arc endpoint tangency.
 
-Supported only when exactly one external/internal tangent branch is established by current geometry and the derived contact lies strictly inside every participating Arc span.
+### Local rank equations
 
-No contact point, endpoint ordinal, tangent branch, physical tolerance or confidence is guessed.
+For already-proven endpoint topology:
 
-### Fail-closed behavior
+- Line-Arc tangency uses line-ray/radius orthogonality;
+- Arc-Arc tangency uses radius-vector collinearity.
 
-Exact DOF remains `INDETERMINATE` for unsupported or ambiguous Arc contact semantics, including:
+These formulations avoid the zero-Jacobian-rank singularity of the general squared-distance tangent equation at a coincident endpoint.
 
-- Arc endpoint-to-interior `COINCIDENT` without explicit topology;
-- multiple plausible endpoint witnesses;
-- tangent contact outside a trimmed Arc;
-- tangent contact on an Arc trim boundary;
-- Line-Arc contact at a finite Line endpoint;
-- no unique compatible round-round tangent branch;
-- degenerate contact geometry.
+### Fail-closed cases
+
+Exact DOF remains `INDETERMINATE` for:
+
+- endpoint `TANGENT` without same-pair `COINCIDENT`;
+- unrelated coincidence evidence;
+- ambiguous endpoint witnesses;
+- non-tangent geometry sharing an endpoint;
+- Arc-Circle boundary tangency without endpoint topology vocabulary;
+- degenerate or unsupported contact geometry.
+
+No endpoint ordinal, tangent branch, confidence, physical tolerance, or geometry is guessed.
 
 ## Invariants
 
@@ -77,26 +88,37 @@ Exact DOF remains `INDETERMINATE` for unsupported or ambiguous Arc contact seman
 - verified physical measurement is never rewritten;
 - provenance, confidence and uncertainty are preserved;
 - no unsupported physical tolerance is introduced;
+- relation context is scoped to one analysis call and cannot leak into another;
 - shared contracts and other chat slices remain unchanged.
 
 ## Runtime / dependencies
 
-Package version: `0.15.0`  
+Package version: `0.16.0`  
 New dependencies: none.
 
 ## Verification
 
-Code-and-tests head `aeebf1082f4c12c26323139f45e08b2cf6b75844` completed the Chat-3 test command successfully before its workflow was superseded by a newer branch push:
+Corrected implementation head:
 
 ```text
-Chat 3 / Geometry — 160 passed in 0.70s
+13c8e0a86378d7c7f83fc40c4e2c1c6d61b577c8
 ```
 
-Final exact-branch-head MREA CI evidence must be green before Pass 18 is treated as delivered.
+MREA CI run `36952095618`:
+
+```text
+Chat 3 / Geometry — SUCCESS — 168 passed in 0.78s
+Contracts / canonical fixtures — SUCCESS
+Integration / Chat 2 -> Chat 3 — SUCCESS
+Chat 4 / Generic CAD gate — SUCCESS
+Integration / Chat 3 -> Chat 4 — SUCCESS
+```
+
+The final branch head still requires its own green exact-head CI after the documentation/handoff commit.
 
 ## Shared ownership
 
-Pass 18 modifies no:
+Pass 19 modifies no:
 
 - `core/contracts/`;
 - canonical shared fixtures;
@@ -107,11 +129,11 @@ Pass 18 modifies no:
 ## Deferred Chat-3 work
 
 - numerical constraint solving / entity movement;
-- coupled endpoint tangency where separate relations explicitly prove tangent contact at an Arc trim endpoint;
 - richer uncertainty/noise models for contact and angular relations;
 - multi-view geometry relationships;
+- further topology-sensitive relations only when explicit evidence exists;
 - CAD-native logic.
 
 ## Status
 
-`PASS18_IMPLEMENTED_PENDING_FINAL_EXACT_HEAD_CI`
+`PASS19_IMPLEMENTED_PENDING_FINAL_EXACT_HEAD_CI`
