@@ -1,24 +1,24 @@
 # MREA Slice Status
 
-**Central round:** 17  
-**Directive:** `OD-2026-10-02-010`  
-**Status:** `ROUND_17_CLOSED_GREEN_SOFTWARE`
+**Central round:** 18  
+**Directive:** `OD-2026-10-02-011`  
+**Status:** `ROUND_18_CLOSED_GREEN_SOFTWARE`
 
 ## Integrated slice state
 
 | Slice | Final central disposition |
 |---|---|
-| Chat 1 — Project & Guided Capture | `INTEGRATED / GREEN — fail-closed prepared-clean-reference capture gate` |
-| Chat 2 — Physical Measurement | `INTEGRATED / GREEN — durable exact-context hands-free restart recovery` |
-| Chat 3 — Geometry & Sketch | `INTEGRATED / GREEN — verified ANGLE local-DOF topology and uncertainty policy` |
-| Chat 4 — CAD Bridge & Verification | `INTEGRATED / GREEN — canonical artifact boundary + fail-closed SOLIDWORKS rebuild evidence` |
-| Chat 5 — Lifecycle & Engineering Knowledge | `INTEGRATED / GREEN — read-only evidence-backed revision-change explanation HTTP surface` |
+| Chat 1 — Project & Guided Capture | `INTEGRATED / GREEN — preparation-aware fail-closed guided capture` |
+| Chat 2 — Physical Measurement | `INTEGRATED / GREEN — explicit manual anchor snap decision + provenance/confirmation guards` |
+| Chat 3 — Geometry & Sketch | `INTEGRATED / GREEN — arc/contact/tangent/angular local-freedom topology diagnostics` |
+| Chat 4 — CAD Bridge & Verification | `INTEGRATED / GREEN — request-correlated native artifact + fail-closed SOLIDWORKS read-back/rebuild evidence` |
+| Chat 5 — Lifecycle & Engineering Knowledge | `INTEGRATED / GREEN — durable field-status projection with full vocabulary + state-machine history replay` |
 
 ## Round authority
 
 ```text
 OPEN_SOFTWARE_BLOCKERS = NONE
-ROUND_17_CLOSED = TRUE
+ROUND_18_CLOSED = TRUE
 MERGE_TO_MAIN_COMPLETED = TRUE
 NEXT_FULL_WORKER_PASS = READY
 ```
@@ -26,34 +26,37 @@ NEXT_FULL_WORKER_PASS = READY
 Accepted lineage:
 
 ```text
-Round-16 closed base:      933d925c69944d40859ae1f9ff80d7a3ecb7f760
-Round-17 final candidate:  86809d59f4f54f91c18da6e29bae02580cc3d56d
-Integration merge to main: d3477c0f0451abdc52726e810d1099fff54e4482
+Round-17 closed base:       af4bf4ce9e3c5da0f8e6ecdc185425b5985e4223
+Round-18 O2 head:           ef37c445c67642a9274e477a95734102c7abed34
+Round-18 final O3 candidate:01bfa765a7c651f480636ec7ad86ef0bd12e1764
+Integration merge to main:  80c1a1fc22c0ec33bc0529e62d2d39722f4a422a
 ```
 
 ## Final software evidence
 
-Candidate exact-head gates:
+Final candidate exact-head gates after O3 repair:
 
 ```text
-36944005351  push MREA CI                SUCCESS  11/11
-36944005448  push MREA Round 4 Truth CI  SUCCESS   6/6
-36944011739  PR MREA CI                  SUCCESS  11/11
-36944011779  PR MREA Round 4 Truth CI    SUCCESS   6/6
+36950497589  push MREA CI                SUCCESS  11/11
+36950497582  push MREA Round 4 Truth CI  SUCCESS   6/6
+36950502466  PR MREA CI                  SUCCESS  11/11
+36950502484  PR MREA Round 4 Truth CI    SUCCESS   6/6
 ```
 
-Post-merge exact-main gates on `d3477c0f0451abdc52726e810d1099fff54e4482`:
+Post-merge exact-main gates on `80c1a1fc22c0ec33bc0529e62d2d39722f4a422a`:
 
 ```text
-36945298543  MREA CI                SUCCESS  11/11
-36945298638  MREA Round 4 Truth CI  SUCCESS   6/6
+36950813022  MREA CI                SUCCESS  11/11
+36950813031  MREA Round 4 Truth CI  SUCCESS   6/6
 ```
 
 All five slice jobs, contracts, all four normal boundaries, normal golden path, all four truth boundaries and truth golden path actually executed. No mandatory job was accepted by skip/cancel.
 
-## Documentation reconciliation
+## Audit repairs
 
-A historical Orchestrator-1 Round-17 audit sentence mentioned non-negative `byte_size` handling for Chat 4. Canonical `ArtifactReference` v1 has no `byte_size` field; this sentence is superseded by actual contract/source evidence. Accepted Chat-4 code uses exactly the canonical required/optional field set and rejects unknown top-level fields.
+Orchestrator 2 found and repaired a Chat-5 integrity defect where an unknown historical lifecycle event could be hidden by a known latest event.
+
+Final Orchestrator 3 found and repaired a second independent Chat-5 integrity defect: known lifecycle event names could still form a durable sequence impossible under the authoritative physical state machine and be projected as a plausible current status. Final code now replays legal transition semantics and validates TESTED/ACTIVATED outcome requirements before emitting status.
 
 ## SOLIDWORKS environment qualification
 
@@ -64,6 +67,6 @@ ROUND_LEVEL_SOFTWARE_BLOCKER = FALSE
 LEGACY_THREE_LINE_CARRY_FORWARD = RETIRED
 ```
 
-Round 17 changed `SolidWorksTransfer.cs`; current positive real-host qualification requires dedicated evidence whose source/boundary fingerprint matches the current repository. Software CI does not establish real-host qualification.
+Round 18 changed fingerprinted host-boundary source. Current positive real-host qualification requires dedicated evidence whose source/boundary fingerprint matches the current repository. Software CI does not establish real-host qualification.
 
-The next full worker pass must branch from the then-current shared `main` containing this Round-17 closure/control state, not from historical Pass-17 branches.
+The next full worker pass must branch from the then-current shared `main` containing this Round-18 closure/control state, not from historical Pass-18 branches.
