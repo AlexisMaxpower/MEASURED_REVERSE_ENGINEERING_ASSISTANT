@@ -25,6 +25,16 @@ from .hands_free import (
     normalize_measurement_number,
 )
 from .models import FeatureAnchor, MeasurementSession, MeasurementType, PhysicalMeasurement, ProvenanceSource
+from .ocr import (
+    AmbiguousOcrMeasurement,
+    DisplayRoi,
+    OcrMeasurementContext,
+    OcrMeasurementError,
+    OcrMeasurementIntake,
+    OcrMeasurementProposal,
+    OcrMeasurementReader,
+    OcrTextObservation,
+)
 from .recovery import (
     AmbiguousPendingMeasurementRecovery,
     HandsFreeRecoveryError,
@@ -43,11 +53,13 @@ from .type_registry import MeasurementTypeRegistry, MeasurementTypeSemantics
 __all__ = [
     "AmbiguousAnchorSnap",
     "AmbiguousMeasurementCommand",
+    "AmbiguousOcrMeasurement",
     "AmbiguousPendingMeasurementRecovery",
     "AnchorSelectionError",
     "AnchorSnapProposal",
     "AnchorSnapTarget",
     "CanonicalMeasurementAdapter",
+    "DisplayRoi",
     "FeatureAnchor",
     "FeatureAnchorSelection",
     "FeatureAnchorSelector",
@@ -71,6 +83,12 @@ __all__ = [
     "MeasurementType",
     "MeasurementTypeRegistry",
     "MeasurementTypeSemantics",
+    "OcrMeasurementContext",
+    "OcrMeasurementError",
+    "OcrMeasurementIntake",
+    "OcrMeasurementProposal",
+    "OcrMeasurementReader",
+    "OcrTextObservation",
     "ParsedMeasurementCommand",
     "PhysicalMeasurement",
     "ProvenanceSource",
