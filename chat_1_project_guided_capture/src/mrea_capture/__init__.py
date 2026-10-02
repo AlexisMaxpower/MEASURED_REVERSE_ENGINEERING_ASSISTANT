@@ -1,5 +1,18 @@
 """Chat 1 domain/application baseline for MREA Project & Guided Capture."""
 
+from .alignment import (
+    CaptureAlignmentAction,
+    CaptureAlignmentError,
+    CaptureAlignmentFinding,
+    CaptureAlignmentMetrics,
+    CaptureAlignmentPolicy,
+    CaptureAlignmentReasonCode,
+    CaptureAlignmentResult,
+    CaptureAlignmentService,
+    CaptureAlignmentSeverity,
+    CaptureAlignmentVerdict,
+    RussianCaptureAlignmentGuidanceAdapter,
+)
 from .artifacts import ArtifactNotFoundError, FileSystemArtifactStore
 from .calibration import (
     CalibrationDetectionError,
@@ -114,6 +127,16 @@ __all__ = [
     "CalibrationResult",
     "CalibrationService",
     "CameraMetadata",
+    "CaptureAlignmentAction",
+    "CaptureAlignmentError",
+    "CaptureAlignmentFinding",
+    "CaptureAlignmentMetrics",
+    "CaptureAlignmentPolicy",
+    "CaptureAlignmentReasonCode",
+    "CaptureAlignmentResult",
+    "CaptureAlignmentService",
+    "CaptureAlignmentSeverity",
+    "CaptureAlignmentVerdict",
     "CapturePreparationAction",
     "CapturePreparationCaptureService",
     "CapturePreparationCheckCode",
@@ -180,6 +203,7 @@ __all__ = [
     "ProjectStatus",
     "QualityReasonCode",
     "QualitySeverity",
+    "RussianCaptureAlignmentGuidanceAdapter",
     "RussianCapturePreparationGuidanceAdapter",
     "RussianQualityGuidanceAdapter",
     "RectificationError",
