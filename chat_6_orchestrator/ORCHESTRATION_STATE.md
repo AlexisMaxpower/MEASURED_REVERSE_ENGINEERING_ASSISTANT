@@ -1,35 +1,49 @@
 # MREA Orchestration State
 
 **Control owner:** central orchestration  
-**Directive revision:** `OD-2026-10-02-009`  
-**Status:** `ROUND_16_CLOSED_GREEN_SOFTWARE`
+**Directive revision:** `OD-2026-10-02-010`  
+**Status:** `ROUND_17_CLOSED_GREEN_SOFTWARE`
 
-## Round 16 authority
+## Round 17 authority
 
 ```text
-ROUND_16_CLOSED = TRUE
+ROUND_17_CLOSED = TRUE
 OPEN_SOFTWARE_BLOCKERS = NONE
 MERGE_TO_MAIN_COMPLETED = TRUE
 NEXT_FULL_WORKER_PASS = READY
 ```
 
-Round 16 is the accepted cumulative repository baseline. Round-15 candidate `7b20b4325157bdc30b4ab35b266ba0b7c603267b` was independently checked as the unchanged upstream ancestor of the accepted Round-16 candidate. The audited cumulative integration merge is `d3c56ce026f16508f91570112c57d7f617a46386`; that exact merge SHA passed the complete ordinary and truth post-merge software suites before this closure state was issued.
+Round 17 is the accepted repository baseline. Final Orchestrator 3 independently audited actual GitHub refs, worker provenance, candidate source, canonical boundaries, critical fail-closed paths and exact-head Actions evidence before authorizing merge.
 
-Historical worker branches, Round-15/16 integration candidates and older certification records remain audit history only. They are not implementation baselines for a new pass.
+Accepted Round-17 candidate:
 
-## Round 15 + Round 16 integrated scope
+```text
+86809d59f4f54f91c18da6e29bae02580cc3d56d
+```
 
-- Chat 1 — voice-trigger capture-control provenance from Pass 15 plus fail-closed capture-preparation guidance from Pass 16; neither surface creates physical measurement truth.
-- Chat 2 — durable keyset session pagination from Pass 15 plus deterministic Russian spoken-measurement capture from Pass 16; explicit spoken units are checked against measurement type before candidate/state mutation and voice values remain unverified until explicit user confirmation.
-- Chat 3 — global constraint-system diagnosis from Pass 15 plus local constraint-freedom/DOF diagnosis from Pass 16; unsupported, conflicting, unresolved or ambiguous topology remains fail-closed, including the final Line-Line COINCIDENT topology guard.
-- Chat 4 — Pass-15 constraint capability/response normalization plus Pass-16 success-response completeness and driven-dimension conflict evidence. Conflict/read-back evidence cannot silently promote canonical verification.
-- Chat 5 — structured durable revision comparison from Pass 15 plus deterministic source-backed revision-change explanation from Pass 16, without ranking, recommendation or causal inference.
+Audited integration merge to `main`:
 
-Final Orchestrator 3 independently audited actual refs, source, replay identity, cumulative lineage, critical fail-closed paths and exact-head CI. No unresolved software blocker remains in the accepted cumulative tree.
+```text
+d3477c0f0451abdc52726e810d1099fff54e4482
+```
+
+That exact merge SHA passed the complete ordinary and truth post-merge software suites before this closure state was issued.
+
+Historical Pass-17 worker branches, integration candidate and Orchestrator-1/2 audit records remain audit history only. They are not implementation baselines for a new pass.
+
+## Round 17 integrated scope
+
+- Chat 1 — fail-closed prepared-clean-reference capture gate; setup/operator readiness remains separate from physical measurement truth and blocked preparation cannot mutate capture state.
+- Chat 2 — durable hands-free restart recovery for exact-context unverified candidates; ambiguous, verified or mismatched recovery fails closed and confirmation remains explicit-user-only.
+- Chat 3 — verified angular local-DOF diagnosis with explicit shared-vertex topology witness, uncertainty-bounded compatibility and fail-closed unsupported/ambiguous geometry.
+- Chat 4 — normalized canonical `ArtifactReference` boundary with required/optional field/type checks, duplicate-ID rejection and unknown-field rejection; Chat 4b adds fail-closed SOLIDWORKS rebuild checks before accepting relation creation or native save/read-back.
+- Chat 5 — GET-only revision-change explanation HTTP surface over durable comparison facts and exact evidence identifiers, without ranking, recommendation, causality or unsupported engineering inference.
+
+One historical Orchestrator-1 audit phrase described `byte_size` handling for Chat 4. That phrase is non-authoritative and inaccurate: canonical `ArtifactReference` v1 has no `byte_size` field. The accepted implementation matches the actual canonical field set and rejects unknown top-level fields.
 
 ## Standing SOLIDWORKS host qualification
 
-Real-host qualification remains a standing environment qualification, not a repeated round-level software status.
+Real-host qualification remains a standing environment qualification, not a round-level software result.
 
 ```text
 SOLIDWORKS_HOST_QUALIFICATION = DEDICATED_WORKFLOW_AUTHORITY
@@ -38,17 +52,15 @@ ROUND_LEVEL_SOFTWARE_BLOCKER = FALSE
 LEGACY_THREE_LINE_CARRY_FORWARD = RETIRED
 ```
 
-Passes 15 and 16 changed fingerprinted SOLIDWORKS host-boundary files, including the worker capability/response surface and `SolidWorksTransfer.cs`. Therefore a prior positive qualification applies only if its recorded host-boundary fingerprint matches the current repository boundary and the controlled host has not materially changed. Software CI, mocks and static checks are not positive real-host evidence.
-
-When real-host status is relevant, resolve it directly from the dedicated workflow and its generated `solidworks_host_qualification.json`; do not copy a guessed host result into ordinary round state or worker handoffs.
+Round 17 changed fingerprinted host-boundary code, including `SolidWorksTransfer.cs`. A prior positive qualification applies only when its recorded source/boundary fingerprint matches the current repository boundary and the controlled host has not materially changed. Linux/software CI, mocks and static checks are not positive real-host evidence.
 
 ## Worker-start authority
 
 Every new full worker pass must:
 
-1. read this file and require `ROUND_16_CLOSED = TRUE` and `NEXT_FULL_WORKER_PASS = READY`;
-2. start from the then-current shared `main` containing this Round-16 closure state;
-3. use a new pass branch rather than any historical Pass-15/16 worker or integration branch;
+1. read this file and require `ROUND_17_CLOSED = TRUE` and `NEXT_FULL_WORKER_PASS = READY`;
+2. start from the then-current shared `main` containing this Round-17 closure state;
+3. use a new pass branch rather than any historical Pass-17 worker or integration branch;
 4. preserve slice ownership, provenance, explicit-confirmation requirements and fail-closed truth boundaries;
 5. follow the active worker-round/user task rather than reviving an historical task;
 6. treat SOLIDWORKS host qualification as out-of-band unless the active task explicitly changes or validates its fingerprinted host boundary.

@@ -1,57 +1,59 @@
 # MREA Slice Status
 
-**Central round:** 16  
-**Directive:** `OD-2026-10-02-009`  
-**Status:** `ROUND_16_CLOSED_GREEN_SOFTWARE`
+**Central round:** 17  
+**Directive:** `OD-2026-10-02-010`  
+**Status:** `ROUND_17_CLOSED_GREEN_SOFTWARE`
 
 ## Integrated slice state
 
 | Slice | Final central disposition |
 |---|---|
-| Chat 1 — Project & Guided Capture | `INTEGRATED / GREEN — voice-trigger capture provenance + fail-closed capture preparation` |
-| Chat 2 — Physical Measurement | `INTEGRATED / GREEN — durable keyset pagination + spoken measurement/unit truth guards` |
-| Chat 3 — Geometry & Sketch | `INTEGRATED / GREEN — global constraint diagnosis + fail-closed local DOF/topology diagnosis` |
-| Chat 4 — CAD Bridge & Verification | `INTEGRATED / GREEN — constraint capability/response normalization + complete success/conflict evidence` |
-| Chat 5 — Lifecycle & Engineering Knowledge | `INTEGRATED / GREEN — structured durable comparison + source-backed factual change explanation` |
+| Chat 1 — Project & Guided Capture | `INTEGRATED / GREEN — fail-closed prepared-clean-reference capture gate` |
+| Chat 2 — Physical Measurement | `INTEGRATED / GREEN — durable exact-context hands-free restart recovery` |
+| Chat 3 — Geometry & Sketch | `INTEGRATED / GREEN — verified ANGLE local-DOF topology and uncertainty policy` |
+| Chat 4 — CAD Bridge & Verification | `INTEGRATED / GREEN — canonical artifact boundary + fail-closed SOLIDWORKS rebuild evidence` |
+| Chat 5 — Lifecycle & Engineering Knowledge | `INTEGRATED / GREEN — read-only evidence-backed revision-change explanation HTTP surface` |
 
 ## Round authority
 
 ```text
 OPEN_SOFTWARE_BLOCKERS = NONE
-ROUND_16_CLOSED = TRUE
+ROUND_17_CLOSED = TRUE
 MERGE_TO_MAIN_COMPLETED = TRUE
 NEXT_FULL_WORKER_PASS = READY
 ```
 
-Accepted cumulative lineage:
+Accepted lineage:
 
 ```text
-Round-15 upstream candidate: 7b20b4325157bdc30b4ab35b266ba0b7c603267b
-Round-16 final candidate:    4aab61d6c793ff7ec955848ce6be664b147369bc
-Integration merge to main:  d3c56ce026f16508f91570112c57d7f617a46386
+Round-16 closed base:      933d925c69944d40859ae1f9ff80d7a3ecb7f760
+Round-17 final candidate:  86809d59f4f54f91c18da6e29bae02580cc3d56d
+Integration merge to main: d3477c0f0451abdc52726e810d1099fff54e4482
 ```
-
-The next full worker pass must branch from the then-current shared `main` containing the Round-16 closure/control state, not from any historical worker or integration branch.
 
 ## Final software evidence
 
 Candidate exact-head gates:
 
 ```text
-36938081940  MREA CI                SUCCESS  11/11
-36938081943  MREA Round 4 Truth CI  SUCCESS   6/6
-36938085912  PR MREA CI             SUCCESS  11/11
-36938085900  PR Round 4 Truth CI     SUCCESS   6/6
+36944005351  push MREA CI                SUCCESS  11/11
+36944005448  push MREA Round 4 Truth CI  SUCCESS   6/6
+36944011739  PR MREA CI                  SUCCESS  11/11
+36944011779  PR MREA Round 4 Truth CI    SUCCESS   6/6
 ```
 
-Post-merge exact-main gates on `d3c56ce026f16508f91570112c57d7f617a46386`:
+Post-merge exact-main gates on `d3477c0f0451abdc52726e810d1099fff54e4482`:
 
 ```text
-36939539944  MREA CI                SUCCESS  11/11
-36939539923  MREA Round 4 Truth CI  SUCCESS   6/6
+36945298543  MREA CI                SUCCESS  11/11
+36945298638  MREA Round 4 Truth CI  SUCCESS   6/6
 ```
 
-All normal/truth boundaries and both golden paths actually executed.
+All five slice jobs, contracts, all four normal boundaries, normal golden path, all four truth boundaries and truth golden path actually executed. No mandatory job was accepted by skip/cancel.
+
+## Documentation reconciliation
+
+A historical Orchestrator-1 Round-17 audit sentence mentioned non-negative `byte_size` handling for Chat 4. Canonical `ArtifactReference` v1 has no `byte_size` field; this sentence is superseded by actual contract/source evidence. Accepted Chat-4 code uses exactly the canonical required/optional field set and rejects unknown top-level fields.
 
 ## SOLIDWORKS environment qualification
 
@@ -62,4 +64,6 @@ ROUND_LEVEL_SOFTWARE_BLOCKER = FALSE
 LEGACY_THREE_LINE_CARRY_FORWARD = RETIRED
 ```
 
-Passes 15/16 changed fingerprinted host-boundary code. A positive real-host result is applicable only if the dedicated qualification artifact carries the matching current fingerprint. Software CI does not establish real-host qualification.
+Round 17 changed `SolidWorksTransfer.cs`; current positive real-host qualification requires dedicated evidence whose source/boundary fingerprint matches the current repository. Software CI does not establish real-host qualification.
+
+The next full worker pass must branch from the then-current shared `main` containing this Round-17 closure/control state, not from historical Pass-17 branches.

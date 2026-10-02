@@ -1,6 +1,6 @@
 # ORCHESTRATOR DIRECTIVE — Chat 5
 
-**Revision:** `OD-2026-10-02-009`  
+**Revision:** `OD-2026-10-02-010`  
 **Control owner:** central orchestration  
 **Status:** `READY_FOR_NEXT_FULL_WORKER_PASS_FROM_CURRENT_MAIN`
 
@@ -11,13 +11,13 @@ This directive supersedes all older Chat-5 directives.
 Before starting the next worker pass:
 
 1. read `chat_6_orchestrator/ORCHESTRATION_STATE.md`;
-2. require `ROUND_16_CLOSED = TRUE` and `NEXT_FULL_WORKER_PASS = READY`;
-3. branch from the then-current shared `main` containing the Round-16 closure state;
+2. require `ROUND_17_CLOSED = TRUE` and `NEXT_FULL_WORKER_PASS = READY`;
+3. branch from the then-current shared `main` containing the Round-17 closure state;
 4. do not use a historical pass or integration branch as the implementation base.
 
 ## Slice ownership
 
-Chat 5 owns Lifecycle & Engineering Knowledge. Preserve manufacturing-eligibility truth, deterministic lifecycle transitions, snapshot/cursor semantics and the rule that lifecycle/knowledge code cannot promote unverified CAD/runtime facts. Durable comparisons and explanations must stay bound to committed snapshot facts and exact source records/artifacts; they must not introduce ranking, recommendation, causality or unsupported engineering inference.
+Chat 5 owns Lifecycle & Engineering Knowledge. Preserve manufacturing-eligibility truth, deterministic lifecycle transitions, snapshot/cursor semantics and the rule that lifecycle/knowledge code cannot promote unverified CAD/runtime facts. Revision comparison/explanation surfaces must remain GET-only/read-only where designed, bound to durable committed snapshot facts and exact source records/artifacts, and must not introduce ranking, recommendation, causality or unsupported engineering inference.
 
 ## Standing SOLIDWORKS qualification
 

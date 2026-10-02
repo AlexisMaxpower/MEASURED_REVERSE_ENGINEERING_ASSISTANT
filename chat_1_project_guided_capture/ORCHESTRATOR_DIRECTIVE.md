@@ -1,6 +1,6 @@
 # ORCHESTRATOR DIRECTIVE — Chat 1
 
-**Revision:** `OD-2026-10-02-009`  
+**Revision:** `OD-2026-10-02-010`  
 **Control owner:** central orchestration  
 **Status:** `READY_FOR_NEXT_FULL_WORKER_PASS_FROM_CURRENT_MAIN`
 
@@ -11,13 +11,13 @@ This directive supersedes all older Chat-1 directives.
 Before starting the next worker pass:
 
 1. read `chat_6_orchestrator/ORCHESTRATION_STATE.md`;
-2. require `ROUND_16_CLOSED = TRUE` and `NEXT_FULL_WORKER_PASS = READY`;
-3. branch from the then-current shared `main` containing the Round-16 closure state;
+2. require `ROUND_17_CLOSED = TRUE` and `NEXT_FULL_WORKER_PASS = READY`;
+3. branch from the then-current shared `main` containing the Round-17 closure state;
 4. do not use a historical pass or integration branch as the implementation base.
 
 ## Slice ownership
 
-Chat 1 owns Project & Guided Capture. Preserve explicit recapture lineage, immutable clean-reference truth, attributable provenance and canonical-contract ownership. Voice triggers are capture-control provenance only and must not create metrology truth. Capture-preparation readiness is operator/setup guidance and must remain separate from physical measurement truth.
+Chat 1 owns Project & Guided Capture. Preserve explicit recapture lineage, immutable clean-reference truth, attributable provenance and canonical-contract ownership. Voice triggers are capture-control provenance only and must not create metrology truth. Prepared-clean-reference readiness remains operator/setup guidance: any required unknown/failed preparation check must block capture mutation rather than being promoted into measurement truth.
 
 ## Standing SOLIDWORKS qualification
 
