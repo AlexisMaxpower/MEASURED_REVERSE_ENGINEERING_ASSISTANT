@@ -2,6 +2,7 @@ using System;
 using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
+using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
 
 namespace Mrea.SolidWorksCadAgent
@@ -67,6 +68,12 @@ namespace Mrea.SolidWorksCadAgent
                 model = app.NewDocument(template, (int)swDwgPaperSizes_e.swDwgPaperAsize, 0.0, 0.0);
                 if (model == null)
                     throw new InvalidOperationException("SOLIDWORKS failed to create a new part document from template: " + template);
+
+                var documentType = ((IModelDoc2)model).GetType();
+                if (documentType != (int)swDocumentTypes_e.swDocPART)
+                    throw new InvalidOperationException(
+                        "SOLIDWORKS part template created a non-part document; expected swDocPART, actual document type=" +
+                        documentType + ", template=" + template);
 
                 SelectFrontPlaneWithoutLocalizedName(app, model);
                 dynamic sketchManager = model.SketchManager;
