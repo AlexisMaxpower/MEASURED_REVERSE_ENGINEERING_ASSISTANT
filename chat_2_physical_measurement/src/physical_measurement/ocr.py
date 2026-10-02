@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from decimal import Decimal
 from math import isfinite
 
-from .models import MeasurementType, ProvenanceSource
+from .models import FeatureAnchor, MeasurementType, PhysicalMeasurement, ProvenanceSource
+from .service import MeasurementSessionService
 from .type_registry import MeasurementTypeRegistry
 
 
@@ -132,6 +133,41 @@ class OcrMeasurementProposal:
             raise OcrMeasurementError("OCR proposal source must be OCR_MEASURED")
 
 
+@dataclass(frozen=True, slots=True)
+class OcrMeasurementContext:
+    """Physical-measurement context into which one OCR proposal may be inserted."""
+
+    measurement_type: MeasurementType
+    view_id: str
+    anchor_a: FeatureAnchor
+    anchor_b: FeatureAnchor | None = None
+    anchor_c: FeatureAnchor | None = None
+    evidence_frame_id: str | None = None
+    uncertainty: Decimal | int | float | str | None = None
+    uncertainty_mm: Decimal | int | float | str | None = None
+    instrument_type: str | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "view_id", _non_empty(self.view_id, "view_id"))
+        if not isinstance(self.measurement_type, MeasurementType):
+            raise OcrMeasurementError("measurement_type must be MeasurementType")
+        anchors = tuple(anchor for anchor in (self.anchor_a, self.anchor_b, self.anchor_c) if anchor)
+        if not anchors:
+            raise OcrMeasurementError("OCR measurement context requires at least one anchor")
+        for anchor in anchors:
+            if not isinstance(anchor, FeatureAnchor):
+                raise OcrMeasurementError("OCR measurement anchors must be FeatureAnchor")
+            if anchor.view_id != self.view_id:
+                raise OcrMeasurementError("OCR measurement anchor view_id must match context view_id")
+        if self.evidence_frame_id is None:
+            raise OcrMeasurementError("OCR measurement context requires evidence_frame_id")
+        object.__setattr__(
+            self,
+            "evidence_frame_id",
+            _non_empty(self.evidence_frame_id, "evidence_frame_id"),
+        )
+
+
 class OcrMeasurementReader:
     """Deterministic provider-neutral validator for LCD OCR text.
 
@@ -166,8 +202,6 @@ class OcrMeasurementReader:
             )
 
         raw_value = match.group("value")
-        if "," in raw_value and "." in raw_value:
-            raise AmbiguousOcrMeasurement("mixed decimal separators are ambiguous")
         value = Decimal(raw_value.replace(",", "."))
         if not value.is_finite():
             raise OcrMeasurementError("OCR value must be finite")
@@ -196,3 +230,52 @@ class OcrMeasurementReader:
         if not normalized:
             raise OcrMeasurementError("OCR text must not be empty")
         return normalized
+
+
+class OcrMeasurementIntake:
+    """Turn one validated OCR observation into an unverified session candidate."""
+
+    def __init__(
+        self,
+        *,
+        service: MeasurementSessionService,
+        reader: OcrMeasurementReader | None = None,
+    ) -> None:
+        self._service = service
+        self._reader = reader or OcrMeasurementReader()
+
+    def propose_candidate(
+        self,
+        *,
+        session_id: str,
+        context: OcrMeasurementContext,
+        observation: OcrTextObservation,
+    ) -> PhysicalMeasurement:
+        if observation.roi.view_id != context.view_id:
+            raise OcrMeasurementError("OCR ROI view_id does not match measurement context")
+        if observation.roi.evidence_frame_id != context.evidence_frame_id:
+            raise OcrMeasurementError(
+                "OCR ROI evidence_frame_id does not match measurement context"
+            )
+
+        proposal = self._reader.read(
+            observation=observation,
+            measurement_type=context.measurement_type,
+        )
+        measurement = self._service.add_reported_candidate(
+            session_id=session_id,
+            measurement_type=context.measurement_type,
+            value=proposal.value,
+            source=ProvenanceSource.OCR_MEASURED,
+            view_id=context.view_id,
+            anchor_a=context.anchor_a,
+            anchor_b=context.anchor_b,
+            anchor_c=context.anchor_c,
+            evidence_frame_id=context.evidence_frame_id,
+            uncertainty=context.uncertainty,
+            uncertainty_mm=context.uncertainty_mm,
+            instrument_type=context.instrument_type,
+        )
+        if measurement.is_verified:
+            raise AssertionError("OCR intake must never auto-verify a measurement candidate")
+        return measurement
