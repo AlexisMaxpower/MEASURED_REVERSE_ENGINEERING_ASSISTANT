@@ -8,7 +8,7 @@ The existing durable physical timeline already contains the authoritative commit
 
 ```text
 committed physical timeline
-→ validate identity/order
+→ validate identity/order/event vocabulary/state-machine history
 → select latest persisted physical event
 → map event type to PhysicalPartState
 → return exact source-event linkage
@@ -70,11 +70,17 @@ Before emitting status, the complete returned timeline is checked for:
 - one stable `manufacturing_id`;
 - strictly increasing persisted sequence;
 - non-decreasing event time;
-- supported physical lifecycle event type.
+- supported physical lifecycle event type;
+- `MANUFACTURED` as the first physical event;
+- only transitions that the existing `PhysicalPartLifecycleService` can produce;
+- an explicit `PASSED` or `FAILED` outcome on every `TESTED` event;
+- `ACTIVATED` only immediately after a `TESTED` event whose persisted outcome is `PASSED`.
 
-Identity/order/event-vocabulary divergence raises `LifecycleKnowledgeIntegrityError` rather than returning a contradictory current state.
+Identity/order/vocabulary/state-machine divergence raises `LifecycleKnowledgeIntegrityError` rather than returning a plausible status from corrupt durable history.
 
 Blank or unknown instance IDs fail closed with `ValueError`.
+
+The single-instance projection can validate the superseded instance's own transition into `SUPERSEDED`; cross-instance replacement eligibility remains owned by the authoritative lifecycle service because that rule depends on the replacement instance's separate timeline and equipment position.
 
 ## Truth boundary
 
