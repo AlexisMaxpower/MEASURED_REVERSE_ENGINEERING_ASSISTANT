@@ -108,10 +108,15 @@ class AnchorSnapProposal:
 class FeatureAnchorSelection:
     """Explicit final anchor placement decision in IMAGE_PX.
 
-    ``provenance`` is MANUAL_MEASURED even when a detected target was accepted:
-    the detector proposes a location, but the final anchor becomes actionable only
-    after explicit operator confirmation. ``suggestion_source`` keeps the advisory
-    origin visible to the caller without promoting it to measurement truth.
+    For a manual keep-raw decision the source is ``MANUAL_MEASURED``. For an
+    accepted snap the source remains ``VISION_DETECTED`` and the distinct
+    ``confirmation_source`` records ``USER_CONFIRMED``. This prevents the
+    detector contribution from being relabelled as manual truth.
+
+    The existing ``FeatureAnchor`` model does not yet persist this selection
+    provenance. Callers that need the provenance must retain this decision object
+    alongside the materialized anchor until a dedicated durable-anchor metadata
+    migration is approved.
     """
 
     view_id: str
@@ -120,9 +125,9 @@ class FeatureAnchorSelection:
     y_px: float
     raw_x_px: float
     raw_y_px: float
-    provenance: ProvenanceSource = ProvenanceSource.MANUAL_MEASURED
+    source: ProvenanceSource
+    confirmation_source: ProvenanceSource | None = None
     snap_target_id: str | None = None
-    suggestion_source: ProvenanceSource | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "view_id", _non_empty(self.view_id, "view_id"))
@@ -133,31 +138,38 @@ class FeatureAnchorSelection:
         )
         for field_name in ("x_px", "y_px", "raw_x_px", "raw_y_px"):
             object.__setattr__(self, field_name, _coordinate(getattr(self, field_name), field_name))
-        if self.provenance is not ProvenanceSource.MANUAL_MEASURED:
-            raise AnchorSelectionError(
-                "final anchor selection must remain MANUAL_MEASURED after explicit operator choice"
-            )
-        if (self.snap_target_id is None) != (self.suggestion_source is None):
-            raise AnchorSelectionError(
-                "snap_target_id and suggestion_source must either both be set or both be absent"
-            )
-        if self.snap_target_id is not None:
-            object.__setattr__(
-                self,
-                "snap_target_id",
-                _non_empty(self.snap_target_id, "snap_target_id"),
-            )
-            if self.suggestion_source is not ProvenanceSource.VISION_DETECTED:
+
+        if self.snap_target_id is None:
+            if self.source is not ProvenanceSource.MANUAL_MEASURED:
                 raise AnchorSelectionError(
-                    "accepted snap suggestion_source must be VISION_DETECTED"
+                    "unsnapped anchor selection source must be MANUAL_MEASURED"
                 )
+            if self.confirmation_source is not None:
+                raise AnchorSelectionError(
+                    "unsnapped manual anchor selection must not invent confirmation provenance"
+                )
+            return
+
+        object.__setattr__(
+            self,
+            "snap_target_id",
+            _non_empty(self.snap_target_id, "snap_target_id"),
+        )
+        if self.source is not ProvenanceSource.VISION_DETECTED:
+            raise AnchorSelectionError(
+                "snapped anchor selection source must remain VISION_DETECTED"
+            )
+        if self.confirmation_source is not ProvenanceSource.USER_CONFIRMED:
+            raise AnchorSelectionError(
+                "snapped anchor selection requires USER_CONFIRMED confirmation provenance"
+            )
 
     @property
     def snapped(self) -> bool:
         return self.snap_target_id is not None
 
     def build_anchor(self, *, anchor_id: str) -> FeatureAnchor:
-        """Materialize the confirmed placement as the existing internal FeatureAnchor."""
+        """Materialize the explicit placement as the existing internal FeatureAnchor."""
 
         return FeatureAnchor(
             anchor_id=anchor_id,
@@ -231,6 +243,7 @@ class FeatureAnchorSelector:
             y_px=raw_pick.y_px,
             raw_x_px=raw_pick.x_px,
             raw_y_px=raw_pick.y_px,
+            source=ProvenanceSource.MANUAL_MEASURED,
         )
 
     def accept_snap(
@@ -250,6 +263,7 @@ class FeatureAnchorSelector:
             y_px=proposal.target.y_px,
             raw_x_px=proposal.raw_pick.x_px,
             raw_y_px=proposal.raw_pick.y_px,
+            source=proposal.target.source,
+            confirmation_source=ProvenanceSource.USER_CONFIRMED,
             snap_target_id=proposal.target.target_id,
-            suggestion_source=proposal.target.source,
         )
