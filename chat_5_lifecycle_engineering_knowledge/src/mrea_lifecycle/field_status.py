@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Protocol
 
 from .engineering_knowledge import LifecycleKnowledgeIntegrityError
-from .models import PhysicalLifecycleEventType, PhysicalPartState
+from .models import PhysicalLifecycleEventType, PhysicalPartState, PhysicalTestOutcome
 from .relational import PhysicalEventQueryResult
 
 
@@ -17,6 +17,40 @@ _STATE_BY_EVENT = {
     PhysicalLifecycleEventType.FAILED: PhysicalPartState.FAILED,
     PhysicalLifecycleEventType.REMOVED: PhysicalPartState.REMOVED,
     PhysicalLifecycleEventType.SUPERSEDED: PhysicalPartState.SUPERSEDED,
+}
+
+_ALLOWED_NEXT_EVENTS = {
+    PhysicalLifecycleEventType.MANUFACTURED: frozenset(
+        {PhysicalLifecycleEventType.INSTALLED}
+    ),
+    PhysicalLifecycleEventType.INSTALLED: frozenset(
+        {
+            PhysicalLifecycleEventType.TESTED,
+            PhysicalLifecycleEventType.FAILED,
+            PhysicalLifecycleEventType.REMOVED,
+        }
+    ),
+    PhysicalLifecycleEventType.TESTED: frozenset(
+        {
+            PhysicalLifecycleEventType.TESTED,
+            PhysicalLifecycleEventType.ACTIVATED,
+            PhysicalLifecycleEventType.FAILED,
+            PhysicalLifecycleEventType.REMOVED,
+        }
+    ),
+    PhysicalLifecycleEventType.ACTIVATED: frozenset(
+        {
+            PhysicalLifecycleEventType.FAILED,
+            PhysicalLifecycleEventType.REMOVED,
+        }
+    ),
+    PhysicalLifecycleEventType.FAILED: frozenset(
+        {PhysicalLifecycleEventType.REMOVED}
+    ),
+    PhysicalLifecycleEventType.REMOVED: frozenset(
+        {PhysicalLifecycleEventType.SUPERSEDED}
+    ),
+    PhysicalLifecycleEventType.SUPERSEDED: frozenset(),
 }
 
 
@@ -51,6 +85,54 @@ class PhysicalTimelineQuery(Protocol):
         self,
         instance_id: str,
     ) -> tuple[PhysicalEventQueryResult, ...]: ...
+
+
+def _validate_transition_history(
+    timeline: tuple[PhysicalEventQueryResult, ...],
+    event_types: tuple[PhysicalLifecycleEventType, ...],
+) -> None:
+    """Replay durable event semantics without inventing state from corrupt history."""
+
+    if event_types[0] is not PhysicalLifecycleEventType.MANUFACTURED:
+        raise LifecycleKnowledgeIntegrityError(
+            "physical field-status timeline must start with MANUFACTURED"
+        )
+
+    for index, (event, event_type) in enumerate(zip(timeline, event_types)):
+        if event_type is PhysicalLifecycleEventType.TESTED:
+            try:
+                PhysicalTestOutcome(event.test_outcome)
+            except (TypeError, ValueError) as exc:
+                raise LifecycleKnowledgeIntegrityError(
+                    "physical field-status TESTED event requires PASSED or FAILED outcome"
+                ) from exc
+
+        if index == 0:
+            continue
+
+        previous_type = event_types[index - 1]
+        if event_type not in _ALLOWED_NEXT_EVENTS[previous_type]:
+            raise LifecycleKnowledgeIntegrityError(
+                "physical field-status timeline contains impossible transition: "
+                f"{previous_type.value} -> {event_type.value}"
+            )
+
+        if event_type is PhysicalLifecycleEventType.ACTIVATED:
+            previous = timeline[index - 1]
+            if previous_type is not PhysicalLifecycleEventType.TESTED:
+                raise LifecycleKnowledgeIntegrityError(
+                    "physical field-status ACTIVATED event must follow TESTED"
+                )
+            try:
+                previous_outcome = PhysicalTestOutcome(previous.test_outcome)
+            except (TypeError, ValueError) as exc:
+                raise LifecycleKnowledgeIntegrityError(
+                    "physical field-status activation requires a valid preceding test outcome"
+                ) from exc
+            if previous_outcome is not PhysicalTestOutcome.PASSED:
+                raise LifecycleKnowledgeIntegrityError(
+                    "physical field-status activation requires preceding PASSED test"
+                )
 
 
 def build_physical_field_status(
@@ -105,8 +187,11 @@ def build_physical_field_status(
         previous_sequence = event.sequence
         previous_time = event.occurred_at
 
+    validated_event_type_tuple = tuple(validated_event_types)
+    _validate_transition_history(timeline, validated_event_type_tuple)
+
     latest = timeline[-1]
-    latest_event_type = validated_event_types[-1]
+    latest_event_type = validated_event_type_tuple[-1]
 
     return PhysicalFieldStatus(
         instance_id=latest.instance_id,
