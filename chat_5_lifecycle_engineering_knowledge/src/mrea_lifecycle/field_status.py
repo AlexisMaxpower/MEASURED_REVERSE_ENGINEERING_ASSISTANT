@@ -66,6 +66,7 @@ def build_physical_field_status(
     expected_manufacturing_id = timeline[0].manufacturing_id
     previous_sequence: int | None = None
     previous_time: datetime | None = None
+    validated_event_types: list[PhysicalLifecycleEventType] = []
 
     for event in timeline:
         if event.instance_id != expected_instance_id:
@@ -88,22 +89,30 @@ def build_physical_field_status(
             raise LifecycleKnowledgeIntegrityError(
                 "physical field-status timeline moves backward in time"
             )
+
+        try:
+            event_type = PhysicalLifecycleEventType(event.event_type)
+        except ValueError as exc:
+            raise LifecycleKnowledgeIntegrityError(
+                f"unsupported physical lifecycle event type: {event.event_type}"
+            ) from exc
+        if event_type not in _STATE_BY_EVENT:
+            raise LifecycleKnowledgeIntegrityError(
+                f"unsupported physical lifecycle event type: {event.event_type}"
+            )
+        validated_event_types.append(event_type)
+
         previous_sequence = event.sequence
         previous_time = event.occurred_at
 
     latest = timeline[-1]
-    try:
-        event_type = PhysicalLifecycleEventType(latest.event_type)
-    except ValueError as exc:
-        raise LifecycleKnowledgeIntegrityError(
-            f"unsupported physical lifecycle event type: {latest.event_type}"
-        ) from exc
+    latest_event_type = validated_event_types[-1]
 
     return PhysicalFieldStatus(
         instance_id=latest.instance_id,
         revision_id=latest.revision_id,
         manufacturing_id=latest.manufacturing_id,
-        state=_STATE_BY_EVENT[event_type],
+        state=_STATE_BY_EVENT[latest_event_type],
         state_changed_at=latest.occurred_at,
         source_event_id=latest.event_id,
         source_event_sequence=latest.sequence,
