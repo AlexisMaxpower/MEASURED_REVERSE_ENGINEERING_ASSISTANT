@@ -427,6 +427,14 @@ def _validate_success_response_against_request(
             f"metadata: {sorted(malformed_fields)!r}"
         )
 
+    expected_artifact_id = f"SWPART-{request.get('sketch_package_id')}"
+    if native_part["artifact_id"] != expected_artifact_id:
+        raise CadAdapterError(
+            "SOLIDWORKS CAD Agent successful response native artifact identity does not "
+            "match request: "
+            f"expected {expected_artifact_id!r}, got {native_part['artifact_id']!r}"
+        )
+
 
 class SolidWorksAgentAdapter:
     """Production vendor adapter boundary for the out-of-process SOLIDWORKS 2026 agent."""
