@@ -89,7 +89,14 @@ class ConstraintFreedomAnalyzer(_TopologyConstraintFreedomAnalyzer):
                 layout,
             ):
                 return None
-            return (self._line_round_tangent_equation(first_id, second_id, layout),)
+            return (
+                self._line_arc_endpoint_tangent_equation(
+                    first_id,
+                    second_id,
+                    witness,
+                    layout,
+                ),
+            )
 
         if isinstance(second, Line) and isinstance(first, Arc):
             reversed_witness = (witness[1], witness[0])
@@ -100,7 +107,14 @@ class ConstraintFreedomAnalyzer(_TopologyConstraintFreedomAnalyzer):
                 layout,
             ):
                 return None
-            return (self._line_round_tangent_equation(second_id, first_id, layout),)
+            return (
+                self._line_arc_endpoint_tangent_equation(
+                    second_id,
+                    first_id,
+                    reversed_witness,
+                    layout,
+                ),
+            )
 
         if isinstance(first, Arc) and isinstance(second, Arc):
             if not self._arc_arc_endpoint_tangent_witness(
@@ -110,7 +124,14 @@ class ConstraintFreedomAnalyzer(_TopologyConstraintFreedomAnalyzer):
                 layout,
             ):
                 return None
-            return (self._round_round_tangent_equation(first_id, second_id, layout),)
+            return (
+                self._arc_arc_endpoint_tangent_equation(
+                    first_id,
+                    second_id,
+                    witness,
+                    layout,
+                ),
+            )
 
         # Arc-Circle boundary tangency remains unsupported because Circle exposes no
         # endpoint ordinal that a separate COINCIDENT relation could prove.
@@ -176,6 +197,50 @@ class ConstraintFreedomAnalyzer(_TopologyConstraintFreedomAnalyzer):
             contact,
             second_endpoint,
         )
+
+    def _line_arc_endpoint_tangent_equation(
+        self,
+        line_id: str,
+        arc_id: str,
+        witness: tuple[int, int],
+        layout: _ParameterLayout,
+    ) -> _Equation:
+        line_ordinal, arc_ordinal = witness
+
+        def equation(vector: tuple[float, ...]) -> float:
+            line_contact = layout.endpoint(vector, line_id, line_ordinal)
+            line_outer = layout.endpoint(vector, line_id, 1 - line_ordinal)
+            arc_contact = layout.endpoint(vector, arc_id, arc_ordinal)
+            cx, cy, _, _, _ = layout.arc(vector, arc_id)
+            line_dx = line_outer[0] - line_contact[0]
+            line_dy = line_outer[1] - line_contact[1]
+            radius_dx = arc_contact[0] - cx
+            radius_dy = arc_contact[1] - cy
+            return line_dx * radius_dx + line_dy * radius_dy
+
+        return equation
+
+    def _arc_arc_endpoint_tangent_equation(
+        self,
+        first_id: str,
+        second_id: str,
+        witness: tuple[int, int],
+        layout: _ParameterLayout,
+    ) -> _Equation:
+        first_ordinal, second_ordinal = witness
+
+        def equation(vector: tuple[float, ...]) -> float:
+            first_contact = layout.endpoint(vector, first_id, first_ordinal)
+            second_contact = layout.endpoint(vector, second_id, second_ordinal)
+            first_cx, first_cy, _, _, _ = layout.arc(vector, first_id)
+            second_cx, second_cy, _, _, _ = layout.arc(vector, second_id)
+            first_rx = first_contact[0] - first_cx
+            first_ry = first_contact[1] - first_cy
+            second_rx = second_contact[0] - second_cx
+            second_ry = second_contact[1] - second_cy
+            return first_rx * second_ry - first_ry * second_rx
+
+        return equation
 
     def _line_round_tangent_contact_including_endpoints(
         self,
