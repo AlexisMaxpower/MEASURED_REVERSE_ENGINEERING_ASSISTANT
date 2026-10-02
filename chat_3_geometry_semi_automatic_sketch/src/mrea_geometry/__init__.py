@@ -6,7 +6,7 @@ from .constraint_freedom import (
     ConstraintFreedomIssue,
     ConstraintFreedomStatus,
 )
-from .constraint_freedom_policy import ConstraintFreedomAnalyzer
+from .constraint_freedom_coupled_policy import ConstraintFreedomAnalyzer
 from .constraint_satisfaction import ConstraintSatisfaction, ConstraintSatisfactionAnalyzer
 from .constraint_system import (
     ConstraintSystemAnalyzer,
